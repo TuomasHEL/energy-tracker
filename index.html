@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="description" content="Energy Work Session Manager & Development Tracker">
+    
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <title>Energy Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- App Container -->
+    <div id="app">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <h1>Energy Tracker</h1>
+            </div>
+            <div class="header-right">
+                <div class="user-selector">
+                    <select id="currentUser">
+                        <option value="">Loading...</option>
+                    </select>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main id="mainContent">
+            <!-- Dashboard View (Default) -->
+            <section id="viewDashboard" class="view active">
+                <div class="dashboard-stats">
+                    <div class="stat-card">
+                        <span class="stat-value" id="statTotalMarkers">-</span>
+                        <span class="stat-label">Markers</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="statTodaySessions">-</span>
+                        <span class="stat-label">Today's Sessions</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="statTotalTime">-</span>
+                        <span class="stat-label">Total Time</span>
+                    </div>
+                </div>
+
+                <div class="quick-actions">
+                    <button class="action-btn primary" onclick="showView('track')">
+                        <span class="btn-icon">◎</span>
+                        <span class="btn-text">Track Progress</span>
+                    </button>
+                    <button class="action-btn secondary" onclick="showView('timer')">
+                        <span class="btn-icon">⏱</span>
+                        <span class="btn-text">Start Timer</span>
+                    </button>
+                    <button class="action-btn secondary" onclick="showView('playlists')">
+                        <span class="btn-icon">▶</span>
+                        <span class="btn-text">Playlists</span>
+                    </button>
+                </div>
+
+                <div class="recent-activity">
+                    <h3>Recent Activity</h3>
+                    <div id="recentActivityList" class="activity-list">
+                        <p class="empty-state">No recent activity</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Track Progress View -->
+            <section id="viewTrack" class="view">
+                <div class="view-header">
+                    <h2>Track Progress</h2>
+                    <div class="blind-mode-toggle">
+                        <label class="toggle">
+                            <input type="checkbox" id="blindModeToggle" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span>Blind Mode</span>
+                    </div>
+                </div>
+
+                <!-- Category Filter -->
+                <div class="category-filter">
+                    <select id="categoryFilter">
+                        <option value="">All Categories</option>
+                    </select>
+                </div>
+
+                <!-- Markers List -->
+                <div id="markersList" class="markers-list">
+                    <p class="loading">Loading markers...</p>
+                </div>
+
+                <!-- Assessment Modal -->
+                <div id="assessmentModal" class="modal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3 id="assessmentMarkerName">Marker Name</h3>
+                            <button class="close-btn" onclick="closeAssessmentModal()">×</button>
+                        </div>
+                        <div class="modal-body">
+                            <p id="assessmentDescription" class="marker-description"></p>
+                            
+                            <div class="assessment-input">
+                                <label>What do you sense now?</label>
+                                <div class="slider-container">
+                                    <input type="range" id="sensedValue" min="0" max="100" value="50">
+                                    <div class="slider-value"><span id="sensedValueDisplay">50</span>%</div>
+                                </div>
+                            </div>
+
+                            <div class="assessment-notes">
+                                <label>Notes (optional)</label>
+                                <textarea id="assessmentNotes" placeholder="Any observations..."></textarea>
+                            </div>
+
+                            <!-- Previous value reveal (shown after save in blind mode) -->
+                            <div id="previousValueReveal" class="previous-reveal hidden">
+                                <div class="reveal-content">
+                                    <span class="reveal-label">Previous value was:</span>
+                                    <span id="revealedPreviousValue" class="reveal-value">-</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button id="saveAssessmentBtn" class="btn primary" onclick="saveAssessment()">Save Assessment</button>
+                            <button id="doneAssessmentBtn" class="btn secondary hidden" onclick="closeAssessmentModal()">Done</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Timer View -->
+            <section id="viewTimer" class="view">
+                <div class="view-header">
+                    <h2>Energy Work Timer</h2>
+                </div>
+
+                <!-- Timer Setup (shown when no timer running) -->
+                <div id="timerSetup" class="timer-setup">
+                    <div class="form-group">
+                        <label>What are you working on?</label>
+                        <select id="timerMarkerSelect">
+                            <option value="">Select marker...</option>
+                            <option value="custom">Custom / General</option>
+                        </select>
+                    </div>
+
+                    <div id="customWorkInput" class="form-group hidden">
+                        <label>Custom work description</label>
+                        <input type="text" id="customWorkName" placeholder="e.g., General clearing">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Duration</label>
+                        <div class="duration-presets">
+                            <button class="preset-btn" onclick="setDuration(15)">15m</button>
+                            <button class="preset-btn" onclick="setDuration(30)">30m</button>
+                            <button class="preset-btn" onclick="setDuration(60)">1h</button>
+                            <button class="preset-btn" onclick="setDuration(90)">1.5h</button>
+                            <button class="preset-btn" onclick="setDuration(120)">2h</button>
+                        </div>
+                        <div class="custom-duration">
+                            <input type="number" id="customDuration" min="1" max="1440" placeholder="Custom minutes">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Energy Type</label>
+                        <select id="energyType">
+                            <option value="">Select type...</option>
+                            <option value="VortexHealing">VortexHealing</option>
+                            <option value="VortexHealing Highest">VortexHealing Highest Level</option>
+                            <option value="Reiki">Reiki</option>
+                            <option value="Meditation">Meditation</option>
+                            <option value="Breathwork">Breathwork</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Intensity</label>
+                        <div class="intensity-select">
+                            <button class="intensity-btn" data-intensity="low">Low</button>
+                            <button class="intensity-btn active" data-intensity="medium">Medium</button>
+                            <button class="intensity-btn" data-intensity="high">High</button>
+                            <button class="intensity-btn" data-intensity="highest">Highest</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Session Notes</label>
+                        <textarea id="timerNotes" placeholder="Intentions, focus areas..."></textarea>
+                    </div>
+
+                    <button class="btn primary large" onclick="startTimer()">
+                        <span class="btn-icon">▶</span>
+                        Start Session
+                    </button>
+                </div>
+
+                <!-- Active Timer (shown when timer running) -->
+                <div id="timerActive" class="timer-active hidden">
+                    <div class="timer-display">
+                        <div class="timer-target" id="timerTargetName">Target Name</div>
+                        <div class="timer-countdown" id="timerCountdown">00:00:00</div>
+                        <div class="timer-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="timerProgressBar"></div>
+                            </div>
+                            <span id="timerPercentage">0%</span>
+                        </div>
+                    </div>
+
+                    <div class="timer-info">
+                        <div class="info-row">
+                            <span class="info-label">Energy:</span>
+                            <span id="timerEnergyType">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Intensity:</span>
+                            <span id="timerIntensity">-</span>
+                        </div>
+                    </div>
+
+                    <div class="timer-notes-display" id="timerNotesDisplay"></div>
+
+                    <div class="timer-controls">
+                        <button class="btn secondary" onclick="pauseTimer()" id="pauseBtn">
+                            <span class="btn-icon">⏸</span> Pause
+                        </button>
+                        <button class="btn danger" onclick="endTimer()">
+                            <span class="btn-icon">⏹</span> End Session
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Playlists View -->
+            <section id="viewPlaylists" class="view">
+                <div class="view-header">
+                    <h2>Playlists</h2>
+                    <button class="btn small" onclick="showCreatePlaylist()">+ New</button>
+                </div>
+
+                <div id="playlistsList" class="playlists-list">
+                    <p class="empty-state">No playlists yet</p>
+                </div>
+
+                <!-- Create/Edit Playlist Modal -->
+                <div id="playlistModal" class="modal">
+                    <div class="modal-content large">
+                        <div class="modal-header">
+                            <h3 id="playlistModalTitle">Create Playlist</h3>
+                            <button class="close-btn" onclick="closePlaylistModal()">×</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label>Playlist Name</label>
+                                <input type="text" id="playlistName" placeholder="e.g., Morning Routine">
+                            </div>
+
+                            <div class="playlist-items">
+                                <h4>Items <button class="btn tiny" onclick="addPlaylistItem()">+ Add</button></h4>
+                                <div id="playlistItemsList"></div>
+                            </div>
+
+                            <div class="playlist-total">
+                                Total Duration: <span id="playlistTotalDuration">0 min</span>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn secondary" onclick="closePlaylistModal()">Cancel</button>
+                            <button class="btn primary" onclick="savePlaylist()">Save Playlist</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Running Playlist -->
+                <div id="playlistRunner" class="playlist-runner hidden">
+                    <div class="runner-header">
+                        <h3 id="runningPlaylistName">Playlist Name</h3>
+                        <div class="runner-progress">
+                            <span id="runnerCurrentItem">1</span> / <span id="runnerTotalItems">5</span>
+                        </div>
+                    </div>
+                    <div class="runner-current">
+                        <div class="current-item-name" id="runnerItemName">Current Item</div>
+                        <div class="current-item-timer" id="runnerItemTimer">00:00:00</div>
+                    </div>
+                    <div class="runner-queue" id="runnerQueue"></div>
+                    <div class="runner-controls">
+                        <button class="btn secondary" onclick="skipPlaylistItem()">Skip →</button>
+                        <button class="btn danger" onclick="stopPlaylist()">Stop Playlist</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- History View -->
+            <section id="viewHistory" class="view">
+                <div class="view-header">
+                    <h2>History</h2>
+                    <div class="history-tabs">
+                        <button class="tab-btn active" onclick="showHistoryTab('sessions')">Sessions</button>
+                        <button class="tab-btn" onclick="showHistoryTab('progress')">Progress</button>
+                    </div>
+                </div>
+
+                <div id="historySessionsTab" class="history-tab active">
+                    <div id="sessionsHistoryList" class="history-list">
+                        <p class="loading">Loading sessions...</p>
+                    </div>
+                </div>
+
+                <div id="historyProgressTab" class="history-tab">
+                    <div class="filter-group">
+                        <select id="progressMarkerFilter">
+                            <option value="">All Markers</option>
+                        </select>
+                    </div>
+                    <div id="progressHistoryList" class="history-list">
+                        <p class="loading">Loading progress...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings View -->
+            <section id="viewSettings" class="view">
+                <div class="view-header">
+                    <h2>Settings</h2>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Users</h3>
+                    <div id="usersList" class="users-list"></div>
+                    <button class="btn secondary" onclick="showAddUserModal()">+ Add User</button>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Markers</h3>
+                    <button class="btn secondary" onclick="showAddMarkerModal()">+ Add Custom Marker</button>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Data</h3>
+                    <button class="btn secondary" onclick="exportData()">Export Data</button>
+                    <button class="btn secondary" onclick="syncData()">Sync Now</button>
+                </div>
+
+                <div class="settings-section">
+                    <h3>About</h3>
+                    <p class="version">Energy Tracker v1.0</p>
+                    <p class="copyright">Professional Energy Work Management</p>
+                </div>
+            </section>
+        </main>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <button class="nav-btn active" onclick="showView('dashboard')" data-view="dashboard">
+                <span class="nav-icon">⌂</span>
+                <span class="nav-label">Home</span>
+            </button>
+            <button class="nav-btn" onclick="showView('track')" data-view="track">
+                <span class="nav-icon">◎</span>
+                <span class="nav-label">Track</span>
+            </button>
+            <button class="nav-btn" onclick="showView('timer')" data-view="timer">
+                <span class="nav-icon">⏱</span>
+                <span class="nav-label">Timer</span>
+            </button>
+            <button class="nav-btn" onclick="showView('history')" data-view="history">
+                <span class="nav-icon">☰</span>
+                <span class="nav-label">History</span>
+            </button>
+            <button class="nav-btn" onclick="showView('settings')" data-view="settings">
+                <span class="nav-icon">⚙</span>
+                <span class="nav-label">Settings</span>
+            </button>
+        </nav>
+
+        <!-- Add User Modal -->
+        <div id="addUserModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Add User</h3>
+                    <button class="close-btn" onclick="closeAddUserModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" id="newUserName" placeholder="Enter name">
+                    </div>
+                    <div class="form-group">
+                        <label>Notes (optional)</label>
+                        <textarea id="newUserNotes" placeholder="Any notes about this user"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn secondary" onclick="closeAddUserModal()">Cancel</button>
+                    <button class="btn primary" onclick="addUser()">Add User</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Marker Modal -->
+        <div id="addMarkerModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Add Custom Marker</h3>
+                    <button class="close-btn" onclick="closeAddMarkerModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="newMarkerCategory">
+                            <option value="Custom">Custom</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" id="newMarkerName" placeholder="Enter marker name">
+                    </div>
+                    <div class="form-group">
+                        <label>Description (optional)</label>
+                        <textarea id="newMarkerDescription" placeholder="What does this marker track?"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn secondary" onclick="closeAddMarkerModal()">Cancel</button>
+                    <button class="btn primary" onclick="addMarker()">Add Marker</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notifications -->
+        <div id="toast" class="toast"></div>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay hidden">
+            <div class="spinner"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
