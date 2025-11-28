@@ -1,5 +1,5 @@
 // Energy Tracker PWA - Main Application
-// Version 1.0 - MVP
+// Version 2.0 - Enhanced Timer
 
 // ============================================
 // CONFIGURATION
@@ -25,9 +25,12 @@ const state = {
         isRunning: false,
         isPaused: false,
         startTime: null,
+        endTime: null,
         duration: 0,
         remaining: 0,
         marker: null,
+        customWork: '',
+        targetName: '',
         energyType: '',
         intensity: 'medium',
         notes: '',
@@ -45,8 +48,13 @@ const state = {
         isRunning: false,
         playlist: null,
         currentIndex: 0,
-        itemTimer: null
-    }
+        itemTimer: null,
+        itemEndTime: null
+    },
+    
+    // Audio context for sounds
+    audioContext: null,
+    notificationPermission: 'default'
 };
 
 // ============================================
@@ -59,6 +67,12 @@ async function init() {
     showLoading();
     
     try {
+        // Initialize audio context
+        initAudio();
+        
+        // Request notification permission
+        await requestNotificationPermission();
+        
         // Load users first
         await loadUsers();
         
@@ -81,8 +95,17 @@ async function init() {
             await loadUserData();
         }
         
+        // Restore timer if it was running
+        restoreTimerState();
+        
+        // Restore playlist runner if it was running
+        restorePlaylistState();
+        
         // Setup event listeners
         setupEventListeners();
+        
+        // Setup visibility change handler for background
+        setupVisibilityHandler();
         
         // Update dashboard
         updateDashboard();
@@ -93,6 +116,295 @@ async function init() {
     }
     
     hideLoading();
+}
+
+// ============================================
+// AUDIO & NOTIFICATIONS
+// ============================================
+
+function initAudio() {
+    // Create audio context on user interaction (required by browsers)
+    document.addEventListener('click', () => {
+        if (!state.audioContext) {
+            state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    }, { once: true });
+}
+
+async function requestNotificationPermission() {
+    if ('Notification' in window) {
+        if (Notification.permission === 'default') {
+            // We'll request on first timer start instead of immediately
+            state.notificationPermission = 'default';
+        } else {
+            state.notificationPermission = Notification.permission;
+        }
+    }
+}
+
+async function ensureNotificationPermission() {
+    if ('Notification' in window && Notification.permission === 'default') {
+        const permission = await Notification.requestPermission();
+        state.notificationPermission = permission;
+        return permission === 'granted';
+    }
+    return Notification.permission === 'granted';
+}
+
+function playCompletionSound() {
+    // Initialize audio context if needed
+    if (!state.audioContext) {
+        state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    const ctx = state.audioContext;
+    
+    // Resume context if suspended (browser policy)
+    if (ctx.state === 'suspended') {
+        ctx.resume();
+    }
+    
+    // Create a pleasant completion sound (chime-like)
+    const now = ctx.currentTime;
+    
+    // Play a sequence of tones
+    const frequencies = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+    
+    frequencies.forEach((freq, i) => {
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        
+        oscillator.frequency.value = freq;
+        oscillator.type = 'sine';
+        
+        const startTime = now + (i * 0.15);
+        const endTime = startTime + 0.4;
+        
+        gainNode.gain.setValueAtTime(0, startTime);
+        gainNode.gain.linearRampToValueAtTime(0.3, startTime + 0.05);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, endTime);
+        
+        oscillator.start(startTime);
+        oscillator.stop(endTime);
+    });
+}
+
+function vibrate(pattern = [200, 100, 200, 100, 300]) {
+    if ('vibrate' in navigator) {
+        navigator.vibrate(pattern);
+    }
+}
+
+function showNotification(title, body, tag = 'timer') {
+    if ('Notification' in window && Notification.permission === 'granted') {
+        const notification = new Notification(title, {
+            body: body,
+            icon: 'icons/icon-192.png',
+            badge: 'icons/icon-96.png',
+            tag: tag,
+            requireInteraction: true,
+            vibrate: [200, 100, 200]
+        });
+        
+        notification.onclick = () => {
+            window.focus();
+            notification.close();
+        };
+        
+        // Auto-close after 30 seconds
+        setTimeout(() => notification.close(), 30000);
+    }
+}
+
+// ============================================
+// TIMER PERSISTENCE
+// ============================================
+
+function saveTimerState() {
+    if (state.timer.isRunning) {
+        const timerData = {
+            isRunning: state.timer.isRunning,
+            isPaused: state.timer.isPaused,
+            startTime: state.timer.startTime?.toISOString(),
+            endTime: state.timer.endTime?.toISOString(),
+            duration: state.timer.duration,
+            marker: state.timer.marker,
+            customWork: state.timer.customWork,
+            targetName: state.timer.targetName,
+            energyType: state.timer.energyType,
+            intensity: state.timer.intensity,
+            notes: state.timer.notes,
+            pausedAt: state.timer.isPaused ? new Date().toISOString() : null,
+            remainingWhenPaused: state.timer.isPaused ? state.timer.remaining : null
+        };
+        localStorage.setItem('timerState', JSON.stringify(timerData));
+    } else {
+        localStorage.removeItem('timerState');
+    }
+}
+
+function restoreTimerState() {
+    const saved = localStorage.getItem('timerState');
+    if (!saved) return;
+    
+    try {
+        const timerData = JSON.parse(saved);
+        
+        if (!timerData.isRunning) {
+            localStorage.removeItem('timerState');
+            return;
+        }
+        
+        const now = new Date();
+        const endTime = new Date(timerData.endTime);
+        
+        // Check if timer should have already ended
+        if (!timerData.isPaused && now >= endTime) {
+            // Timer completed while away - notify and save session
+            localStorage.removeItem('timerState');
+            
+            // Calculate actual duration
+            const startTime = new Date(timerData.startTime);
+            const durationMinutes = Math.round(timerData.duration / 60);
+            
+            // Save the completed session
+            if (state.currentUser) {
+                apiCall('saveSession', {
+                    userId: state.currentUser.user_id,
+                    markerId: timerData.marker || '',
+                    startTime: timerData.startTime,
+                    endTime: timerData.endTime,
+                    durationMinutes: durationMinutes,
+                    energyType: timerData.energyType,
+                    intensity: timerData.intensity,
+                    notes: timerData.notes
+                }).then(() => {
+                    showToast(`Session completed: ${timerData.targetName} (${durationMinutes} min)`, 'success');
+                });
+            }
+            
+            playCompletionSound();
+            vibrate();
+            return;
+        }
+        
+        // Timer still running - restore it
+        state.timer.isRunning = true;
+        state.timer.isPaused = timerData.isPaused;
+        state.timer.startTime = new Date(timerData.startTime);
+        state.timer.endTime = endTime;
+        state.timer.duration = timerData.duration;
+        state.timer.marker = timerData.marker;
+        state.timer.customWork = timerData.customWork;
+        state.timer.targetName = timerData.targetName;
+        state.timer.energyType = timerData.energyType;
+        state.timer.intensity = timerData.intensity;
+        state.timer.notes = timerData.notes;
+        
+        if (timerData.isPaused) {
+            state.timer.remaining = timerData.remainingWhenPaused;
+        } else {
+            state.timer.remaining = Math.max(0, Math.round((endTime - now) / 1000));
+        }
+        
+        // Update UI
+        document.getElementById('timerSetup').classList.add('hidden');
+        document.getElementById('timerActive').classList.remove('hidden');
+        
+        document.getElementById('timerTargetName').textContent = state.timer.targetName;
+        document.getElementById('timerEnergyType').textContent = state.timer.energyType || '—';
+        document.getElementById('timerIntensity').textContent = capitalize(state.timer.intensity);
+        document.getElementById('timerNotesDisplay').textContent = state.timer.notes;
+        
+        // Update pause button state
+        const pauseBtn = document.getElementById('pauseBtn');
+        if (state.timer.isPaused) {
+            pauseBtn.innerHTML = '<span class="btn-icon">▶</span> Resume';
+        }
+        
+        // Start the interval
+        updateTimerDisplay();
+        state.timer.interval = setInterval(timerTick, 1000);
+        
+        showToast('Timer restored', 'success');
+        
+    } catch (error) {
+        console.error('Error restoring timer:', error);
+        localStorage.removeItem('timerState');
+    }
+}
+
+function savePlaylistState() {
+    if (state.playlistRunner.isRunning) {
+        const data = {
+            isRunning: true,
+            playlistId: state.playlistRunner.playlist?.playlist_id,
+            items: state.playlistRunner.items,
+            currentIndex: state.playlistRunner.currentIndex,
+            itemEndTime: state.playlistRunner.itemEndTime?.toISOString()
+        };
+        localStorage.setItem('playlistState', JSON.stringify(data));
+    } else {
+        localStorage.removeItem('playlistState');
+    }
+}
+
+function restorePlaylistState() {
+    const saved = localStorage.getItem('playlistState');
+    if (!saved) return;
+    
+    try {
+        const data = JSON.parse(saved);
+        if (!data.isRunning) {
+            localStorage.removeItem('playlistState');
+            return;
+        }
+        
+        // For now, just clear it - playlist restoration is more complex
+        // Could be enhanced later
+        localStorage.removeItem('playlistState');
+        
+    } catch (error) {
+        localStorage.removeItem('playlistState');
+    }
+}
+
+// ============================================
+// VISIBILITY HANDLER (Background Support)
+// ============================================
+
+function setupVisibilityHandler() {
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            // App going to background
+            saveTimerState();
+            savePlaylistState();
+        } else {
+            // App coming to foreground
+            if (state.timer.isRunning && !state.timer.isPaused) {
+                // Recalculate remaining time
+                const now = new Date();
+                const remaining = Math.max(0, Math.round((state.timer.endTime - now) / 1000));
+                
+                if (remaining <= 0) {
+                    // Timer completed while in background
+                    endTimer(true);
+                } else {
+                    state.timer.remaining = remaining;
+                    updateTimerDisplay();
+                }
+            }
+        }
+    });
+    
+    // Also save on page unload
+    window.addEventListener('beforeunload', () => {
+        saveTimerState();
+        savePlaylistState();
+    });
 }
 
 // ============================================
@@ -492,7 +804,7 @@ function setDuration(minutes) {
     document.getElementById('customDuration').value = minutes;
 }
 
-function startTimer() {
+async function startTimer() {
     const markerSelect = document.getElementById('timerMarkerSelect');
     const markerId = markerSelect.value;
     const customWork = document.getElementById('customWorkName').value;
@@ -511,6 +823,14 @@ function startTimer() {
         return;
     }
     
+    // Request notification permission on first timer start
+    await ensureNotificationPermission();
+    
+    // Initialize audio context (needs user interaction)
+    if (!state.audioContext) {
+        state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
     // Get marker name
     let targetName = customWork || 'General';
     if (markerId && markerId !== 'custom') {
@@ -518,13 +838,18 @@ function startTimer() {
         targetName = marker?.name || markerId;
     }
     
+    const now = new Date();
+    const durationSeconds = duration * 60;
+    const endTime = new Date(now.getTime() + durationSeconds * 1000);
+    
     // Set timer state
     state.timer = {
         isRunning: true,
         isPaused: false,
-        startTime: new Date(),
-        duration: duration * 60, // Convert to seconds
-        remaining: duration * 60,
+        startTime: now,
+        endTime: endTime,
+        duration: durationSeconds,
+        remaining: durationSeconds,
         marker: markerId !== 'custom' ? markerId : null,
         customWork: customWork,
         targetName: targetName,
@@ -533,6 +858,9 @@ function startTimer() {
         notes: notes,
         interval: null
     };
+    
+    // Save state immediately
+    saveTimerState();
     
     // Update UI
     document.getElementById('timerSetup').classList.add('hidden');
@@ -543,15 +871,23 @@ function startTimer() {
     document.getElementById('timerIntensity').textContent = capitalize(intensity);
     document.getElementById('timerNotesDisplay').textContent = notes;
     
+    // Reset pause button
+    document.getElementById('pauseBtn').innerHTML = '<span class="btn-icon">⏸</span> Pause';
+    
     // Start countdown
     updateTimerDisplay();
     state.timer.interval = setInterval(timerTick, 1000);
+    
+    showToast(`Timer started: ${duration} minutes`, 'success');
 }
 
 function timerTick() {
     if (!state.timer.isRunning || state.timer.isPaused) return;
     
-    state.timer.remaining--;
+    // Calculate remaining from end time (more accurate than decrementing)
+    const now = new Date();
+    state.timer.remaining = Math.max(0, Math.round((state.timer.endTime - now) / 1000));
+    
     updateTimerDisplay();
     
     if (state.timer.remaining <= 0) {
@@ -583,9 +919,16 @@ function pauseTimer() {
     
     if (state.timer.isPaused) {
         btn.innerHTML = '<span class="btn-icon">▶</span> Resume';
+        showToast('Timer paused', 'success');
     } else {
+        // Recalculate end time based on remaining
+        state.timer.endTime = new Date(Date.now() + state.timer.remaining * 1000);
         btn.innerHTML = '<span class="btn-icon">⏸</span> Pause';
+        showToast('Timer resumed', 'success');
     }
+    
+    // Save state
+    saveTimerState();
 }
 
 async function endTimer(completed = false) {
@@ -593,6 +936,21 @@ async function endTimer(completed = false) {
     
     const actualDuration = state.timer.duration - state.timer.remaining;
     const durationMinutes = Math.round(actualDuration / 60);
+    
+    // Play sound and vibrate
+    if (completed) {
+        playCompletionSound();
+        vibrate();
+        
+        // Show notification if in background
+        if (document.hidden) {
+            showNotification(
+                'Session Complete! 🎉',
+                `${state.timer.targetName} - ${durationMinutes} minutes`,
+                'timer-complete'
+            );
+        }
+    }
     
     if (durationMinutes > 0 && state.currentUser) {
         showLoading();
@@ -621,7 +979,10 @@ async function endTimer(completed = false) {
                 notes: state.timer.notes
             });
             
-            showToast(`Session saved: ${durationMinutes} minutes`, 'success');
+            const message = completed 
+                ? `Session complete: ${durationMinutes} minutes 🎉` 
+                : `Session saved: ${durationMinutes} minutes`;
+            showToast(message, 'success');
             updateDashboard();
             
         } catch (error) {
@@ -640,14 +1001,20 @@ function resetTimer() {
         isRunning: false,
         isPaused: false,
         startTime: null,
+        endTime: null,
         duration: 0,
         remaining: 0,
         marker: null,
+        customWork: '',
+        targetName: '',
         energyType: '',
         intensity: 'medium',
         notes: '',
         interval: null
     };
+    
+    // Clear saved state
+    localStorage.removeItem('timerState');
     
     document.getElementById('timerSetup').classList.remove('hidden');
     document.getElementById('timerActive').classList.add('hidden');
@@ -662,6 +1029,7 @@ function resetTimer() {
     document.querySelectorAll('.intensity-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.intensity === 'medium');
     });
+    document.getElementById('customWorkInput').classList.add('hidden');
 }
 
 // ============================================
@@ -670,6 +1038,15 @@ function resetTimer() {
 
 function renderPlaylists() {
     const container = document.getElementById('playlistsList');
+    
+    // Show/hide based on runner state
+    if (state.playlistRunner.isRunning) {
+        container.classList.add('hidden');
+        document.getElementById('playlistRunner').classList.remove('hidden');
+    } else {
+        container.classList.remove('hidden');
+        document.getElementById('playlistRunner').classList.add('hidden');
+    }
     
     if (state.playlists.length === 0) {
         container.innerHTML = '<p class="empty-state">No playlists yet. Create one!</p>';
@@ -888,7 +1265,7 @@ async function deletePlaylistConfirm(playlistId) {
     hideLoading();
 }
 
-function runPlaylist(playlistId) {
+async function runPlaylist(playlistId) {
     const playlist = state.playlists.find(p => p.playlist_id === playlistId);
     if (!playlist) return;
     
@@ -905,12 +1282,22 @@ function runPlaylist(playlistId) {
         return;
     }
     
+    // Request notification permission
+    await ensureNotificationPermission();
+    
+    // Initialize audio context
+    if (!state.audioContext) {
+        state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
     state.playlistRunner = {
         isRunning: true,
         playlist: playlist,
         items: items,
         currentIndex: 0,
-        itemTimer: null
+        itemTimer: null,
+        itemEndTime: null,
+        itemRemaining: 0
     };
     
     // Show runner UI
@@ -939,15 +1326,31 @@ function startPlaylistItem() {
         </div>
     `).join('');
     
-    // Start item timer
+    // Calculate end time
+    const now = new Date();
+    const durationMs = item.duration * 60 * 1000;
+    runner.itemEndTime = new Date(now.getTime() + durationMs);
     runner.itemRemaining = item.duration * 60;
+    
     updatePlaylistItemTimer();
+    
+    // Save state
+    savePlaylistState();
+    
     runner.itemTimer = setInterval(() => {
-        runner.itemRemaining--;
+        // Calculate from end time for accuracy
+        const now = new Date();
+        runner.itemRemaining = Math.max(0, Math.round((runner.itemEndTime - now) / 1000));
+        
         updatePlaylistItemTimer();
         
         if (runner.itemRemaining <= 0) {
             clearInterval(runner.itemTimer);
+            
+            // Play sound between items
+            playCompletionSound();
+            vibrate([100, 50, 100]);
+            
             nextPlaylistItem();
         }
     }, 1000);
@@ -968,19 +1371,50 @@ function skipPlaylistItem() {
     nextPlaylistItem();
 }
 
-function nextPlaylistItem() {
+async function nextPlaylistItem() {
     const runner = state.playlistRunner;
     
-    // Save current session (simplified - just log it)
+    // Log current item completion
     const currentItem = runner.items[runner.currentIndex];
     console.log('Completed:', currentItem.name);
+    
+    // Save session for this item
+    if (state.currentUser) {
+        try {
+            await apiCall('saveSession', {
+                userId: state.currentUser.user_id,
+                markerId: currentItem.marker_id !== 'custom' ? currentItem.marker_id : '',
+                startTime: new Date(runner.itemEndTime.getTime() - currentItem.duration * 60 * 1000).toISOString(),
+                endTime: new Date().toISOString(),
+                durationMinutes: currentItem.duration,
+                energyType: '',
+                intensity: 'medium',
+                notes: `Playlist: ${runner.playlist.name}`
+            });
+        } catch (error) {
+            console.error('Failed to save playlist session:', error);
+        }
+    }
     
     runner.currentIndex++;
     
     if (runner.currentIndex >= runner.items.length) {
         // Playlist complete
         stopPlaylist();
-        showToast('Playlist completed!', 'success');
+        playCompletionSound();
+        vibrate([200, 100, 200, 100, 300]);
+        
+        if (document.hidden) {
+            showNotification(
+                'Playlist Complete! 🎉',
+                `${runner.playlist.name} finished`,
+                'playlist-complete'
+            );
+        }
+        
+        showToast('Playlist completed! 🎉', 'success');
+        await loadUserData(); // Refresh sessions
+        updateDashboard();
         return;
     }
     
@@ -995,8 +1429,12 @@ function stopPlaylist() {
         playlist: null,
         items: [],
         currentIndex: 0,
-        itemTimer: null
+        itemTimer: null,
+        itemEndTime: null,
+        itemRemaining: 0
     };
+    
+    localStorage.removeItem('playlistState');
     
     document.getElementById('playlistRunner').classList.add('hidden');
     document.getElementById('playlistsList').classList.remove('hidden');
@@ -1304,6 +1742,11 @@ function setupEventListeners() {
     // Progress marker filter
     document.getElementById('progressMarkerFilter').addEventListener('change', () => {
         renderProgressHistory();
+    });
+    
+    // Custom duration input - clear presets when typed
+    document.getElementById('customDuration').addEventListener('input', () => {
+        document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
     });
 }
 
