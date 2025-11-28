@@ -96,6 +96,7 @@
                 <div class="category-filter">
                     <select id="categoryFilter">
                         <option value="">All Categories</option>
+                        <option value="Foundations">⭐ Foundations</option>
                     </select>
                 </div>
 
@@ -113,6 +114,12 @@
                         </div>
                         <div class="modal-body">
                             <p id="assessmentDescription" class="marker-description"></p>
+                            
+                            <!-- Previous value shown when blind mode OFF -->
+                            <div id="currentValueDisplay" class="current-value-display hidden">
+                                <span class="current-value-label">Current value:</span>
+                                <span id="currentValueAmount" class="current-value-amount">-</span>
+                            </div>
                             
                             <div class="assessment-input">
                                 <label>What do you sense now?</label>
@@ -155,7 +162,7 @@
                         <label>What are you working on?</label>
                         <select id="timerMarkerSelect">
                             <option value="">Select marker...</option>
-                            <option value="custom">Custom / General</option>
+                            <option value="custom">✦ Custom / General</option>
                         </select>
                     </div>
 
@@ -179,15 +186,9 @@
                     </div>
 
                     <div class="form-group">
-                        <label>Energy Type</label>
+                        <label>Energy Type / Transmission</label>
                         <select id="energyType">
                             <option value="">Select type...</option>
-                            <option value="VortexHealing">VortexHealing</option>
-                            <option value="VortexHealing Highest">VortexHealing Highest Level</option>
-                            <option value="Reiki">Reiki</option>
-                            <option value="Meditation">Meditation</option>
-                            <option value="Breathwork">Breathwork</option>
-                            <option value="Other">Other</option>
                         </select>
                     </div>
 
@@ -275,7 +276,7 @@
 
                             <div class="playlist-items">
                                 <h4>Items <button class="btn tiny" onclick="addPlaylistItem()">+ Add</button></h4>
-                                <div id="playlistItemsList"></div>
+                                <div id="playlistItemsList" class="playlist-items-sortable"></div>
                             </div>
 
                             <div class="playlist-total">
@@ -300,11 +301,15 @@
                     <div class="runner-current">
                         <div class="current-item-name" id="runnerItemName">Current Item</div>
                         <div class="current-item-timer" id="runnerItemTimer">00:00:00</div>
+                        <div class="current-item-info" id="runnerItemInfo"></div>
                     </div>
                     <div class="runner-queue" id="runnerQueue"></div>
                     <div class="runner-controls">
+                        <button class="btn secondary" onclick="pausePlaylist()" id="playlistPauseBtn">
+                            <span class="btn-icon">⏸</span> Pause
+                        </button>
                         <button class="btn secondary" onclick="skipPlaylistItem()">Skip →</button>
-                        <button class="btn danger" onclick="stopPlaylist()">Stop Playlist</button>
+                        <button class="btn danger" onclick="stopPlaylist()">Stop</button>
                     </div>
                 </div>
             </section>
@@ -435,6 +440,16 @@
                 </div>
 
                 <div class="settings-section">
+                    <h3>Energy Transmissions</h3>
+                    <p class="settings-hint" style="margin-bottom: var(--space-md);">Custom energy types for timer & playlists</p>
+                    <div id="transmissionsList" class="transmissions-list"></div>
+                    <div class="add-transmission-row">
+                        <input type="text" id="newTransmissionName" placeholder="New transmission name...">
+                        <button class="btn small" onclick="addTransmission()">Add</button>
+                    </div>
+                </div>
+
+                <div class="settings-section">
                     <h3>Users</h3>
                     <div id="usersList" class="users-list"></div>
                     <button class="btn secondary" onclick="showAddUserModal()">+ Add User</button>
@@ -453,7 +468,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Energy Tracker v2.0</p>
+                    <p class="version">Energy Tracker v2.1</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>
@@ -542,7 +557,10 @@
 
         <!-- Loading Overlay -->
         <div id="loadingOverlay" class="loading-overlay hidden">
-            <div class="spinner"></div>
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <div class="loading-text">Connecting to the source...</div>
+            </div>
         </div>
     </div>
 
