@@ -1,11 +1,12 @@
 // Energy Tracker - Service Worker
-const CACHE_NAME = 'energy-tracker-v1';
+const CACHE_NAME = 'energy-tracker-v2';
+const BASE_PATH = '/energy-tracker/';
 const urlsToCache = [
-    '/',
-    '/index.html',
-    '/styles.css',
-    '/app.js',
-    '/manifest.json'
+    BASE_PATH,
+    BASE_PATH + 'index.html',
+    BASE_PATH + 'styles.css',
+    BASE_PATH + 'app.js',
+    BASE_PATH + 'manifest.json'
 ];
 
 // Install event
