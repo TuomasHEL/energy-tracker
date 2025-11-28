@@ -922,12 +922,19 @@ main {
 
 .playlist-item-row {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-sm);
     align-items: center;
 }
 
+.playlist-item-row.main-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: var(--space-sm);
+}
+
 .playlist-item-row select {
-    flex: 2;
+    min-width: 0;
     padding: var(--space-sm);
     background: var(--bg-card);
     color: var(--text-primary);
@@ -936,8 +943,12 @@ main {
     font-size: 0.875rem;
 }
 
+.playlist-item-marker {
+    width: 100%;
+}
+
 .playlist-item-row input[type="number"] {
-    width: 60px;
+    width: 55px;
     padding: var(--space-sm);
     background: var(--bg-card);
     color: var(--text-primary);
@@ -965,19 +976,33 @@ main {
     font-size: 0.875rem;
 }
 
+.playlist-item-options {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-sm);
+    align-items: center;
+}
+
+.playlist-item-transmission {
+    min-width: 0;
+    flex: 1;
+}
+
 .playlist-item-intensity {
     display: flex;
     gap: 2px;
+    flex-shrink: 0;
 }
 
 .playlist-item-intensity button {
-    padding: 4px 8px;
+    padding: 4px 6px;
     background: var(--bg-card);
     color: var(--text-muted);
     border: none;
     border-radius: 4px;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     cursor: pointer;
+    min-width: 28px;
 }
 
 .playlist-item-intensity button.active {
@@ -988,11 +1013,12 @@ main {
 .playlist-item-controls {
     display: flex;
     gap: var(--space-xs);
+    flex-shrink: 0;
 }
 
 .move-btn, .remove-item {
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1001,7 +1027,7 @@ main {
     border: none;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    font-size: 0.875rem;
+    font-size: 0.75rem;
 }
 
 .move-btn:hover, .remove-item:hover {
