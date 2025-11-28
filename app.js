@@ -1,11 +1,32 @@
 // Energy Tracker PWA - Main Application
-// Version 2.1 - Settings & Statistics
+// Version 2.1 - Enhanced Features
 
 // ============================================
 // CONFIGURATION
 // ============================================
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbxb1VSLiVVu72_HsRAB_CaZn0TQjayYaWB2YKNTaTu5g6JhGKHzNRy-jf3riMMnVS80/exec';
+
+// Foundations markers (for special filter)
+const FOUNDATIONS_MARKERS = [
+    'LOC',
+    'Chakra System Overall',
+    'Meridian System Overall', 
+    'Nadi System Overall',
+    '13 Bhumis'
+];
+
+// Default transmissions
+const DEFAULT_TRANSMISSIONS = [
+    'VortexHealing',
+    'VortexHealing Highest',
+    'Reiki',
+    'Meditation',
+    'Breathwork',
+    'RASA',
+    'Kundalini',
+    'Pranic Healing'
+];
 
 // ============================================
 // STATE MANAGEMENT
@@ -20,10 +41,12 @@ const state = {
     progress: [],
     playlists: [],
     
-    // Settings (defaults)
+    // Settings
     settings: {
         soundEnabled: false,
-        vibrationEnabled: false
+        vibrationEnabled: false,
+        transmissions: [...DEFAULT_TRANSMISSIONS],
+        collapsedCategories: {}
     },
     
     // Timer state
@@ -52,10 +75,14 @@ const state = {
     // Playlist runner state
     playlistRunner: {
         isRunning: false,
+        isPaused: false,
         playlist: null,
+        items: [],
         currentIndex: 0,
         itemTimer: null,
-        itemEndTime: null
+        itemEndTime: null,
+        itemRemaining: 0,
+        pausedAt: null
     },
     
     // Audio context for sounds
@@ -122,6 +149,12 @@ async function init() {
         // Apply settings to UI
         applySettingsToUI();
         
+        // Populate transmissions dropdown
+        populateTransmissionsDropdown();
+        
+        // Render transmissions list in settings
+        renderTransmissionsList();
+        
     } catch (error) {
         console.error('Init error:', error);
         showToast('Failed to initialize app', 'error');
@@ -140,6 +173,14 @@ function loadSettings() {
         try {
             const parsed = JSON.parse(saved);
             state.settings = { ...state.settings, ...parsed };
+            // Ensure transmissions array exists
+            if (!state.settings.transmissions || !Array.isArray(state.settings.transmissions)) {
+                state.settings.transmissions = [...DEFAULT_TRANSMISSIONS];
+            }
+            // Ensure collapsedCategories exists
+            if (!state.settings.collapsedCategories) {
+                state.settings.collapsedCategories = {};
+            }
         } catch (e) {
             console.error('Error loading settings:', e);
         }
@@ -162,11 +203,75 @@ function applySettingsToUI() {
 }
 
 // ============================================
+// TRANSMISSIONS MANAGEMENT
+// ============================================
+
+function populateTransmissionsDropdown() {
+    const select = document.getElementById('energyType');
+    
+    let options = '<option value="">Select type...</option>';
+    state.settings.transmissions.forEach(t => {
+        options += `<option value="${t}">${t}</option>`;
+    });
+    options += '<option value="Other">Other</option>';
+    
+    select.innerHTML = options;
+}
+
+function renderTransmissionsList() {
+    const container = document.getElementById('transmissionsList');
+    
+    if (state.settings.transmissions.length === 0) {
+        container.innerHTML = '<p class="empty-state">No custom transmissions</p>';
+        return;
+    }
+    
+    container.innerHTML = state.settings.transmissions.map((t, i) => `
+        <div class="transmission-item">
+            <span>${t}</span>
+            ${!DEFAULT_TRANSMISSIONS.includes(t) ? 
+                `<button class="btn tiny danger" onclick="removeTransmission(${i})">×</button>` :
+                ''
+            }
+        </div>
+    `).join('');
+}
+
+function addTransmission() {
+    const input = document.getElementById('newTransmissionName');
+    const name = input.value.trim();
+    
+    if (!name) {
+        showToast('Please enter a name', 'error');
+        return;
+    }
+    
+    if (state.settings.transmissions.includes(name)) {
+        showToast('Transmission already exists', 'error');
+        return;
+    }
+    
+    state.settings.transmissions.push(name);
+    saveSettings();
+    renderTransmissionsList();
+    populateTransmissionsDropdown();
+    input.value = '';
+    showToast('Transmission added!', 'success');
+}
+
+function removeTransmission(index) {
+    state.settings.transmissions.splice(index, 1);
+    saveSettings();
+    renderTransmissionsList();
+    populateTransmissionsDropdown();
+    showToast('Transmission removed', 'success');
+}
+
+// ============================================
 // AUDIO & NOTIFICATIONS
 // ============================================
 
 function initAudio() {
-    // Create audio context on user interaction (required by browsers)
     document.addEventListener('click', () => {
         if (!state.audioContext) {
             state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -194,26 +299,20 @@ async function ensureNotificationPermission() {
 }
 
 function playCompletionSound() {
-    // Check if sound is enabled
     if (!state.settings.soundEnabled) return;
     
-    // Initialize audio context if needed
     if (!state.audioContext) {
         state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
     
     const ctx = state.audioContext;
     
-    // Resume context if suspended (browser policy)
     if (ctx.state === 'suspended') {
         ctx.resume();
     }
     
-    // Create a pleasant completion sound (chime-like)
     const now = ctx.currentTime;
-    
-    // Play a sequence of tones
-    const frequencies = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+    const frequencies = [523.25, 659.25, 783.99, 1046.50];
     
     frequencies.forEach((freq, i) => {
         const oscillator = ctx.createOscillator();
@@ -238,7 +337,6 @@ function playCompletionSound() {
 }
 
 function vibrate(pattern = [200, 100, 200, 100, 300]) {
-    // Check if vibration is enabled
     if (!state.settings.vibrationEnabled) return;
     
     if ('vibrate' in navigator) {
@@ -262,7 +360,6 @@ function showNotification(title, body, tag = 'timer') {
             notification.close();
         };
         
-        // Auto-close after 30 seconds
         setTimeout(() => notification.close(), 30000);
     }
 }
@@ -309,15 +406,11 @@ function restoreTimerState() {
         const now = new Date();
         const endTime = new Date(timerData.endTime);
         
-        // Check if timer should have already ended
         if (!timerData.isPaused && now >= endTime) {
-            // Timer completed while away - notify and save session
             localStorage.removeItem('timerState');
             
-            // Calculate actual duration
             const durationMinutes = Math.round(timerData.duration / 60);
             
-            // Save the completed session
             if (state.currentUser) {
                 apiCall('saveSession', {
                     userId: state.currentUser.user_id,
@@ -338,7 +431,6 @@ function restoreTimerState() {
             return;
         }
         
-        // Timer still running - restore it
         state.timer.isRunning = true;
         state.timer.isPaused = timerData.isPaused;
         state.timer.startTime = new Date(timerData.startTime);
@@ -357,7 +449,6 @@ function restoreTimerState() {
             state.timer.remaining = Math.max(0, Math.round((endTime - now) / 1000));
         }
         
-        // Update UI
         document.getElementById('timerSetup').classList.add('hidden');
         document.getElementById('timerActive').classList.remove('hidden');
         
@@ -366,13 +457,11 @@ function restoreTimerState() {
         document.getElementById('timerIntensity').textContent = capitalize(state.timer.intensity);
         document.getElementById('timerNotesDisplay').textContent = state.timer.notes;
         
-        // Update pause button state
         const pauseBtn = document.getElementById('pauseBtn');
         if (state.timer.isPaused) {
             pauseBtn.innerHTML = '<span class="btn-icon">▶</span> Resume';
         }
         
-        // Start the interval
         updateTimerDisplay();
         state.timer.interval = setInterval(timerTick, 1000);
         
@@ -388,10 +477,13 @@ function savePlaylistState() {
     if (state.playlistRunner.isRunning) {
         const data = {
             isRunning: true,
+            isPaused: state.playlistRunner.isPaused,
             playlistId: state.playlistRunner.playlist?.playlist_id,
             items: state.playlistRunner.items,
             currentIndex: state.playlistRunner.currentIndex,
-            itemEndTime: state.playlistRunner.itemEndTime?.toISOString()
+            itemEndTime: state.playlistRunner.itemEndTime?.toISOString(),
+            itemRemaining: state.playlistRunner.itemRemaining,
+            pausedAt: state.playlistRunner.pausedAt?.toISOString()
         };
         localStorage.setItem('playlistState', JSON.stringify(data));
     } else {
@@ -409,6 +501,7 @@ function restorePlaylistState() {
             localStorage.removeItem('playlistState');
             return;
         }
+        // For simplicity, we don't fully restore playlists across refreshes
         localStorage.removeItem('playlistState');
     } catch (error) {
         localStorage.removeItem('playlistState');
@@ -434,6 +527,22 @@ function setupVisibilityHandler() {
                 } else {
                     state.timer.remaining = remaining;
                     updateTimerDisplay();
+                }
+            }
+            
+            // Restore playlist timer if running
+            if (state.playlistRunner.isRunning && !state.playlistRunner.isPaused) {
+                const now = new Date();
+                const remaining = Math.max(0, Math.round((state.playlistRunner.itemEndTime - now) / 1000));
+                
+                if (remaining <= 0) {
+                    clearInterval(state.playlistRunner.itemTimer);
+                    playCompletionSound();
+                    vibrate([100, 50, 100]);
+                    nextPlaylistItem();
+                } else {
+                    state.playlistRunner.itemRemaining = remaining;
+                    updatePlaylistItemTimer();
                 }
             }
         }
@@ -529,8 +638,9 @@ function populateCategoryFilters() {
     const categoryFilter = document.getElementById('categoryFilter');
     const markerCategorySelect = document.getElementById('newMarkerCategory');
     
-    const options = '<option value="">All Categories</option>' + 
-        state.categories.map(c => `<option value="${c}">${c}</option>`).join('');
+    let options = '<option value="">All Categories</option>';
+    options += '<option value="Foundations">⭐ Foundations</option>';
+    options += state.categories.map(c => `<option value="${c}">${c}</option>`).join('');
     
     categoryFilter.innerHTML = options;
     
@@ -547,7 +657,7 @@ function populateTimerMarkerSelect() {
     const select = document.getElementById('timerMarkerSelect');
     
     let options = '<option value="">Select marker...</option>';
-    options += '<option value="custom">Custom / General</option>';
+    options += '<option value="custom">✦ Custom / General</option>';
     
     state.categories.forEach(category => {
         const categoryMarkers = state.markers.filter(m => m.category === category);
@@ -608,6 +718,7 @@ function showView(viewName) {
         case 'settings':
             renderSettings();
             applySettingsToUI();
+            renderTransmissionsList();
             break;
         case 'playlists':
             renderPlaylists();
@@ -689,7 +800,7 @@ function renderRecentActivity() {
 }
 
 // ============================================
-// STATISTICS
+// STATISTICS (same as before)
 // ============================================
 
 function updateStats() {
@@ -697,7 +808,6 @@ function updateStats() {
     const filteredSessions = filterSessionsByPeriod(period);
     const filteredProgress = filterProgressByPeriod(period);
     
-    // Summary stats
     const totalSessions = filteredSessions.length;
     const totalMinutes = filteredSessions.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
     const totalHours = (totalMinutes / 60).toFixed(1);
@@ -707,7 +817,6 @@ function updateStats() {
     document.getElementById('statsTotalHours').textContent = `${totalHours}h`;
     document.getElementById('statsAvgSession').textContent = `${avgSession}m`;
     
-    // Render charts
     renderDailyChart(filteredSessions, period);
     renderMarkerBreakdown(filteredSessions);
     renderCorrelationView(filteredSessions, filteredProgress);
@@ -743,7 +852,6 @@ function renderDailyChart(sessions, period) {
     const canvas = document.getElementById('dailyChart');
     const ctx = canvas.getContext('2d');
     
-    // Get daily data
     const days = period === 'all' ? 30 : Math.min(parseInt(period), 30);
     const dailyData = [];
     const labels = [];
@@ -761,7 +869,6 @@ function renderDailyChart(sessions, period) {
         labels.push(date.getDate().toString());
     }
     
-    // Draw chart
     const width = canvas.offsetWidth;
     const height = canvas.offsetHeight;
     canvas.width = width * 2;
@@ -782,13 +889,11 @@ function renderDailyChart(sessions, period) {
     const barWidth = (width - 40) / dailyData.length - 2;
     const chartHeight = height - 40;
     
-    // Draw bars
     dailyData.forEach((value, i) => {
         const barHeight = (value / maxValue) * chartHeight;
         const x = 30 + i * (barWidth + 2);
         const y = height - 25 - barHeight;
         
-        // Gradient
         const gradient = ctx.createLinearGradient(x, y + barHeight, x, y);
         gradient.addColorStop(0, '#7c3aed');
         gradient.addColorStop(1, '#a855f7');
@@ -799,7 +904,6 @@ function renderDailyChart(sessions, period) {
         ctx.fill();
     });
     
-    // Draw x-axis labels (every 5th)
     ctx.fillStyle = '#6a6a7a';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
@@ -810,7 +914,6 @@ function renderDailyChart(sessions, period) {
         }
     });
     
-    // Draw y-axis
     ctx.textAlign = 'right';
     ctx.fillText('0', 25, height - 25);
     ctx.fillText(`${Math.round(maxValue)}m`, 25, 20);
@@ -819,14 +922,12 @@ function renderDailyChart(sessions, period) {
 function renderMarkerBreakdown(sessions) {
     const container = document.getElementById('markerBreakdown');
     
-    // Group by marker
     const markerTotals = {};
     sessions.forEach(s => {
         const markerId = s.marker_id || 'general';
         markerTotals[markerId] = (markerTotals[markerId] || 0) + (s.duration_minutes || 0);
     });
     
-    // Sort by time
     const sorted = Object.entries(markerTotals)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10);
@@ -921,7 +1022,6 @@ function renderProgressChart(progressData) {
     const chartHeight = height - 40;
     const pointSpacing = chartWidth / Math.max(values.length - 1, 1);
     
-    // Draw line
     ctx.beginPath();
     ctx.strokeStyle = '#a855f7';
     ctx.lineWidth = 2;
@@ -938,7 +1038,6 @@ function renderProgressChart(progressData) {
     });
     ctx.stroke();
     
-    // Draw points
     values.forEach((value, i) => {
         const x = 40 + i * pointSpacing;
         const y = 20 + chartHeight - ((value - minValue) / range) * chartHeight;
@@ -949,7 +1048,6 @@ function renderProgressChart(progressData) {
         ctx.fill();
     });
     
-    // Y-axis labels
     ctx.fillStyle = '#6a6a7a';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'right';
@@ -960,7 +1058,6 @@ function renderProgressChart(progressData) {
 function renderCorrelationView(sessions, progress) {
     const container = document.getElementById('correlationView');
     
-    // Find markers with both sessions and progress
     const markerData = {};
     
     sessions.forEach(s => {
@@ -975,12 +1072,11 @@ function renderCorrelationView(sessions, progress) {
         markerData[p.marker_id].progress.push(p.sensed_value);
     });
     
-    // Calculate change for each marker
     const correlations = [];
     for (const [markerId, data] of Object.entries(markerData)) {
         if (data.progress.length >= 2 && data.time > 0) {
-            const first = data.progress[data.progress.length - 1]; // Oldest (most recent in sorted)
-            const last = data.progress[0]; // Newest
+            const first = data.progress[data.progress.length - 1];
+            const last = data.progress[0];
             const change = last - first;
             
             const marker = state.markers.find(m => m.marker_id === markerId);
@@ -992,7 +1088,6 @@ function renderCorrelationView(sessions, progress) {
         }
     }
     
-    // Sort by most time spent
     correlations.sort((a, b) => b.time - a.time);
     
     if (correlations.length === 0) {
@@ -1036,9 +1131,16 @@ function renderCorrelationView(sessions, progress) {
 function renderMarkersList() {
     const container = document.getElementById('markersList');
     const categoryFilter = document.getElementById('categoryFilter').value;
+    const blindMode = document.getElementById('blindModeToggle').checked;
     
     let filteredMarkers = state.markers;
-    if (categoryFilter) {
+    
+    // Handle Foundations filter
+    if (categoryFilter === 'Foundations') {
+        filteredMarkers = state.markers.filter(m => 
+            FOUNDATIONS_MARKERS.some(f => m.name.includes(f) || m.name === f)
+        );
+    } else if (categoryFilter) {
         filteredMarkers = state.markers.filter(m => m.category === categoryFilter);
     }
     
@@ -1055,25 +1157,52 @@ function renderMarkersList() {
     
     let html = '';
     for (const [category, markers] of Object.entries(grouped)) {
-        html += `<h3 class="category-header" style="font-size: 0.875rem; color: var(--text-muted); margin: var(--space-md) 0 var(--space-sm);">${category}</h3>`;
+        const isCollapsed = state.settings.collapsedCategories[category] || false;
+        
+        html += `
+            <div class="category-header ${isCollapsed ? 'collapsed' : ''}" onclick="toggleCategory('${category}')">
+                <div class="category-header-left">
+                    <span class="category-header-name">${category}</span>
+                    <span class="category-header-count">${markers.length}</span>
+                </div>
+                <span class="category-collapse-icon">▼</span>
+            </div>
+            <div class="category-markers ${isCollapsed ? 'collapsed' : ''}" data-category="${category}">
+        `;
         
         markers.forEach(marker => {
             const latestProgress = getLatestProgressForMarker(marker.marker_id);
             const value = latestProgress?.sensed_value;
+            const displayValue = blindMode ? '—' : (value !== undefined ? value + '%' : '—');
             
             html += `
                 <div class="marker-card ${!value ? 'no-value' : ''}" onclick="openAssessment('${marker.marker_id}')">
                     <div class="marker-header">
                         <span class="marker-name">${marker.name}</span>
-                        <span class="marker-value">${value !== undefined ? value + '%' : '—'}</span>
+                        <span class="marker-value">${displayValue}</span>
                     </div>
                     <div class="marker-category">${marker.subcategory || ''}</div>
                 </div>
             `;
         });
+        
+        html += '</div>';
     }
     
     container.innerHTML = html;
+}
+
+function toggleCategory(category) {
+    state.settings.collapsedCategories[category] = !state.settings.collapsedCategories[category];
+    saveSettings();
+    
+    const header = document.querySelector(`.category-header[onclick="toggleCategory('${category}')"]`);
+    const content = document.querySelector(`.category-markers[data-category="${category}"]`);
+    
+    if (header && content) {
+        header.classList.toggle('collapsed');
+        content.classList.toggle('collapsed');
+    }
 }
 
 function getLatestProgressForMarker(markerId) {
@@ -1093,8 +1222,19 @@ function openAssessment(markerId) {
     const latestProgress = getLatestProgressForMarker(markerId);
     state.assessment.previousValue = latestProgress?.sensed_value || null;
     
+    const blindMode = document.getElementById('blindModeToggle').checked;
+    
     document.getElementById('assessmentMarkerName').textContent = marker.name;
     document.getElementById('assessmentDescription').textContent = marker.description || '';
+    
+    // Show current value if blind mode is OFF
+    const currentValueDisplay = document.getElementById('currentValueDisplay');
+    if (!blindMode && state.assessment.previousValue !== null) {
+        document.getElementById('currentValueAmount').textContent = state.assessment.previousValue + '%';
+        currentValueDisplay.classList.remove('hidden');
+    } else {
+        currentValueDisplay.classList.add('hidden');
+    }
     
     document.getElementById('sensedValue').value = 50;
     document.getElementById('sensedValueDisplay').textContent = '50';
@@ -1441,20 +1581,101 @@ function addPlaylistItem() {
     const container = document.getElementById('playlistItemsList');
     const itemId = Date.now();
     
+    // Build marker options including all track markers
+    let markerOptions = '<option value="">Select...</option>';
+    markerOptions += '<option value="custom">✦ Custom</option>';
+    
+    state.categories.forEach(category => {
+        const categoryMarkers = state.markers.filter(m => m.category === category);
+        if (categoryMarkers.length > 0) {
+            markerOptions += `<optgroup label="${category}">`;
+            categoryMarkers.forEach(m => {
+                markerOptions += `<option value="${m.marker_id}">${m.name}</option>`;
+            });
+            markerOptions += '</optgroup>';
+        }
+    });
+    
+    // Build transmission options
+    let transmissionOptions = '<option value="">Energy type...</option>';
+    state.settings.transmissions.forEach(t => {
+        transmissionOptions += `<option value="${t}">${t}</option>`;
+    });
+    
     const html = `
         <div class="playlist-item" data-item-id="${itemId}">
-            <select class="playlist-item-marker" onchange="updatePlaylistTotal()">
-                <option value="">Select...</option>
-                <option value="custom">Custom</option>
-                ${state.markers.map(m => `<option value="${m.marker_id}">${m.name}</option>`).join('')}
-            </select>
-            <input type="number" class="playlist-item-duration" placeholder="min" min="1" onchange="updatePlaylistTotal()">
-            <button class="remove-item" onclick="removePlaylistItem(${itemId})">×</button>
+            <div class="playlist-item-row">
+                <select class="playlist-item-marker" onchange="onPlaylistItemChange(${itemId})">
+                    ${markerOptions}
+                </select>
+                <input type="number" class="playlist-item-duration" placeholder="min" min="1" onchange="updatePlaylistTotal()">
+                <div class="playlist-item-controls">
+                    <button class="move-btn" onclick="movePlaylistItem(${itemId}, -1)" title="Move up">↑</button>
+                    <button class="move-btn" onclick="movePlaylistItem(${itemId}, 1)" title="Move down">↓</button>
+                    <button class="remove-item" onclick="removePlaylistItem(${itemId})">×</button>
+                </div>
+            </div>
+            <div class="playlist-item-custom-note" id="customNote_${itemId}">
+                <input type="text" class="playlist-item-note" placeholder="Custom work / intention...">
+            </div>
+            <div class="playlist-item-row">
+                <select class="playlist-item-transmission">
+                    ${transmissionOptions}
+                </select>
+                <div class="playlist-item-intensity">
+                    <button type="button" data-intensity="low" onclick="setPlaylistItemIntensity(${itemId}, 'low')">Low</button>
+                    <button type="button" data-intensity="medium" class="active" onclick="setPlaylistItemIntensity(${itemId}, 'medium')">Med</button>
+                    <button type="button" data-intensity="high" onclick="setPlaylistItemIntensity(${itemId}, 'high')">High</button>
+                    <button type="button" data-intensity="highest" onclick="setPlaylistItemIntensity(${itemId}, 'highest')">Max</button>
+                </div>
+            </div>
         </div>
     `;
     
     container.insertAdjacentHTML('beforeend', html);
     updatePlaylistTotal();
+}
+
+function onPlaylistItemChange(itemId) {
+    const item = document.querySelector(`.playlist-item[data-item-id="${itemId}"]`);
+    const markerSelect = item.querySelector('.playlist-item-marker');
+    const customNoteDiv = document.getElementById(`customNote_${itemId}`);
+    
+    if (markerSelect.value === 'custom') {
+        customNoteDiv.classList.add('visible');
+    } else {
+        customNoteDiv.classList.remove('visible');
+    }
+    
+    updatePlaylistTotal();
+}
+
+function setPlaylistItemIntensity(itemId, intensity) {
+    const item = document.querySelector(`.playlist-item[data-item-id="${itemId}"]`);
+    const buttons = item.querySelectorAll('.playlist-item-intensity button');
+    buttons.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.intensity === intensity);
+    });
+}
+
+function movePlaylistItem(itemId, direction) {
+    const container = document.getElementById('playlistItemsList');
+    const items = Array.from(container.querySelectorAll('.playlist-item'));
+    const currentIndex = items.findIndex(item => item.dataset.itemId === String(itemId));
+    
+    if (currentIndex === -1) return;
+    
+    const newIndex = currentIndex + direction;
+    if (newIndex < 0 || newIndex >= items.length) return;
+    
+    const currentItem = items[currentIndex];
+    const targetItem = items[newIndex];
+    
+    if (direction === -1) {
+        container.insertBefore(currentItem, targetItem);
+    } else {
+        container.insertBefore(targetItem, currentItem);
+    }
 }
 
 function removePlaylistItem(itemId) {
@@ -1489,13 +1710,20 @@ async function savePlaylist() {
     itemElements.forEach(el => {
         const markerId = el.querySelector('.playlist-item-marker').value;
         const duration = parseInt(el.querySelector('.playlist-item-duration').value) || 0;
+        const customNote = el.querySelector('.playlist-item-note')?.value || '';
+        const transmission = el.querySelector('.playlist-item-transmission').value;
+        const activeIntensity = el.querySelector('.playlist-item-intensity button.active');
+        const intensity = activeIntensity?.dataset.intensity || 'medium';
         
-        if (markerId && duration > 0) {
+        if ((markerId || customNote) && duration > 0) {
             const marker = state.markers.find(m => m.marker_id === markerId);
             items.push({
                 marker_id: markerId,
-                name: marker?.name || markerId,
-                duration: duration
+                name: markerId === 'custom' ? (customNote || 'Custom') : (marker?.name || markerId),
+                customNote: customNote,
+                duration: duration,
+                transmission: transmission,
+                intensity: intensity
             });
             totalDuration += duration;
         }
@@ -1571,16 +1799,59 @@ function editPlaylist(playlistId) {
     container.innerHTML = '';
     
     items.forEach(item => {
-        const itemId = Date.now() + Math.random();
+        const itemId = Date.now() + Math.random() * 1000;
+        
+        // Build marker options
+        let markerOptions = '<option value="">Select...</option>';
+        markerOptions += `<option value="custom" ${item.marker_id === 'custom' ? 'selected' : ''}>✦ Custom</option>`;
+        
+        state.categories.forEach(category => {
+            const categoryMarkers = state.markers.filter(m => m.category === category);
+            if (categoryMarkers.length > 0) {
+                markerOptions += `<optgroup label="${category}">`;
+                categoryMarkers.forEach(m => {
+                    markerOptions += `<option value="${m.marker_id}" ${m.marker_id === item.marker_id ? 'selected' : ''}>${m.name}</option>`;
+                });
+                markerOptions += '</optgroup>';
+            }
+        });
+        
+        // Build transmission options
+        let transmissionOptions = '<option value="">Energy type...</option>';
+        state.settings.transmissions.forEach(t => {
+            transmissionOptions += `<option value="${t}" ${t === item.transmission ? 'selected' : ''}>${t}</option>`;
+        });
+        
+        const isCustom = item.marker_id === 'custom';
+        const intensity = item.intensity || 'medium';
+        
         container.insertAdjacentHTML('beforeend', `
             <div class="playlist-item" data-item-id="${itemId}">
-                <select class="playlist-item-marker" onchange="updatePlaylistTotal()">
-                    <option value="">Select...</option>
-                    <option value="custom" ${item.marker_id === 'custom' ? 'selected' : ''}>Custom</option>
-                    ${state.markers.map(m => `<option value="${m.marker_id}" ${m.marker_id === item.marker_id ? 'selected' : ''}>${m.name}</option>`).join('')}
-                </select>
-                <input type="number" class="playlist-item-duration" placeholder="min" min="1" value="${item.duration}" onchange="updatePlaylistTotal()">
-                <button class="remove-item" onclick="removePlaylistItem('${itemId}')">×</button>
+                <div class="playlist-item-row">
+                    <select class="playlist-item-marker" onchange="onPlaylistItemChange(${itemId})">
+                        ${markerOptions}
+                    </select>
+                    <input type="number" class="playlist-item-duration" placeholder="min" min="1" value="${item.duration}" onchange="updatePlaylistTotal()">
+                    <div class="playlist-item-controls">
+                        <button class="move-btn" onclick="movePlaylistItem(${itemId}, -1)" title="Move up">↑</button>
+                        <button class="move-btn" onclick="movePlaylistItem(${itemId}, 1)" title="Move down">↓</button>
+                        <button class="remove-item" onclick="removePlaylistItem(${itemId})">×</button>
+                    </div>
+                </div>
+                <div class="playlist-item-custom-note ${isCustom ? 'visible' : ''}" id="customNote_${itemId}">
+                    <input type="text" class="playlist-item-note" placeholder="Custom work / intention..." value="${item.customNote || ''}">
+                </div>
+                <div class="playlist-item-row">
+                    <select class="playlist-item-transmission">
+                        ${transmissionOptions}
+                    </select>
+                    <div class="playlist-item-intensity">
+                        <button type="button" data-intensity="low" class="${intensity === 'low' ? 'active' : ''}" onclick="setPlaylistItemIntensity(${itemId}, 'low')">Low</button>
+                        <button type="button" data-intensity="medium" class="${intensity === 'medium' ? 'active' : ''}" onclick="setPlaylistItemIntensity(${itemId}, 'medium')">Med</button>
+                        <button type="button" data-intensity="high" class="${intensity === 'high' ? 'active' : ''}" onclick="setPlaylistItemIntensity(${itemId}, 'high')">High</button>
+                        <button type="button" data-intensity="highest" class="${intensity === 'highest' ? 'active' : ''}" onclick="setPlaylistItemIntensity(${itemId}, 'highest')">Max</button>
+                    </div>
+                </div>
             </div>
         `);
     });
@@ -1631,12 +1902,14 @@ async function runPlaylist(playlistId) {
     
     state.playlistRunner = {
         isRunning: true,
+        isPaused: false,
         playlist: playlist,
         items: items,
         currentIndex: 0,
         itemTimer: null,
         itemEndTime: null,
-        itemRemaining: 0
+        itemRemaining: 0,
+        pausedAt: null
     };
     
     document.getElementById('playlistsList').classList.add('hidden');
@@ -1644,6 +1917,9 @@ async function runPlaylist(playlistId) {
     
     document.getElementById('runningPlaylistName').textContent = playlist.name;
     document.getElementById('runnerTotalItems').textContent = items.length;
+    
+    const pauseBtn = document.getElementById('playlistPauseBtn');
+    pauseBtn.innerHTML = '<span class="btn-icon">⏸</span> Pause';
     
     startPlaylistItem();
 }
@@ -1654,6 +1930,17 @@ function startPlaylistItem() {
     
     document.getElementById('runnerCurrentItem').textContent = runner.currentIndex + 1;
     document.getElementById('runnerItemName').textContent = item.name;
+    
+    // Show item info (transmission & intensity)
+    let infoText = '';
+    if (item.transmission) infoText += item.transmission;
+    if (item.intensity && item.intensity !== 'medium') {
+        infoText += infoText ? ` • ${capitalize(item.intensity)}` : capitalize(item.intensity);
+    }
+    if (item.customNote) {
+        infoText += infoText ? ` • ${item.customNote}` : item.customNote;
+    }
+    document.getElementById('runnerItemInfo').textContent = infoText;
     
     const queue = runner.items.slice(runner.currentIndex + 1);
     document.getElementById('runnerQueue').innerHTML = queue.map(q => `
@@ -1672,6 +1959,8 @@ function startPlaylistItem() {
     savePlaylistState();
     
     runner.itemTimer = setInterval(() => {
+        if (runner.isPaused) return;
+        
         const now = new Date();
         runner.itemRemaining = Math.max(0, Math.round((runner.itemEndTime - now) / 1000));
         
@@ -1696,6 +1985,28 @@ function updatePlaylistItemTimer() {
         `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
 
+function pausePlaylist() {
+    const runner = state.playlistRunner;
+    runner.isPaused = !runner.isPaused;
+    
+    const btn = document.getElementById('playlistPauseBtn');
+    
+    if (runner.isPaused) {
+        runner.pausedAt = new Date();
+        btn.innerHTML = '<span class="btn-icon">▶</span> Resume';
+        showToast('Playlist paused', 'success');
+    } else {
+        // Recalculate end time
+        const pauseDuration = new Date() - runner.pausedAt;
+        runner.itemEndTime = new Date(runner.itemEndTime.getTime() + pauseDuration);
+        runner.pausedAt = null;
+        btn.innerHTML = '<span class="btn-icon">⏸</span> Pause';
+        showToast('Playlist resumed', 'success');
+    }
+    
+    savePlaylistState();
+}
+
 function skipPlaylistItem() {
     clearInterval(state.playlistRunner.itemTimer);
     nextPlaylistItem();
@@ -1713,9 +2024,9 @@ async function nextPlaylistItem() {
                 startTime: new Date(runner.itemEndTime.getTime() - currentItem.duration * 60 * 1000).toISOString(),
                 endTime: new Date().toISOString(),
                 durationMinutes: currentItem.duration,
-                energyType: '',
-                intensity: 'medium',
-                notes: `Playlist: ${runner.playlist.name}`
+                energyType: currentItem.transmission || '',
+                intensity: currentItem.intensity || 'medium',
+                notes: `Playlist: ${runner.playlist.name}${currentItem.customNote ? ' - ' + currentItem.customNote : ''}`
             });
         } catch (error) {
             console.error('Failed to save playlist session:', error);
@@ -1751,12 +2062,14 @@ function stopPlaylist() {
     
     state.playlistRunner = {
         isRunning: false,
+        isPaused: false,
         playlist: null,
         items: [],
         currentIndex: 0,
         itemTimer: null,
         itemEndTime: null,
-        itemRemaining: 0
+        itemRemaining: 0,
+        pausedAt: null
     };
     
     localStorage.removeItem('playlistState');
@@ -2038,6 +2351,10 @@ function setupEventListeners() {
     });
     
     document.getElementById('categoryFilter').addEventListener('change', () => {
+        renderMarkersList();
+    });
+    
+    document.getElementById('blindModeToggle').addEventListener('change', () => {
         renderMarkersList();
     });
     
