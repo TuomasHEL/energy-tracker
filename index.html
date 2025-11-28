@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -63,6 +64,10 @@
                     <button class="action-btn secondary" onclick="showView('playlists')">
                         <span class="btn-icon">▶</span>
                         <span class="btn-text">Playlists</span>
+                    </button>
+                    <button class="action-btn secondary" onclick="showView('stats')">
+                        <span class="btn-icon">📊</span>
+                        <span class="btn-text">Statistics</span>
                     </button>
                 </div>
 
@@ -304,6 +309,73 @@
                 </div>
             </section>
 
+            <!-- Statistics View -->
+            <section id="viewStats" class="view">
+                <div class="view-header">
+                    <h2>Statistics</h2>
+                </div>
+
+                <!-- Time Period Filter -->
+                <div class="stats-filter">
+                    <select id="statsPeriod" onchange="updateStats()">
+                        <option value="7">Last 7 days</option>
+                        <option value="30" selected>Last 30 days</option>
+                        <option value="90">Last 90 days</option>
+                        <option value="365">Last year</option>
+                        <option value="all">All time</option>
+                    </select>
+                </div>
+
+                <!-- Summary Cards -->
+                <div class="stats-summary">
+                    <div class="stat-card">
+                        <span class="stat-value" id="statsSessions">-</span>
+                        <span class="stat-label">Sessions</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="statsTotalHours">-</span>
+                        <span class="stat-label">Total Hours</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="statsAvgSession">-</span>
+                        <span class="stat-label">Avg Session</span>
+                    </div>
+                </div>
+
+                <!-- Charts Section -->
+                <div class="stats-charts">
+                    <div class="chart-card">
+                        <h3>Session Time by Day</h3>
+                        <div class="chart-container">
+                            <canvas id="dailyChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <h3>Time by Marker</h3>
+                        <div id="markerBreakdown" class="breakdown-list"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <h3>Progress Trends</h3>
+                        <div class="form-group">
+                            <select id="progressTrendMarker" onchange="updateProgressTrend()">
+                                <option value="">Select marker...</option>
+                            </select>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="progressChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <h3>Session Correlation</h3>
+                        <p class="chart-description">Time spent vs. progress improvement</p>
+                        <div id="correlationView" class="correlation-list"></div>
+                    </div>
+                </div>
+            </section>
+
             <!-- History View -->
             <section id="viewHistory" class="view">
                 <div class="view-header">
@@ -339,6 +411,30 @@
                 </div>
 
                 <div class="settings-section">
+                    <h3>Notifications</h3>
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            <span>Sound on completion</span>
+                            <span class="settings-hint">Play chime when timer ends</span>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="settingSoundEnabled" onchange="saveSetting('soundEnabled', this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            <span>Vibration on completion</span>
+                            <span class="settings-hint">Vibrate when timer ends</span>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="settingVibrationEnabled" onchange="saveSetting('vibrationEnabled', this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="settings-section">
                     <h3>Users</h3>
                     <div id="usersList" class="users-list"></div>
                     <button class="btn secondary" onclick="showAddUserModal()">+ Add User</button>
@@ -357,7 +453,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Energy Tracker v1.0</p>
+                    <p class="version">Energy Tracker v2.0</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>
@@ -377,9 +473,9 @@
                 <span class="nav-icon">⏱</span>
                 <span class="nav-label">Timer</span>
             </button>
-            <button class="nav-btn" onclick="showView('history')" data-view="history">
-                <span class="nav-icon">☰</span>
-                <span class="nav-label">History</span>
+            <button class="nav-btn" onclick="showView('stats')" data-view="stats">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Stats</span>
             </button>
             <button class="nav-btn" onclick="showView('settings')" data-view="settings">
                 <span class="nav-icon">⚙</span>
