@@ -1,5 +1,5 @@
 // Energy Tracker PWA - Main Application
-// Version 2.1 - Enhanced Features
+// Version 2.2 - Data Loading Fixes
 
 // ============================================
 // CONFIGURATION
@@ -98,10 +98,12 @@ document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
     showLoading();
+    console.log('App init started');
     
     try {
         // Load settings
         loadSettings();
+        console.log('Settings loaded');
         
         // Initialize audio context
         initAudio();
@@ -111,6 +113,7 @@ async function init() {
         
         // Load users first
         await loadUsers();
+        console.log('Users loaded:', state.users.length);
         
         // Set current user from localStorage or default to first
         const savedUserId = localStorage.getItem('currentUserId');
@@ -119,16 +122,19 @@ async function init() {
         } else if (state.users.length > 0) {
             state.currentUser = state.users[0];
         }
+        console.log('Current user:', state.currentUser?.user_id);
         
         // Populate user selector
         populateUserSelector();
         
         // Load markers
         await loadMarkers();
+        console.log('Markers loaded:', state.markers?.length);
         
         // Load initial data for current user
         if (state.currentUser) {
             await loadUserData();
+            console.log('User data loaded - sessions:', state.sessions?.length, 'progress:', state.progress?.length, 'playlists:', state.playlists?.length);
         }
         
         // Restore timer if it was running
@@ -154,6 +160,8 @@ async function init() {
         
         // Render transmissions list in settings
         renderTransmissionsList();
+        
+        console.log('App init completed successfully');
         
     } catch (error) {
         console.error('Init error:', error);
@@ -615,25 +623,43 @@ async function loadMarkers() {
 }
 
 async function loadUserData() {
-    if (!state.currentUser) return;
+    if (!state.currentUser) {
+        console.log('No current user, skipping data load');
+        return;
+    }
+    
+    console.log('Loading data for user:', state.currentUser.user_id);
     
     try {
+        // Load sessions
         const sessionsData = await apiCall('getSessions', { 
             userId: state.currentUser.user_id,
             limit: 50
         });
-        state.sessions = sessionsData?.sessions || [];
+        console.log('Sessions response:', sessionsData);
+        state.sessions = sessionsData?.sessions || sessionsData || [];
+        if (!Array.isArray(state.sessions)) state.sessions = [];
+        console.log('Loaded sessions:', state.sessions.length);
         
+        // Load progress
         const progressData = await apiCall('getProgress', {
             userId: state.currentUser.user_id,
             limit: 100
         });
-        state.progress = progressData?.progress || [];
+        console.log('Progress response:', progressData);
+        state.progress = progressData?.progress || progressData || [];
+        if (!Array.isArray(state.progress)) state.progress = [];
+        console.log('Loaded progress:', state.progress.length);
         
+        // Load playlists
         const playlistsData = await apiCall('getPlaylists', {
             userId: state.currentUser.user_id
         });
-        state.playlists = playlistsData?.playlists || [];
+        console.log('Playlists response:', playlistsData);
+        state.playlists = playlistsData?.playlists || playlistsData || [];
+        if (!Array.isArray(state.playlists)) state.playlists = [];
+        console.log('Loaded playlists:', state.playlists.length);
+        
     } catch (error) {
         console.error('Error loading user data:', error);
         // Ensure arrays are initialized even on error
@@ -1565,6 +1591,9 @@ function resetTimer() {
 
 function renderPlaylists() {
     const container = document.getElementById('playlistsList');
+    const playlists = state.playlists || [];
+    
+    console.log('Rendering playlists, count:', playlists.length);
     
     if (state.playlistRunner.isRunning) {
         container.classList.add('hidden');
@@ -1574,12 +1603,12 @@ function renderPlaylists() {
         document.getElementById('playlistRunner').classList.add('hidden');
     }
     
-    if (state.playlists.length === 0) {
+    if (playlists.length === 0) {
         container.innerHTML = '<p class="empty-state">No playlists yet. Create one!</p>';
         return;
     }
     
-    container.innerHTML = state.playlists.map(pl => {
+    container.innerHTML = playlists.map(pl => {
         let items = [];
         try {
             items = JSON.parse(pl.items_json);
