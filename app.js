@@ -1,5 +1,5 @@
 // Energy Tracker PWA - Main Application
-// Version 2.2 - Data Loading Fixes
+// Version 2.3 - UI Improvements
 
 // ============================================
 // CONFIGURATION
@@ -1604,7 +1604,7 @@ function renderPlaylists() {
     }
     
     if (playlists.length === 0) {
-        container.innerHTML = '<p class="empty-state">No playlists yet. Create one!</p>';
+        container.innerHTML = '<p class="empty-state">No programs yet. Create one!</p>';
         return;
     }
     
@@ -1632,7 +1632,7 @@ function renderPlaylists() {
 }
 
 function showCreatePlaylist() {
-    document.getElementById('playlistModalTitle').textContent = 'Create Playlist';
+    document.getElementById('playlistModalTitle').textContent = 'Create Program';
     document.getElementById('playlistName').value = '';
     document.getElementById('playlistItemsList').innerHTML = '';
     addPlaylistItem();
@@ -1769,7 +1769,7 @@ function updatePlaylistTotal() {
 async function savePlaylist() {
     const name = document.getElementById('playlistName').value.trim();
     if (!name) {
-        showToast('Please enter a playlist name', 'error');
+        showToast('Please enter a program name', 'error');
         return;
     }
     
@@ -1843,10 +1843,10 @@ async function savePlaylist() {
         
         closePlaylistModal();
         renderPlaylists();
-        showToast('Playlist saved!', 'success');
+        showToast('Program saved!', 'success');
         
     } catch (error) {
-        showToast('Failed to save playlist', 'error');
+        showToast('Failed to save program', 'error');
     }
     
     hideLoading();
@@ -1856,7 +1856,7 @@ function editPlaylist(playlistId) {
     const playlist = state.playlists.find(p => p.playlist_id === playlistId);
     if (!playlist) return;
     
-    document.getElementById('playlistModalTitle').textContent = 'Edit Playlist';
+    document.getElementById('playlistModalTitle').textContent = 'Edit Program';
     document.getElementById('playlistName').value = playlist.name;
     document.getElementById('playlistModal').dataset.editId = playlistId;
     
@@ -1934,7 +1934,7 @@ function editPlaylist(playlistId) {
 }
 
 async function deletePlaylistConfirm(playlistId) {
-    if (!confirm('Delete this playlist?')) return;
+    if (!confirm('Delete this program?')) return;
     
     showLoading();
     
@@ -1942,9 +1942,9 @@ async function deletePlaylistConfirm(playlistId) {
         await apiCall('deletePlaylist', { playlistId: playlistId });
         state.playlists = state.playlists.filter(p => p.playlist_id !== playlistId);
         renderPlaylists();
-        showToast('Playlist deleted', 'success');
+        showToast('Program deleted', 'success');
     } catch (error) {
-        showToast('Failed to delete playlist', 'error');
+        showToast('Failed to delete program', 'error');
     }
     
     hideLoading();
@@ -1958,12 +1958,12 @@ async function runPlaylist(playlistId) {
     try {
         items = JSON.parse(playlist.items_json);
     } catch(e) {
-        showToast('Invalid playlist data', 'error');
+        showToast('Invalid program data', 'error');
         return;
     }
     
     if (items.length === 0) {
-        showToast('Playlist is empty', 'error');
+        showToast('Program is empty', 'error');
         return;
     }
     
@@ -2067,14 +2067,14 @@ function pausePlaylist() {
     if (runner.isPaused) {
         runner.pausedAt = new Date();
         btn.innerHTML = '<span class="btn-icon">▶</span> Resume';
-        showToast('Playlist paused', 'success');
+        showToast('Program paused', 'success');
     } else {
         // Recalculate end time
         const pauseDuration = new Date() - runner.pausedAt;
         runner.itemEndTime = new Date(runner.itemEndTime.getTime() + pauseDuration);
         runner.pausedAt = null;
         btn.innerHTML = '<span class="btn-icon">⏸</span> Pause';
-        showToast('Playlist resumed', 'success');
+        showToast('Program resumed', 'success');
     }
     
     savePlaylistState();
@@ -2099,7 +2099,7 @@ async function nextPlaylistItem() {
                 durationMinutes: currentItem.duration,
                 energyType: currentItem.transmission || '',
                 intensity: currentItem.intensity || 'medium',
-                notes: `Playlist: ${runner.playlist.name}${currentItem.customNote ? ' - ' + currentItem.customNote : ''}`
+                notes: `Program: ${runner.playlist.name}${currentItem.customNote ? ' - ' + currentItem.customNote : ''}`
             });
         } catch (error) {
             console.error('Failed to save playlist session:', error);
@@ -2115,13 +2115,13 @@ async function nextPlaylistItem() {
         
         if (document.hidden) {
             showNotification(
-                'Playlist Complete! 🎉',
+                'Program Complete! 🎉',
                 `${runner.playlist.name} finished`,
-                'playlist-complete'
+                'program-complete'
             );
         }
         
-        showToast('Playlist completed! 🎉', 'success');
+        showToast('Program completed! 🎉', 'success');
         await loadUserData();
         updateDashboard();
         return;
