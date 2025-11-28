@@ -588,39 +588,59 @@ async function apiCall(action, params = {}) {
 // ============================================
 
 async function loadUsers() {
-    const data = await apiCall('getUsers');
-    state.users = data.users.filter(u => u.status === 'active');
+    try {
+        const data = await apiCall('getUsers');
+        const users = data?.users || [];
+        state.users = users.filter(u => u.status === 'active');
+    } catch (error) {
+        console.error('Error loading users:', error);
+        state.users = [];
+    }
 }
 
 async function loadMarkers() {
-    const data = await apiCall('getMarkers');
-    state.markers = data.markers;
-    
-    const categorySet = new Set(state.markers.map(m => m.category));
-    state.categories = Array.from(categorySet).sort();
-    
-    populateCategoryFilters();
+    try {
+        const data = await apiCall('getMarkers');
+        state.markers = data?.markers || [];
+        
+        const categorySet = new Set(state.markers.map(m => m.category));
+        state.categories = Array.from(categorySet).sort();
+        
+        populateCategoryFilters();
+    } catch (error) {
+        console.error('Error loading markers:', error);
+        state.markers = [];
+        state.categories = [];
+    }
 }
 
 async function loadUserData() {
     if (!state.currentUser) return;
     
-    const sessionsData = await apiCall('getSessions', { 
-        userId: state.currentUser.user_id,
-        limit: 50
-    });
-    state.sessions = sessionsData.sessions;
-    
-    const progressData = await apiCall('getProgress', {
-        userId: state.currentUser.user_id,
-        limit: 100
-    });
-    state.progress = progressData.progress;
-    
-    const playlistsData = await apiCall('getPlaylists', {
-        userId: state.currentUser.user_id
-    });
-    state.playlists = playlistsData.playlists;
+    try {
+        const sessionsData = await apiCall('getSessions', { 
+            userId: state.currentUser.user_id,
+            limit: 50
+        });
+        state.sessions = sessionsData?.sessions || [];
+        
+        const progressData = await apiCall('getProgress', {
+            userId: state.currentUser.user_id,
+            limit: 100
+        });
+        state.progress = progressData?.progress || [];
+        
+        const playlistsData = await apiCall('getPlaylists', {
+            userId: state.currentUser.user_id
+        });
+        state.playlists = playlistsData?.playlists || [];
+    } catch (error) {
+        console.error('Error loading user data:', error);
+        // Ensure arrays are initialized even on error
+        state.sessions = state.sessions || [];
+        state.progress = state.progress || [];
+        state.playlists = state.playlists || [];
+    }
 }
 
 // ============================================
@@ -701,31 +721,42 @@ function populateProgressTrendSelect() {
 // ============================================
 
 function showView(viewName) {
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    document.getElementById(`view${capitalize(viewName)}`).classList.add('active');
-    
-    document.querySelectorAll('.nav-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.view === viewName);
-    });
-    
-    switch(viewName) {
-        case 'track':
-            renderMarkersList();
-            break;
-        case 'history':
-            renderHistory();
-            break;
-        case 'settings':
-            renderSettings();
-            applySettingsToUI();
-            renderTransmissionsList();
-            break;
-        case 'playlists':
-            renderPlaylists();
-            break;
-        case 'stats':
-            updateStats();
-            break;
+    try {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        
+        const viewElement = document.getElementById(`view${capitalize(viewName)}`);
+        if (viewElement) {
+            viewElement.classList.add('active');
+        } else {
+            console.error('View not found:', viewName);
+            return;
+        }
+        
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.view === viewName);
+        });
+        
+        switch(viewName) {
+            case 'track':
+                renderMarkersList();
+                break;
+            case 'history':
+                renderHistory();
+                break;
+            case 'settings':
+                renderSettings();
+                applySettingsToUI();
+                renderTransmissionsList();
+                break;
+            case 'playlists':
+                renderPlaylists();
+                break;
+            case 'stats':
+                updateStats();
+                break;
+        }
+    } catch (error) {
+        console.error('Error in showView:', error);
     }
 }
 
@@ -738,15 +769,16 @@ function capitalize(str) {
 // ============================================
 
 function updateDashboard() {
-    document.getElementById('statTotalMarkers').textContent = state.markers.length;
+    document.getElementById('statTotalMarkers').textContent = state.markers?.length || 0;
     
     const today = new Date().toISOString().split('T')[0];
-    const todaySessions = state.sessions.filter(s => 
+    const sessions = state.sessions || [];
+    const todaySessions = sessions.filter(s => 
         s.start_time && s.start_time.startsWith(today)
     ).length;
     document.getElementById('statTodaySessions').textContent = todaySessions;
     
-    const totalMinutes = state.sessions.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+    const totalMinutes = sessions.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
     const hours = Math.floor(totalMinutes / 60);
     const mins = totalMinutes % 60;
     document.getElementById('statTotalTime').textContent = `${hours}h ${mins}m`;
@@ -756,7 +788,9 @@ function updateDashboard() {
 
 function renderRecentActivity() {
     const container = document.getElementById('recentActivityList');
-    const recentItems = [...state.sessions, ...state.progress]
+    const sessions = state.sessions || [];
+    const progress = state.progress || [];
+    const recentItems = [...sessions, ...progress]
         .sort((a, b) => {
             const dateA = new Date(a.timestamp || a.start_time);
             const dateB = new Date(b.timestamp || b.start_time);
@@ -823,6 +857,7 @@ function updateStats() {
 }
 
 function filterSessionsByPeriod(period) {
+    if (!state.sessions || !Array.isArray(state.sessions)) return [];
     if (period === 'all') return state.sessions;
     
     const days = parseInt(period);
@@ -836,6 +871,7 @@ function filterSessionsByPeriod(period) {
 }
 
 function filterProgressByPeriod(period) {
+    if (!state.progress || !Array.isArray(state.progress)) return [];
     if (period === 'all') return state.progress;
     
     const days = parseInt(period);
@@ -1133,15 +1169,16 @@ function renderMarkersList() {
     const categoryFilter = document.getElementById('categoryFilter').value;
     const blindMode = document.getElementById('blindModeToggle').checked;
     
-    let filteredMarkers = state.markers;
+    const markers = state.markers || [];
+    let filteredMarkers = markers;
     
     // Handle Foundations filter
     if (categoryFilter === 'Foundations') {
-        filteredMarkers = state.markers.filter(m => 
+        filteredMarkers = markers.filter(m => 
             FOUNDATIONS_MARKERS.some(f => m.name.includes(f) || m.name === f)
         );
     } else if (categoryFilter) {
-        filteredMarkers = state.markers.filter(m => m.category === categoryFilter);
+        filteredMarkers = markers.filter(m => m.category === categoryFilter);
     }
     
     if (filteredMarkers.length === 0) {
@@ -1206,6 +1243,7 @@ function toggleCategory(category) {
 }
 
 function getLatestProgressForMarker(markerId) {
+    if (!state.progress || !Array.isArray(state.progress)) return null;
     return state.progress.find(p => p.marker_id === markerId);
 }
 
@@ -1608,7 +1646,10 @@ function addPlaylistItem() {
                 <select class="playlist-item-marker" onchange="onPlaylistItemChange(${itemId})">
                     ${markerOptions}
                 </select>
+            </div>
+            <div class="playlist-item-row">
                 <input type="number" class="playlist-item-duration" placeholder="min" min="1" onchange="updatePlaylistTotal()">
+                <span style="color: var(--text-muted); font-size: 0.75rem;">min</span>
                 <div class="playlist-item-controls">
                     <button class="move-btn" onclick="movePlaylistItem(${itemId}, -1)" title="Move up">↑</button>
                     <button class="move-btn" onclick="movePlaylistItem(${itemId}, 1)" title="Move down">↓</button>
@@ -1618,15 +1659,15 @@ function addPlaylistItem() {
             <div class="playlist-item-custom-note" id="customNote_${itemId}">
                 <input type="text" class="playlist-item-note" placeholder="Custom work / intention...">
             </div>
-            <div class="playlist-item-row">
+            <div class="playlist-item-options">
                 <select class="playlist-item-transmission">
                     ${transmissionOptions}
                 </select>
                 <div class="playlist-item-intensity">
-                    <button type="button" data-intensity="low" onclick="setPlaylistItemIntensity(${itemId}, 'low')">Low</button>
-                    <button type="button" data-intensity="medium" class="active" onclick="setPlaylistItemIntensity(${itemId}, 'medium')">Med</button>
-                    <button type="button" data-intensity="high" onclick="setPlaylistItemIntensity(${itemId}, 'high')">High</button>
-                    <button type="button" data-intensity="highest" onclick="setPlaylistItemIntensity(${itemId}, 'highest')">Max</button>
+                    <button type="button" data-intensity="low" onclick="setPlaylistItemIntensity(${itemId}, 'low')">L</button>
+                    <button type="button" data-intensity="medium" class="active" onclick="setPlaylistItemIntensity(${itemId}, 'medium')">M</button>
+                    <button type="button" data-intensity="high" onclick="setPlaylistItemIntensity(${itemId}, 'high')">H</button>
+                    <button type="button" data-intensity="highest" onclick="setPlaylistItemIntensity(${itemId}, 'highest')">+</button>
                 </div>
             </div>
         </div>
@@ -1831,7 +1872,10 @@ function editPlaylist(playlistId) {
                     <select class="playlist-item-marker" onchange="onPlaylistItemChange(${itemId})">
                         ${markerOptions}
                     </select>
+                </div>
+                <div class="playlist-item-row">
                     <input type="number" class="playlist-item-duration" placeholder="min" min="1" value="${item.duration}" onchange="updatePlaylistTotal()">
+                    <span style="color: var(--text-muted); font-size: 0.75rem;">min</span>
                     <div class="playlist-item-controls">
                         <button class="move-btn" onclick="movePlaylistItem(${itemId}, -1)" title="Move up">↑</button>
                         <button class="move-btn" onclick="movePlaylistItem(${itemId}, 1)" title="Move down">↓</button>
@@ -1841,15 +1885,15 @@ function editPlaylist(playlistId) {
                 <div class="playlist-item-custom-note ${isCustom ? 'visible' : ''}" id="customNote_${itemId}">
                     <input type="text" class="playlist-item-note" placeholder="Custom work / intention..." value="${item.customNote || ''}">
                 </div>
-                <div class="playlist-item-row">
+                <div class="playlist-item-options">
                     <select class="playlist-item-transmission">
                         ${transmissionOptions}
                     </select>
                     <div class="playlist-item-intensity">
-                        <button type="button" data-intensity="low" class="${intensity === 'low' ? 'active' : ''}" onclick="setPlaylistItemIntensity(${itemId}, 'low')">Low</button>
-                        <button type="button" data-intensity="medium" class="${intensity === 'medium' ? 'active' : ''}" onclick="setPlaylistItemIntensity(${itemId}, 'medium')">Med</button>
-                        <button type="button" data-intensity="high" class="${intensity === 'high' ? 'active' : ''}" onclick="setPlaylistItemIntensity(${itemId}, 'high')">High</button>
-                        <button type="button" data-intensity="highest" class="${intensity === 'highest' ? 'active' : ''}" onclick="setPlaylistItemIntensity(${itemId}, 'highest')">Max</button>
+                        <button type="button" data-intensity="low" class="${intensity === 'low' ? 'active' : ''}" onclick="setPlaylistItemIntensity(${itemId}, 'low')">L</button>
+                        <button type="button" data-intensity="medium" class="${intensity === 'medium' ? 'active' : ''}" onclick="setPlaylistItemIntensity(${itemId}, 'medium')">M</button>
+                        <button type="button" data-intensity="high" class="${intensity === 'high' ? 'active' : ''}" onclick="setPlaylistItemIntensity(${itemId}, 'high')">H</button>
+                        <button type="button" data-intensity="highest" class="${intensity === 'highest' ? 'active' : ''}" onclick="setPlaylistItemIntensity(${itemId}, 'highest')">+</button>
                     </div>
                 </div>
             </div>
@@ -2103,14 +2147,15 @@ function renderHistory() {
 
 function renderSessionsHistory() {
     const container = document.getElementById('sessionsHistoryList');
+    const sessions = state.sessions || [];
     
-    if (state.sessions.length === 0) {
+    if (sessions.length === 0) {
         container.innerHTML = '<p class="empty-state">No sessions yet</p>';
         return;
     }
     
-    container.innerHTML = state.sessions.map(s => {
-        const marker = state.markers.find(m => m.marker_id === s.marker_id);
+    container.innerHTML = sessions.map(s => {
+        const marker = state.markers?.find(m => m.marker_id === s.marker_id);
         const name = marker?.name || s.marker_id || 'General';
         const date = formatDate(s.start_time);
         
@@ -2132,10 +2177,11 @@ function renderSessionsHistory() {
 function renderProgressHistory() {
     const container = document.getElementById('progressHistoryList');
     const markerFilter = document.getElementById('progressMarkerFilter').value;
+    const progress = state.progress || [];
     
-    let filtered = state.progress;
+    let filtered = progress;
     if (markerFilter) {
-        filtered = state.progress.filter(p => p.marker_id === markerFilter);
+        filtered = progress.filter(p => p.marker_id === markerFilter);
     }
     
     if (filtered.length === 0) {
@@ -2144,7 +2190,7 @@ function renderProgressHistory() {
     }
     
     container.innerHTML = filtered.map(p => {
-        const marker = state.markers.find(m => m.marker_id === p.marker_id);
+        const marker = state.markers?.find(m => m.marker_id === p.marker_id);
         const name = marker?.name || p.marker_id;
         const date = formatDate(p.timestamp);
         
