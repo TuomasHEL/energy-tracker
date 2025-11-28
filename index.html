@@ -58,11 +58,11 @@
                     </button>
                     <button class="action-btn secondary" onclick="showView('timer')">
                         <span class="btn-icon">⏱</span>
-                        <span class="btn-text">Start Timer</span>
+                        <span class="btn-text">Do a Session</span>
                     </button>
                     <button class="action-btn secondary" onclick="showView('playlists')">
                         <span class="btn-icon">▶</span>
-                        <span class="btn-text">Playlists</span>
+                        <span class="btn-text">Programs</span>
                     </button>
                     <button class="action-btn secondary" onclick="showView('stats')">
                         <span class="btn-icon">📊</span>
@@ -252,24 +252,24 @@
             <!-- Playlists View -->
             <section id="viewPlaylists" class="view">
                 <div class="view-header">
-                    <h2>Playlists</h2>
+                    <h2>Programs</h2>
                     <button class="btn small" onclick="showCreatePlaylist()">+ New</button>
                 </div>
 
                 <div id="playlistsList" class="playlists-list">
-                    <p class="empty-state">No playlists yet</p>
+                    <p class="empty-state">No programs yet</p>
                 </div>
 
                 <!-- Create/Edit Playlist Modal -->
                 <div id="playlistModal" class="modal">
                     <div class="modal-content large">
                         <div class="modal-header">
-                            <h3 id="playlistModalTitle">Create Playlist</h3>
+                            <h3 id="playlistModalTitle">Create Program</h3>
                             <button class="close-btn" onclick="closePlaylistModal()">×</button>
                         </div>
                         <div class="modal-body">
                             <div class="form-group">
-                                <label>Playlist Name</label>
+                                <label>Program Name</label>
                                 <input type="text" id="playlistName" placeholder="e.g., Morning Routine">
                             </div>
 
@@ -289,10 +289,10 @@
                     </div>
                 </div>
 
-                <!-- Running Playlist -->
+                <!-- Running Program -->
                 <div id="playlistRunner" class="playlist-runner hidden">
                     <div class="runner-header">
-                        <h3 id="runningPlaylistName">Playlist Name</h3>
+                        <h3 id="runningPlaylistName">Program Name</h3>
                         <div class="runner-progress">
                             <span id="runnerCurrentItem">1</span> / <span id="runnerTotalItems">5</span>
                         </div>
@@ -467,7 +467,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Energy Tracker v2.2</p>
+                    <p class="version">Energy Tracker v2.3</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>
@@ -485,7 +485,7 @@
             </button>
             <button class="nav-btn" onclick="showView('timer')" data-view="timer">
                 <span class="nav-icon">⏱</span>
-                <span class="nav-label">Timer</span>
+                <span class="nav-label">Energy</span>
             </button>
             <button class="nav-btn" onclick="showView('stats')" data-view="stats">
                 <span class="nav-icon">📊</span>
