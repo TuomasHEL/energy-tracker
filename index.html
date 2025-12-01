@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#1a1a2e">
-    <meta name="description" content="Energy Work Session Manager & Development Tracker">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="description" content="Clear Ground - Energy Work Session Manager & Development Tracker">
     
     <!-- PWA -->
     <link rel="manifest" href="manifest.json">
@@ -12,42 +12,56 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
-    <title>Energy Tracker</title>
+    <title>Clear Ground</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <!-- Animated Background Canvas -->
+    <canvas id="backgroundCanvas"></canvas>
+
+    <!-- Loading Screen -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-icon">
+            <img src="icons/icon.svg" alt="Clear Ground">
+        </div>
+        <div class="loading-app-name">Clear Ground</div>
+        <div class="loading-text">Connecting to the source...</div>
+        <div class="loading-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    </div>
+
     <!-- App Container -->
-    <div id="app">
-        <!-- Header -->
-        <header class="app-header">
-            <div class="header-left">
-                <h1>Energy Tracker</h1>
+    <div class="app-container">
+        <!-- Global Header -->
+        <header class="global-header">
+            <div class="global-header-left">
+                <img src="icons/icon.svg" alt="" class="global-header-icon">
+                <span class="global-header-title">Clear Ground</span>
             </div>
-            <div class="header-right">
-                <div class="user-selector">
-                    <select id="currentUser">
-                        <option value="">Loading...</option>
-                    </select>
-                </div>
-            </div>
+            <select id="currentUser" class="user-selector">
+                <option value="">Loading...</option>
+            </select>
         </header>
 
         <!-- Main Content Area -->
-        <main id="mainContent">
+        <main class="content-area">
             <!-- Dashboard View (Default) -->
             <section id="viewDashboard" class="view active">
-                <div class="dashboard-stats">
+                <div class="stats-summary">
                     <div class="stat-card">
                         <span class="stat-value" id="statTotalMarkers">-</span>
                         <span class="stat-label">Markers</span>
                     </div>
                     <div class="stat-card">
                         <span class="stat-value" id="statTodaySessions">-</span>
-                        <span class="stat-label">Today's Sessions</span>
+                        <span class="stat-label">Today</span>
                     </div>
                     <div class="stat-card">
                         <span class="stat-value" id="statTotalTime">-</span>
-                        <span class="stat-label">Total Time</span>
+                        <span class="stat-label">Total</span>
                     </div>
                 </div>
 
@@ -82,21 +96,21 @@
             <section id="viewTrack" class="view">
                 <div class="view-header">
                     <h2>Track Progress</h2>
-                    <div class="blind-mode-toggle">
-                        <label class="toggle">
-                            <input type="checkbox" id="blindModeToggle" checked>
-                            <span class="toggle-slider"></span>
-                        </label>
-                        <span>Blind Mode</span>
-                    </div>
                 </div>
 
-                <!-- Category Filter -->
-                <div class="category-filter">
-                    <select id="categoryFilter">
+                <!-- Filter Row -->
+                <div class="filter-row">
+                    <select id="categoryFilter" class="filter-group">
                         <option value="">All Categories</option>
                         <option value="Foundations">⭐ Foundations</option>
                     </select>
+                    <div class="toggle-container">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="blindModeToggle" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <label>Blind</label>
+                    </div>
                 </div>
 
                 <!-- Markers List -->
@@ -467,7 +481,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Energy Tracker v2.3</p>
+                    <p class="version">Clear Ground v3.0</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>
@@ -551,16 +565,8 @@
             </div>
         </div>
 
-        <!-- Toast Notifications -->
-        <div id="toast" class="toast"></div>
-
-        <!-- Loading Overlay -->
-        <div id="loadingOverlay" class="loading-overlay hidden">
-            <div class="loading-content">
-                <div class="spinner"></div>
-                <div class="loading-text">Connecting to the source...</div>
-            </div>
-        </div>
+        <!-- Toast Container -->
+        <div class="toast-container" id="toastContainer"></div>
     </div>
 
     <script src="app.js"></script>

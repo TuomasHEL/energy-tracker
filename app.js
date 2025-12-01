@@ -1,5 +1,5 @@
-// Energy Tracker PWA - Main Application
-// Version 2.3 - UI Improvements
+// Clear Ground - Main Application
+// Version 3.0 - Visual Redesign
 
 // ============================================
 // CONFIGURATION
@@ -97,7 +97,9 @@ const state = {
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
-    showLoading();
+    // Start background animation immediately
+    initBackgroundAnimation();
+    
     console.log('App init started');
     
     try {
@@ -2502,21 +2504,125 @@ function formatDuration(minutes) {
 }
 
 function showToast(message, type = 'success') {
-    const toast = document.getElementById('toast');
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
     toast.textContent = message;
-    toast.className = `toast ${type} show`;
+    container.appendChild(toast);
     
     setTimeout(() => {
-        toast.classList.remove('show');
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-20px)';
+        setTimeout(() => toast.remove(), 300);
     }, 3000);
 }
 
+// ============================================
+// BACKGROUND ANIMATION - NODE NETWORK
+// ============================================
+
+let animationFrame;
+let particles = [];
+let canvas, ctx;
+
+function initBackgroundAnimation() {
+    canvas = document.getElementById('backgroundCanvas');
+    if (!canvas) return;
+    
+    ctx = canvas.getContext('2d');
+    resizeCanvas();
+    createParticles();
+    animate();
+    
+    window.addEventListener('resize', resizeCanvas);
+}
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+
+function createParticles() {
+    particles = [];
+    const particleCount = Math.min(40, Math.floor((canvas.width * canvas.height) / 25000));
+    
+    for (let i = 0; i < particleCount; i++) {
+        particles.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            vx: (Math.random() - 0.5) * 0.3,
+            vy: (Math.random() - 0.5) * 0.3,
+            radius: Math.random() * 1.5 + 1
+        });
+    }
+}
+
+function animate() {
+    if (document.hidden) {
+        animationFrame = requestAnimationFrame(animate);
+        return;
+    }
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Update and draw particles
+    particles.forEach(particle => {
+        // Update position
+        particle.x += particle.vx;
+        particle.y += particle.vy;
+        
+        // Wrap around edges
+        if (particle.x < 0) particle.x = canvas.width;
+        if (particle.x > canvas.width) particle.x = 0;
+        if (particle.y < 0) particle.y = canvas.height;
+        if (particle.y > canvas.height) particle.y = 0;
+        
+        // Draw particle
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.fill();
+    });
+    
+    // Draw connections
+    const connectionDistance = 120;
+    ctx.strokeStyle = 'rgba(139, 92, 246, 0.15)';
+    ctx.lineWidth = 1;
+    
+    for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+            const dx = particles[i].x - particles[j].x;
+            const dy = particles[i].y - particles[j].y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance < connectionDistance) {
+                const opacity = 1 - (distance / connectionDistance);
+                ctx.strokeStyle = `rgba(139, 92, 246, ${opacity * 0.15})`;
+                ctx.beginPath();
+                ctx.moveTo(particles[i].x, particles[i].y);
+                ctx.lineTo(particles[j].x, particles[j].y);
+                ctx.stroke();
+            }
+        }
+    }
+    
+    animationFrame = requestAnimationFrame(animate);
+}
+
+// ============================================
+// LOADING SCREEN
+// ============================================
+
 function showLoading() {
-    document.getElementById('loadingOverlay').classList.remove('hidden');
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.classList.remove('hidden');
 }
 
 function hideLoading() {
-    document.getElementById('loadingOverlay').classList.add('hidden');
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.classList.add('hidden');
 }
 
 // ============================================

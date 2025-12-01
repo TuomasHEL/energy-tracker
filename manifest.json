@@ -1,55 +1,25 @@
 {
-    "name": "Energy Work Tracker",
-    "short_name": "Energy Tracker",
+    "name": "Clear Ground",
+    "short_name": "Clear Ground",
     "description": "Energy Work Session Manager & Development Tracker",
     "start_url": "/energy-tracker/",
     "scope": "/energy-tracker/",
     "display": "standalone",
-    "background_color": "#0f0f1a",
-    "theme_color": "#1a1a2e",
+    "background_color": "#0a0a0a",
+    "theme_color": "#0a0a0a",
     "orientation": "portrait",
     "icons": [
         {
-            "src": "icons/icon-72.png",
-            "sizes": "72x72",
-            "type": "image/png"
+            "src": "icons/icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
         },
         {
-            "src": "icons/icon-96.png",
-            "sizes": "96x96",
-            "type": "image/png"
-        },
-        {
-            "src": "icons/icon-128.png",
-            "sizes": "128x128",
-            "type": "image/png"
-        },
-        {
-            "src": "icons/icon-144.png",
-            "sizes": "144x144",
-            "type": "image/png"
-        },
-        {
-            "src": "icons/icon-152.png",
-            "sizes": "152x152",
-            "type": "image/png"
-        },
-        {
-            "src": "icons/icon-192.png",
-            "sizes": "192x192",
-            "type": "image/png",
-            "purpose": "any maskable"
-        },
-        {
-            "src": "icons/icon-384.png",
-            "sizes": "384x384",
-            "type": "image/png"
-        },
-        {
-            "src": "icons/icon-512.png",
+            "src": "icons/icon.svg",
             "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "any maskable"
+            "type": "image/svg+xml",
+            "purpose": "maskable"
         }
     ],
     "categories": ["health", "lifestyle", "productivity"],

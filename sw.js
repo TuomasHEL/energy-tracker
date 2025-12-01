@@ -1,12 +1,13 @@
-// Energy Tracker - Service Worker
-const CACHE_NAME = 'energy-tracker-v2';
+// Clear Ground - Service Worker
+const CACHE_NAME = 'clear-ground-v3';
 const BASE_PATH = '/energy-tracker/';
 const urlsToCache = [
     BASE_PATH,
     BASE_PATH + 'index.html',
     BASE_PATH + 'styles.css',
     BASE_PATH + 'app.js',
-    BASE_PATH + 'manifest.json'
+    BASE_PATH + 'manifest.json',
+    BASE_PATH + 'icons/icon.svg'
 ];
 
 // Install event
@@ -77,7 +78,5 @@ self.addEventListener('sync', event => {
 });
 
 async function syncData() {
-    // This would sync any offline-queued data
-    // For now, it's a placeholder
     console.log('Background sync triggered');
 }
