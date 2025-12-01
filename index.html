@@ -166,7 +166,7 @@
             <!-- Timer View -->
             <section id="viewTimer" class="view">
                 <div class="view-header">
-                    <h2>Energy Work Timer</h2>
+                    <h2>Energy Work</h2>
                 </div>
 
                 <!-- Timer Setup (shown when no timer running) -->
@@ -301,7 +301,7 @@
                         </div>
                         <div class="modal-footer">
                             <button class="btn secondary" onclick="closePlaylistModal()">Cancel</button>
-                            <button class="btn primary" onclick="savePlaylist()">Save Playlist</button>
+                            <button class="btn primary" onclick="savePlaylist()">Save Program</button>
                         </div>
                     </div>
                 </div>
@@ -375,6 +375,11 @@
                     <div class="chart-card">
                         <h3>Time by Marker</h3>
                         <div id="markerBreakdown" class="breakdown-list"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <h3>Recent Activity</h3>
+                        <div id="recentActivityList" class="activity-list"></div>
                     </div>
 
                     <div class="chart-card">

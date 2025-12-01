@@ -816,6 +816,8 @@ function updateDashboard() {
 
 function renderRecentActivity() {
     const container = document.getElementById('recentActivityList');
+    if (!container) return;
+    
     const sessions = state.sessions || [];
     const progress = state.progress || [];
     const recentItems = [...sessions, ...progress]
@@ -881,6 +883,7 @@ function updateStats() {
     
     renderDailyChart(filteredSessions, period);
     renderMarkerBreakdown(filteredSessions);
+    renderRecentActivity();
     renderCorrelationView(filteredSessions, filteredProgress);
 }
 
@@ -2622,13 +2625,13 @@ function animate() {
         // Draw particle
         ctx.beginPath();
         ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.fillStyle = 'rgba(139, 92, 246, 0.5)';
         ctx.fill();
     });
     
     // Draw connections
     const connectionDistance = 120;
-    ctx.strokeStyle = 'rgba(139, 92, 246, 0.15)';
+    ctx.strokeStyle = 'rgba(139, 92, 246, 0.2)';
     ctx.lineWidth = 1;
     
     for (let i = 0; i < particles.length; i++) {
@@ -2639,7 +2642,7 @@ function animate() {
             
             if (distance < connectionDistance) {
                 const opacity = 1 - (distance / connectionDistance);
-                ctx.strokeStyle = `rgba(139, 92, 246, ${opacity * 0.15})`;
+                ctx.strokeStyle = `rgba(139, 92, 246, ${opacity * 0.25})`;
                 ctx.beginPath();
                 ctx.moveTo(particles[i].x, particles[i].y);
                 ctx.lineTo(particles[j].x, particles[j].y);
