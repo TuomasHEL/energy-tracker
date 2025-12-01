@@ -40,12 +40,13 @@ const state = {
     sessions: [],
     progress: [],
     playlists: [],
+    transmissions: [], // Cloud-synced transmissions
+    intentions: null,  // User intentions/profile
     
     // Settings
     settings: {
         soundEnabled: false,
         vibrationEnabled: false,
-        transmissions: [...DEFAULT_TRANSMISSIONS],
         collapsedCategories: {}
     },
     
@@ -136,7 +137,10 @@ async function init() {
         // Load initial data for current user
         if (state.currentUser) {
             await loadUserData();
+            await loadTransmissions();
+            await loadIntentions();
             console.log('User data loaded - sessions:', state.sessions?.length, 'progress:', state.progress?.length, 'playlists:', state.playlists?.length);
+            console.log('Transmissions loaded:', state.transmissions?.length);
         }
         
         // Restore timer if it was running
@@ -163,6 +167,9 @@ async function init() {
         // Render transmissions list in settings
         renderTransmissionsList();
         
+        // Update profile view if visible
+        updateProfileView();
+        
         console.log('App init completed successfully');
         
     } catch (error) {
@@ -183,10 +190,6 @@ function loadSettings() {
         try {
             const parsed = JSON.parse(saved);
             state.settings = { ...state.settings, ...parsed };
-            // Ensure transmissions array exists
-            if (!state.settings.transmissions || !Array.isArray(state.settings.transmissions)) {
-                state.settings.transmissions = [...DEFAULT_TRANSMISSIONS];
-            }
             // Ensure collapsedCategories exists
             if (!state.settings.collapsedCategories) {
                 state.settings.collapsedCategories = {};
@@ -218,10 +221,11 @@ function applySettingsToUI() {
 
 function populateTransmissionsDropdown() {
     const select = document.getElementById('energyType');
+    if (!select) return;
     
     let options = '<option value="">Select type...</option>';
-    state.settings.transmissions.forEach(t => {
-        options += `<option value="${t}">${t}</option>`;
+    state.transmissions.forEach(t => {
+        options += `<option value="${t.name}">${t.name}</option>`;
     });
     options += '<option value="Other">Other</option>';
     
@@ -230,24 +234,25 @@ function populateTransmissionsDropdown() {
 
 function renderTransmissionsList() {
     const container = document.getElementById('transmissionsList');
+    if (!container) return;
     
-    if (state.settings.transmissions.length === 0) {
-        container.innerHTML = '<p class="empty-state">No custom transmissions</p>';
+    if (state.transmissions.length === 0) {
+        container.innerHTML = '<p class="empty-state">No transmissions</p>';
         return;
     }
     
-    container.innerHTML = state.settings.transmissions.map((t, i) => `
+    container.innerHTML = state.transmissions.map(t => `
         <div class="transmission-item">
-            <span>${t}</span>
-            ${!DEFAULT_TRANSMISSIONS.includes(t) ? 
-                `<button class="btn tiny danger" onclick="removeTransmission(${i})">×</button>` :
-                ''
+            <span>${t.name}</span>
+            ${!t.is_default ? 
+                `<button class="btn tiny danger" onclick="removeTransmission('${t.transmission_id}')">×</button>` :
+                '<span class="transmission-default">default</span>'
             }
         </div>
     `).join('');
 }
 
-function addTransmission() {
+async function addTransmission() {
     const input = document.getElementById('newTransmissionName');
     const name = input.value.trim();
     
@@ -256,25 +261,55 @@ function addTransmission() {
         return;
     }
     
-    if (state.settings.transmissions.includes(name)) {
+    // Check if already exists
+    if (state.transmissions.some(t => t.name.toLowerCase() === name.toLowerCase())) {
         showToast('Transmission already exists', 'error');
         return;
     }
     
-    state.settings.transmissions.push(name);
-    saveSettings();
-    renderTransmissionsList();
-    populateTransmissionsDropdown();
-    input.value = '';
-    showToast('Transmission added!', 'success');
+    try {
+        const response = await fetch(`${API_URL}?action=addTransmission&userId=${state.currentUser.user_id}&name=${encodeURIComponent(name)}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            // Add to local state
+            state.transmissions.push({
+                transmission_id: result.transmissionId,
+                user_id: state.currentUser.user_id,
+                name: name,
+                is_default: false
+            });
+            renderTransmissionsList();
+            populateTransmissionsDropdown();
+            input.value = '';
+            showToast('Transmission added!', 'success');
+        } else {
+            throw new Error(result.error || 'Failed to add transmission');
+        }
+    } catch (error) {
+        console.error('Error adding transmission:', error);
+        showToast('Failed to add transmission', 'error');
+    }
 }
 
-function removeTransmission(index) {
-    state.settings.transmissions.splice(index, 1);
-    saveSettings();
-    renderTransmissionsList();
-    populateTransmissionsDropdown();
-    showToast('Transmission removed', 'success');
+async function removeTransmission(transmissionId) {
+    try {
+        const response = await fetch(`${API_URL}?action=deleteTransmission&transmissionId=${transmissionId}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            // Remove from local state
+            state.transmissions = state.transmissions.filter(t => t.transmission_id !== transmissionId);
+            renderTransmissionsList();
+            populateTransmissionsDropdown();
+            showToast('Transmission removed', 'success');
+        } else {
+            throw new Error(result.error || 'Failed to remove transmission');
+        }
+    } catch (error) {
+        console.error('Error removing transmission:', error);
+        showToast(error.message || 'Failed to remove transmission', 'error');
+    }
 }
 
 // ============================================
@@ -671,6 +706,45 @@ async function loadUserData() {
     }
 }
 
+async function loadTransmissions() {
+    if (!state.currentUser) {
+        console.log('No current user, skipping transmissions load');
+        return;
+    }
+    
+    try {
+        const data = await apiCall('getTransmissions', {
+            userId: state.currentUser.user_id
+        });
+        console.log('Transmissions response:', data);
+        state.transmissions = data?.transmissions || [];
+        if (!Array.isArray(state.transmissions)) state.transmissions = [];
+        console.log('Loaded transmissions:', state.transmissions.length);
+    } catch (error) {
+        console.error('Error loading transmissions:', error);
+        state.transmissions = [];
+    }
+}
+
+async function loadIntentions() {
+    if (!state.currentUser) {
+        console.log('No current user, skipping intentions load');
+        return;
+    }
+    
+    try {
+        const data = await apiCall('getIntentions', {
+            userId: state.currentUser.user_id
+        });
+        console.log('Intentions response:', data);
+        state.intentions = data?.intentions || null;
+        console.log('Loaded intentions:', state.intentions ? 'yes' : 'no');
+    } catch (error) {
+        console.error('Error loading intentions:', error);
+        state.intentions = null;
+    }
+}
+
 // ============================================
 // UI POPULATION FUNCTIONS
 // ============================================
@@ -783,6 +857,9 @@ function showView(viewName) {
                 populateProgressTrendSelect();
                 // Small delay to ensure canvas container is visible before rendering
                 setTimeout(() => updateStats(), 50);
+                break;
+            case 'profile':
+                updateProfileView();
                 break;
         }
     } catch (error) {
@@ -2455,6 +2532,230 @@ async function syncData() {
 }
 
 // ============================================
+// PROFILE & INTENTIONS
+// ============================================
+
+let currentEditingIntention = null;
+
+const intentionHelpers = {
+    release_beliefs: "What beliefs hold you back? (e.g., 'I'm not good enough', 'I don't deserve success'). Describe how you'd like to transform them.",
+    release_emotions: "List the negative emotions (fears, doubts, guilt, shame, anger, resentment) you frequently experience. How would you feel without them?",
+    release_trauma: "Describe any past trauma, addictions, or bad habits you're ready to let go of. Imagine how your life will change without them.",
+    raise_consciousness: "Envision living fully in the present moment. Describe your journey towards realizing your True Self.",
+    raise_intelligences: "Which intelligences do you want to strengthen? (Cognitive, Emotional, Spiritual, Somatic, Interpersonal, Moral, Creative). Specify areas for focused development.",
+    realize_health: "Paint a picture of your life with optimal health. How does it influence your daily activities and overall happiness?",
+    realize_wealth: "Describe your ideal career path and financial status. How do these aspects contribute to your sense of fulfillment?",
+    realize_relationships: "Describe the ideal state of relationships in your life, focusing on the qualities of connections you wish to cultivate.",
+    realize_other: "List any other intentions, goals, or short-term objectives you're aiming for."
+};
+
+const intentionLabels = {
+    release_beliefs: "Limiting Beliefs & Blocks",
+    release_emotions: "Negative Patterns",
+    release_trauma: "Trauma & Habits",
+    raise_consciousness: "Consciousness & Presence",
+    raise_intelligences: "Developing Capacities",
+    realize_health: "Health & Vitality",
+    realize_wealth: "Abundance & Purpose",
+    realize_relationships: "Relationships & Connection",
+    realize_other: "Other Intentions"
+};
+
+const intentionPlaceholders = {
+    release_beliefs: "What beliefs hold you back? Tap to add...",
+    release_emotions: "What emotions do you want to release? Tap to add...",
+    release_trauma: "What patterns are you ready to let go of? Tap to add...",
+    raise_consciousness: "Describe your vision of living fully present. Tap to add...",
+    raise_intelligences: "Which intelligences do you want to strengthen? Tap to add...",
+    realize_health: "Describe your optimal state of health. Tap to add...",
+    realize_wealth: "What does fulfilling work look like for you? Tap to add...",
+    realize_relationships: "Describe the quality of relationships you want. Tap to add...",
+    realize_other: "Any other goals or dreams? Tap to add..."
+};
+
+function updateProfileView() {
+    // Update username
+    const usernameEl = document.getElementById('profileUsername');
+    if (usernameEl && state.currentUser) {
+        usernameEl.textContent = state.currentUser.name;
+    }
+    
+    // Update network connection state
+    const networkCard = document.getElementById('networkCard');
+    const networkToggle = document.getElementById('networkConnectedToggle');
+    
+    if (networkCard && networkToggle) {
+        const isConnected = state.intentions?.network_connected || false;
+        networkToggle.checked = isConnected;
+        networkCard.classList.toggle('connected', isConnected);
+        
+        const statusEl = document.getElementById('networkStatus');
+        if (statusEl) {
+            if (isConnected) {
+                statusEl.textContent = "Connected. Energy work aligned with your intentions is being channeled to support your journey.";
+            } else {
+                statusEl.textContent = "I open myself to receive energy work that serves my highest good and spiritual evolution.";
+            }
+        }
+    }
+    
+    // Update intention previews
+    updateIntentionPreviews();
+}
+
+function updateIntentionPreviews() {
+    const fields = [
+        'release_beliefs', 'release_emotions', 'release_trauma',
+        'raise_consciousness', 'raise_intelligences',
+        'realize_health', 'realize_wealth', 'realize_relationships', 'realize_other'
+    ];
+    
+    fields.forEach(field => {
+        const previewEl = document.getElementById(`preview_${field}`);
+        const cardEl = previewEl?.closest('.intention-card');
+        
+        if (previewEl) {
+            const value = state.intentions?.[field] || '';
+            if (value) {
+                // Truncate to ~100 chars for preview
+                previewEl.textContent = value.length > 100 ? value.substring(0, 100) + '...' : value;
+                cardEl?.classList.add('has-content');
+            } else {
+                previewEl.textContent = intentionPlaceholders[field];
+                cardEl?.classList.remove('has-content');
+            }
+        }
+    });
+}
+
+function switchIntentionTab(tab) {
+    // Update tab buttons
+    document.querySelectorAll('.intention-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    
+    // Update content panels
+    document.getElementById('intentionRelease').classList.toggle('active', tab === 'release');
+    document.getElementById('intentionRaise').classList.toggle('active', tab === 'raise');
+    document.getElementById('intentionRealize').classList.toggle('active', tab === 'realize');
+}
+
+function editIntention(field) {
+    currentEditingIntention = field;
+    
+    const modal = document.getElementById('intentionModal');
+    const titleEl = document.getElementById('intentionModalTitle');
+    const helperEl = document.getElementById('intentionHelper');
+    const textareaEl = document.getElementById('intentionTextarea');
+    
+    titleEl.textContent = intentionLabels[field] || 'Edit Intention';
+    helperEl.textContent = intentionHelpers[field] || 'Describe your intention...';
+    textareaEl.value = state.intentions?.[field] || '';
+    textareaEl.placeholder = "Take your time to articulate what you truly want...";
+    
+    modal.classList.add('active');
+    
+    // Focus textarea after animation
+    setTimeout(() => textareaEl.focus(), 100);
+}
+
+function closeIntentionModal() {
+    currentEditingIntention = null;
+    document.getElementById('intentionModal').classList.remove('active');
+}
+
+async function saveIntention() {
+    if (!currentEditingIntention || !state.currentUser) return;
+    
+    const textareaEl = document.getElementById('intentionTextarea');
+    const value = textareaEl.value.trim();
+    
+    try {
+        const params = new URLSearchParams({
+            action: 'saveIntentions',
+            userId: state.currentUser.user_id,
+            [currentEditingIntention]: value
+        });
+        
+        const response = await fetch(`${API_URL}?${params.toString()}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            // Update local state
+            if (!state.intentions) {
+                state.intentions = {
+                    user_id: state.currentUser.user_id,
+                    network_connected: false
+                };
+            }
+            state.intentions[currentEditingIntention] = value;
+            
+            // Update UI
+            updateIntentionPreviews();
+            closeIntentionModal();
+            showToast('Intention saved', 'success');
+        } else {
+            throw new Error(result.error || 'Failed to save intention');
+        }
+    } catch (error) {
+        console.error('Error saving intention:', error);
+        showToast('Failed to save intention', 'error');
+    }
+}
+
+async function toggleNetworkConnection(connected) {
+    if (!state.currentUser) return;
+    
+    try {
+        const params = new URLSearchParams({
+            action: 'saveIntentions',
+            userId: state.currentUser.user_id,
+            network_connected: connected
+        });
+        
+        const response = await fetch(`${API_URL}?${params.toString()}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            // Update local state
+            if (!state.intentions) {
+                state.intentions = {
+                    user_id: state.currentUser.user_id,
+                    network_connected: connected
+                };
+            } else {
+                state.intentions.network_connected = connected;
+            }
+            
+            // Update UI
+            const networkCard = document.getElementById('networkCard');
+            const statusEl = document.getElementById('networkStatus');
+            
+            if (networkCard) {
+                networkCard.classList.toggle('connected', connected);
+            }
+            
+            if (statusEl) {
+                if (connected) {
+                    statusEl.textContent = "Connected. Energy work aligned with your intentions is being channeled to support your journey.";
+                } else {
+                    statusEl.textContent = "I open myself to receive energy work that serves my highest good and spiritual evolution.";
+                }
+            }
+            
+            showToast(connected ? 'Connected to Clear Ground Network' : 'Disconnected from network', 'success');
+        } else {
+            throw new Error(result.error || 'Failed to update connection');
+        }
+    } catch (error) {
+        console.error('Error toggling network connection:', error);
+        // Revert toggle
+        document.getElementById('networkConnectedToggle').checked = !connected;
+        showToast('Failed to update connection', 'error');
+    }
+}
+
+// ============================================
 // EVENT LISTENERS
 // ============================================
 
@@ -2466,7 +2767,12 @@ function setupEventListeners() {
         
         showLoading();
         await loadUserData();
+        await loadTransmissions();
+        await loadIntentions();
         updateDashboard();
+        populateTransmissionsDropdown();
+        renderTransmissionsList();
+        updateProfileView();
         hideLoading();
     });
     

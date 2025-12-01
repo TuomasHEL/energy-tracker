@@ -1,5 +1,5 @@
 // Clear Ground - Service Worker
-const CACHE_NAME = 'clear-ground-v3';
+const CACHE_NAME = 'clear-ground-v3.1';
 const BASE_PATH = '/energy-tracker/';
 const urlsToCache = [
     BASE_PATH,
