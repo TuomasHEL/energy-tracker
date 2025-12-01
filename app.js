@@ -780,7 +780,9 @@ function showView(viewName) {
                 renderPlaylists();
                 break;
             case 'stats':
-                updateStats();
+                populateProgressTrendSelect();
+                // Small delay to ensure canvas container is visible before rendering
+                setTimeout(() => updateStats(), 50);
                 break;
         }
     } catch (error) {
@@ -914,6 +916,9 @@ function filterProgressByPeriod(period) {
 
 function renderDailyChart(sessions, period) {
     const canvas = document.getElementById('dailyChart');
+    if (!canvas) return;
+    
+    const container = canvas.parentElement;
     const ctx = canvas.getContext('2d');
     
     const days = period === 'all' ? 30 : Math.min(parseInt(period), 30);
@@ -933,54 +938,70 @@ function renderDailyChart(sessions, period) {
         labels.push(date.getDate().toString());
     }
     
-    const width = canvas.offsetWidth;
-    const height = canvas.offsetHeight;
-    canvas.width = width * 2;
-    canvas.height = height * 2;
-    ctx.scale(2, 2);
+    // Get container dimensions
+    const rect = container.getBoundingClientRect();
+    const width = rect.width || 300;
+    const height = rect.height || 200;
+    
+    // Set canvas size with retina support
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    ctx.scale(dpr, dpr);
     
     ctx.clearRect(0, 0, width, height);
     
     if (dailyData.every(d => d === 0)) {
-        ctx.fillStyle = '#6a6a7a';
-        ctx.font = '14px sans-serif';
+        ctx.fillStyle = '#666666';
+        ctx.font = '14px -apple-system, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('No session data for this period', width / 2, height / 2);
         return;
     }
     
     const maxValue = Math.max(...dailyData, 60);
-    const barWidth = (width - 40) / dailyData.length - 2;
-    const chartHeight = height - 40;
+    const padding = { left: 35, right: 10, top: 20, bottom: 30 };
+    const chartWidth = width - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
+    const barWidth = Math.max(4, (chartWidth / dailyData.length) - 2);
+    const barGap = (chartWidth - (barWidth * dailyData.length)) / (dailyData.length - 1 || 1);
     
     dailyData.forEach((value, i) => {
         const barHeight = (value / maxValue) * chartHeight;
-        const x = 30 + i * (barWidth + 2);
-        const y = height - 25 - barHeight;
+        const x = padding.left + i * (barWidth + barGap);
+        const y = padding.top + chartHeight - barHeight;
         
-        const gradient = ctx.createLinearGradient(x, y + barHeight, x, y);
-        gradient.addColorStop(0, '#7c3aed');
-        gradient.addColorStop(1, '#a855f7');
-        
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.roundRect(x, y, barWidth, barHeight, 3);
-        ctx.fill();
+        if (barHeight > 0) {
+            const gradient = ctx.createLinearGradient(x, y + barHeight, x, y);
+            gradient.addColorStop(0, '#8b5cf6');
+            gradient.addColorStop(1, '#a78bfa');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.roundRect(x, y, barWidth, barHeight, 2);
+            ctx.fill();
+        }
     });
     
-    ctx.fillStyle = '#6a6a7a';
-    ctx.font = '10px sans-serif';
+    // X-axis labels
+    ctx.fillStyle = '#666666';
+    ctx.font = '10px -apple-system, sans-serif';
     ctx.textAlign = 'center';
+    
+    const labelInterval = Math.ceil(dailyData.length / 7);
     labels.forEach((label, i) => {
-        if (i % 5 === 0 || i === labels.length - 1) {
-            const x = 30 + i * (barWidth + 2) + barWidth / 2;
+        if (i % labelInterval === 0 || i === labels.length - 1) {
+            const x = padding.left + i * (barWidth + barGap) + barWidth / 2;
             ctx.fillText(label, x, height - 8);
         }
     });
     
+    // Y-axis labels
     ctx.textAlign = 'right';
-    ctx.fillText('0', 25, height - 25);
-    ctx.fillText(`${Math.round(maxValue)}m`, 25, 20);
+    ctx.fillText('0', padding.left - 5, padding.top + chartHeight);
+    ctx.fillText(`${Math.round(maxValue)}m`, padding.left - 5, padding.top + 5);
 }
 
 function renderMarkerBreakdown(sessions) {
@@ -1043,35 +1064,52 @@ function updateProgressTrend() {
 
 function clearProgressChart() {
     const canvas = document.getElementById('progressChart');
+    if (!canvas) return;
+    
+    const container = canvas.parentElement;
     const ctx = canvas.getContext('2d');
-    const width = canvas.offsetWidth;
-    const height = canvas.offsetHeight;
-    canvas.width = width * 2;
-    canvas.height = height * 2;
-    ctx.scale(2, 2);
+    
+    const rect = container.getBoundingClientRect();
+    const width = rect.width || 300;
+    const height = rect.height || 200;
+    
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, width, height);
     
-    ctx.fillStyle = '#6a6a7a';
-    ctx.font = '14px sans-serif';
+    ctx.fillStyle = '#666666';
+    ctx.font = '14px -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('Select a marker to see trends', width / 2, height / 2);
 }
 
 function renderProgressChart(progressData) {
     const canvas = document.getElementById('progressChart');
+    if (!canvas) return;
+    
+    const container = canvas.parentElement;
     const ctx = canvas.getContext('2d');
     
-    const width = canvas.offsetWidth;
-    const height = canvas.offsetHeight;
-    canvas.width = width * 2;
-    canvas.height = height * 2;
-    ctx.scale(2, 2);
+    const rect = container.getBoundingClientRect();
+    const width = rect.width || 300;
+    const height = rect.height || 200;
+    
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    ctx.scale(dpr, dpr);
     
     ctx.clearRect(0, 0, width, height);
     
     if (progressData.length === 0) {
-        ctx.fillStyle = '#6a6a7a';
-        ctx.font = '14px sans-serif';
+        ctx.fillStyle = '#666666';
+        ctx.font = '14px -apple-system, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('No progress data for this marker', width / 2, height / 2);
         return;
@@ -1082,17 +1120,19 @@ function renderProgressChart(progressData) {
     const maxValue = Math.max(...values) + 5;
     const range = maxValue - minValue || 1;
     
-    const chartWidth = width - 50;
-    const chartHeight = height - 40;
+    const padding = { left: 45, right: 15, top: 20, bottom: 25 };
+    const chartWidth = width - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
     const pointSpacing = chartWidth / Math.max(values.length - 1, 1);
     
+    // Draw line
     ctx.beginPath();
-    ctx.strokeStyle = '#a855f7';
+    ctx.strokeStyle = '#8b5cf6';
     ctx.lineWidth = 2;
     
     values.forEach((value, i) => {
-        const x = 40 + i * pointSpacing;
-        const y = 20 + chartHeight - ((value - minValue) / range) * chartHeight;
+        const x = padding.left + i * pointSpacing;
+        const y = padding.top + chartHeight - ((value - minValue) / range) * chartHeight;
         
         if (i === 0) {
             ctx.moveTo(x, y);
@@ -1102,21 +1142,23 @@ function renderProgressChart(progressData) {
     });
     ctx.stroke();
     
+    // Draw points
     values.forEach((value, i) => {
-        const x = 40 + i * pointSpacing;
-        const y = 20 + chartHeight - ((value - minValue) / range) * chartHeight;
+        const x = padding.left + i * pointSpacing;
+        const y = padding.top + chartHeight - ((value - minValue) / range) * chartHeight;
         
         ctx.beginPath();
-        ctx.fillStyle = '#7c3aed';
+        ctx.fillStyle = '#8b5cf6';
         ctx.arc(x, y, 4, 0, Math.PI * 2);
         ctx.fill();
     });
     
-    ctx.fillStyle = '#6a6a7a';
-    ctx.font = '10px sans-serif';
+    // Y-axis labels
+    ctx.fillStyle = '#666666';
+    ctx.font = '10px -apple-system, sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillText(`${Math.round(maxValue)}%`, 35, 25);
-    ctx.fillText(`${Math.round(minValue)}%`, 35, height - 20);
+    ctx.fillText(`${Math.round(maxValue)}%`, padding.left - 5, padding.top + 5);
+    ctx.fillText(`${Math.round(minValue)}%`, padding.left - 5, height - padding.bottom);
 }
 
 function renderCorrelationView(sessions, progress) {
