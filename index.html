@@ -50,6 +50,32 @@
         <main class="content-area">
             <!-- Dashboard View (Default) -->
             <section id="viewDashboard" class="view active">
+                <!-- Hero Section with Icon -->
+                <div class="dashboard-hero">
+                    <img src="icons/icon.svg" alt="" class="hero-icon">
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="quick-actions">
+                    <button class="action-btn" onclick="showView('track')">
+                        <span class="btn-icon">◎</span>
+                        <span class="btn-text">Track Progress</span>
+                    </button>
+                    <button class="action-btn" onclick="showView('timer')">
+                        <span class="btn-icon">⏱</span>
+                        <span class="btn-text">Do a Session</span>
+                    </button>
+                    <button class="action-btn" onclick="showView('playlists')">
+                        <span class="btn-icon">▶</span>
+                        <span class="btn-text">Programs</span>
+                    </button>
+                    <button class="action-btn" onclick="showView('stats')">
+                        <span class="btn-icon">☰</span>
+                        <span class="btn-text">Statistics</span>
+                    </button>
+                </div>
+
+                <!-- Stats Summary (moved below actions) -->
                 <div class="stats-summary">
                     <div class="stat-card">
                         <span class="stat-value" id="statTotalMarkers">-</span>
@@ -62,32 +88,6 @@
                     <div class="stat-card">
                         <span class="stat-value" id="statTotalTime">-</span>
                         <span class="stat-label">Total</span>
-                    </div>
-                </div>
-
-                <div class="quick-actions">
-                    <button class="action-btn primary" onclick="showView('track')">
-                        <span class="btn-icon">◎</span>
-                        <span class="btn-text">Track Progress</span>
-                    </button>
-                    <button class="action-btn secondary" onclick="showView('timer')">
-                        <span class="btn-icon">⏱</span>
-                        <span class="btn-text">Do a Session</span>
-                    </button>
-                    <button class="action-btn secondary" onclick="showView('playlists')">
-                        <span class="btn-icon">▶</span>
-                        <span class="btn-text">Programs</span>
-                    </button>
-                    <button class="action-btn secondary" onclick="showView('stats')">
-                        <span class="btn-icon">📊</span>
-                        <span class="btn-text">Statistics</span>
-                    </button>
-                </div>
-
-                <div class="recent-activity">
-                    <h3>Recent Activity</h3>
-                    <div id="recentActivityList" class="activity-list">
-                        <p class="empty-state">No recent activity</p>
                     </div>
                 </div>
             </section>
@@ -505,7 +505,7 @@
                 <span class="nav-label">Energy</span>
             </button>
             <button class="nav-btn" onclick="showView('stats')" data-view="stats">
-                <span class="nav-icon">📊</span>
+                <span class="nav-icon">▤</span>
                 <span class="nav-label">Stats</span>
             </button>
             <button class="nav-btn" onclick="showView('settings')" data-view="settings">

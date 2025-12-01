@@ -812,8 +812,6 @@ function updateDashboard() {
     const hours = Math.floor(totalMinutes / 60);
     const mins = totalMinutes % 60;
     document.getElementById('statTotalTime').textContent = `${hours}h ${mins}m`;
-    
-    renderRecentActivity();
 }
 
 function renderRecentActivity() {

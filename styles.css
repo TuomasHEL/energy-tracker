@@ -393,6 +393,23 @@ body {
    ACTION BUTTONS (Dashboard)
    ============================================ */
 
+/* Dashboard Hero */
+.dashboard-hero {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-xl) 0;
+    min-height: 25vh;
+}
+
+.hero-icon {
+    width: 120px;
+    height: 120px;
+    opacity: 0.15;
+    filter: grayscale(30%);
+}
+
+/* Quick Actions */
 .quick-actions {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -418,26 +435,45 @@ body {
 }
 
 .action-btn:hover {
-    border-color: var(--text-muted);
-    color: var(--text-primary);
-}
-
-.action-btn.primary {
     border-color: var(--accent-primary);
     color: var(--text-primary);
+    background: rgba(139, 92, 246, 0.05);
 }
 
-.action-btn.primary:hover {
-    background: rgba(139, 92, 246, 0.1);
+.action-btn:active {
+    transform: scale(0.98);
 }
 
 .btn-icon {
     font-size: 1.5rem;
-    opacity: 0.8;
+    opacity: 0.7;
 }
 
 .btn-text {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
+    font-weight: 400;
+}
+
+/* Dashboard Stats Summary */
+#viewDashboard .stats-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-sm);
+    margin-top: var(--space-md);
+}
+
+#viewDashboard .stat-card {
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    padding: var(--space-md) var(--space-sm);
+}
+
+#viewDashboard .stat-value {
+    font-size: 1.25rem;
+}
+
+#viewDashboard .stat-label {
+    font-size: 0.65rem;
 }
 
 /* ============================================
