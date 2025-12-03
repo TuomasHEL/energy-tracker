@@ -2640,6 +2640,393 @@ input:checked + .toggle-slider:before {
 }
 
 /* ============================================
+   AWAKEN SECTION
+   ============================================ */
+
+/* Awaken Launcher */
+.awaken-intro {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: var(--space-lg);
+    line-height: 1.5;
+}
+
+.practice-card {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-md);
+    padding: var(--space-lg);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    margin-bottom: var(--space-md);
+}
+
+.practice-card:hover {
+    border-color: var(--accent-primary);
+    background: rgba(139, 92, 246, 0.05);
+}
+
+.practice-card:active {
+    transform: scale(0.99);
+}
+
+.practice-icon {
+    font-size: 2rem;
+    color: var(--accent-primary);
+    opacity: 0.8;
+    flex-shrink: 0;
+}
+
+.practice-content {
+    flex: 1;
+}
+
+.practice-title {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin: 0 0 var(--space-sm) 0;
+}
+
+.practice-description {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 0 0 var(--space-md) 0;
+}
+
+.practice-meta {
+    display: flex;
+    gap: var(--space-md);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.practice-completed {
+    color: var(--success);
+}
+
+.practice-arrow {
+    font-size: 1.25rem;
+    color: var(--text-muted);
+    align-self: center;
+}
+
+.coming-soon-text {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-top: var(--space-xl);
+    font-style: italic;
+}
+
+/* Awaken Session (Immersive) */
+.awaken-session-view {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-primary);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+}
+
+.awaken-session-view.active {
+    display: flex;
+}
+
+.session-exit-btn {
+    position: absolute;
+    top: var(--space-md);
+    right: var(--space-md);
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: var(--space-sm);
+    z-index: 10;
+    transition: color var(--transition-fast);
+}
+
+.session-exit-btn:hover {
+    color: var(--text-primary);
+}
+
+.session-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: var(--space-xl);
+    padding-top: 60px;
+    overflow-y: auto;
+    text-align: center;
+}
+
+.session-text {
+    max-width: 400px;
+    font-size: 1.1rem;
+    line-height: 1.8;
+    color: var(--text-primary);
+    margin-bottom: var(--space-lg);
+}
+
+.session-text p {
+    margin-bottom: var(--space-md);
+}
+
+.session-text p:last-child {
+    margin-bottom: 0;
+}
+
+/* Session Timer */
+.session-timer {
+    margin: var(--space-xl) 0;
+    width: 100%;
+    max-width: 300px;
+}
+
+.timer-display {
+    font-size: 2.5rem;
+    font-weight: 200;
+    color: var(--accent-primary);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: var(--space-md);
+}
+
+.timer-progress {
+    width: 100%;
+    height: 4px;
+    background: var(--bg-surface-2);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.timer-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-primary), #a78bfa);
+    border-radius: 2px;
+    transition: width 0.1s linear;
+    width: 100%;
+}
+
+/* Session Options */
+.session-options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    width: 100%;
+    max-width: 350px;
+    margin-top: var(--space-md);
+}
+
+.session-option {
+    padding: var(--space-md) var(--space-lg);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    text-align: left;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-family: inherit;
+}
+
+.session-option:hover {
+    border-color: var(--accent-primary);
+    background: rgba(139, 92, 246, 0.1);
+}
+
+.session-option:active {
+    transform: scale(0.98);
+}
+
+.session-option.selected {
+    border-color: var(--accent-primary);
+    background: rgba(139, 92, 246, 0.15);
+}
+
+/* Session Text Input */
+.session-input {
+    width: 100%;
+    max-width: 400px;
+    margin-top: var(--space-md);
+}
+
+#sessionTextInput {
+    width: 100%;
+    padding: var(--space-md);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    resize: none;
+}
+
+#sessionTextInput:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+}
+
+#sessionTextInput::placeholder {
+    color: var(--text-muted);
+}
+
+/* Session Footer */
+.session-footer {
+    padding: var(--space-lg);
+    padding-bottom: calc(var(--space-lg) + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-md);
+}
+
+.session-continue-btn {
+    padding: var(--space-md) var(--space-xl);
+    background: var(--accent-primary);
+    border: none;
+    border-radius: var(--radius-md);
+    color: white;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-family: inherit;
+    min-width: 150px;
+}
+
+.session-continue-btn:hover {
+    opacity: 0.9;
+}
+
+.session-continue-btn:active {
+    transform: scale(0.98);
+}
+
+.session-continue-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.session-continue-btn.hidden {
+    display: none;
+}
+
+/* Session Progress Dots */
+.session-progress {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+}
+
+.progress-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--border-subtle);
+    transition: background var(--transition-fast);
+}
+
+.progress-dot.completed {
+    background: var(--accent-primary);
+}
+
+.progress-dot.current {
+    background: var(--accent-primary);
+    box-shadow: 0 0 6px var(--accent-primary);
+}
+
+/* Session Complete View */
+.awaken-complete-view {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-primary);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: var(--space-xl);
+}
+
+.complete-content {
+    text-align: center;
+    max-width: 400px;
+}
+
+.complete-icon {
+    font-size: 4rem;
+    color: var(--success);
+    margin-bottom: var(--space-lg);
+}
+
+.complete-title {
+    font-size: 1.5rem;
+    font-weight: 400;
+    color: var(--text-primary);
+    margin: 0 0 var(--space-sm) 0;
+}
+
+.complete-message {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    margin-bottom: var(--space-xl);
+}
+
+.complete-summary {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--space-lg);
+    margin-bottom: var(--space-xl);
+    text-align: left;
+}
+
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--space-sm) 0;
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: 0.9rem;
+}
+
+.summary-item:last-child {
+    border-bottom: none;
+}
+
+.summary-label {
+    color: var(--text-muted);
+}
+
+.summary-value {
+    color: var(--text-primary);
+}
+
+/* Modal small variant */
+.modal-content.small {
+    max-width: 320px;
+}
+
+/* ============================================
    RESPONSIVE
    ============================================ */
 

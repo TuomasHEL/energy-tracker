@@ -170,6 +170,9 @@ async function init() {
         // Update profile view if visible
         updateProfileView();
         
+        // Update awaken launcher
+        updateAwakenLauncher();
+        
         console.log('App init completed successfully');
         
     } catch (error) {
@@ -860,6 +863,15 @@ function showView(viewName) {
                 break;
             case 'profile':
                 updateProfileView();
+                break;
+            case 'awaken':
+                updateAwakenLauncher();
+                break;
+            case 'awakenSession':
+                // Session view handled by startAwakenPractice
+                break;
+            case 'awakenComplete':
+                // Complete view handled by completeSession
                 break;
         }
     } catch (error) {
@@ -2529,6 +2541,1143 @@ async function syncData() {
     }
     
     hideLoading();
+}
+
+// ============================================
+// AWAKEN SECTION - SESSION ENGINE
+// ============================================
+
+// Session state
+const awakenSession = {
+    active: false,
+    practiceId: null,
+    currentStepIndex: 0,
+    steps: [],
+    responses: {},
+    startedAt: null,
+    timerInterval: null,
+    timerRemaining: 0,
+    totalMilestones: 0,
+    currentMilestone: 0
+};
+
+// 2-Part Formula Full Session Script
+const PRACTICE_2PF_FULL = {
+    id: '2pf-full',
+    name: '2-Part Formula',
+    steps: [
+        // 0. Introduction
+        {
+            id: 'intro',
+            type: 'text',
+            content: `Welcome. This session is about seeing very clearly what you are not, and what you actually are.
+
+We will move between two modes.
+
+First, a mode where experience is spacious, quiet and does not contain a solid "me".
+
+Second, a mode where we deliberately call up the sense of "me" and look at it closely.`,
+            milestone: true
+        },
+        {
+            id: 'intro-2',
+            type: 'text',
+            content: `You do not need to believe anything in advance. Just follow the steps and report honestly what you notice.
+
+If at any point you feel overwhelmed or too activated, you can pause the session, open your eyes, or come back another time. Nothing here is worth forcing.
+
+If you feel ready to explore, let us begin.`
+        },
+        // 1. Landing in the Body
+        {
+            id: 'landing',
+            type: 'text',
+            content: `Sit in a comfortable position. You can close your eyes now, or keep them open with a soft, relaxed gaze.
+
+Let your hands rest wherever they want to rest.`,
+            milestone: true
+        },
+        {
+            id: 'landing-breath',
+            type: 'text',
+            content: `Take one easy breath in through the nose.
+
+And exhale gently through the mouth.
+
+Let the breath return to its natural rhythm.
+
+For a moment, do not try to achieve anything.
+
+Just notice: you are here.`
+        },
+        // 2. Mode 1 - Body Scan
+        {
+            id: 'mode1-intro',
+            type: 'text',
+            content: `We will start by relaxing the body and noticing what appears when tension lets go.
+
+Bring your attention to your forehead.
+
+Notice any tightness or effort there.
+
+You do not have to force anything. Just let that area soften, even a little bit.`,
+            milestone: true
+        },
+        {
+            id: 'mode1-scan-1',
+            type: 'text',
+            content: `As it softens, notice what is left behind in that spot.
+
+There is a sense of open space where the effort was.
+
+Now bring your attention to the area around your eyes.
+
+The muscles around the eyes, eyebrows, the space between your brows.
+
+Let this region relax.
+
+Again, as it relaxes, feel the space that becomes obvious there.`
+        },
+        {
+            id: 'mode1-scan-2',
+            type: 'text',
+            content: `We will continue like this for a bit.
+
+Top of the head. Back of the head.
+
+Jaw and mouth. Throat and neck.
+
+Left shoulder. Right shoulder.
+
+Chest. Upper back.
+
+Solar plexus. Belly. Lower back.
+
+Pelvis. Hips.
+
+Thighs. Knees. Lower legs. Feet.`
+        },
+        {
+            id: 'mode1-scan-pause',
+            type: 'pause',
+            content: `Wherever you notice extra tension, let it unwind.
+
+Then notice the quiet space that remains.`,
+            duration: 45
+        },
+        // Whole-Field Spaciousness
+        {
+            id: 'mode1-field',
+            type: 'text',
+            content: `Now let your attention include the whole inner space at once.
+
+From the top of the head to the feet.
+
+Feel the body as one field of sensation and space.
+
+There can be some remaining tension, some comfort, some neutral areas.
+
+All of that can be there.`,
+            milestone: true
+        },
+        {
+            id: 'mode1-field-2',
+            type: 'pause',
+            content: `At the same time, there is a sense that the inside of the body is also a kind of open room.
+
+Thoughts may be quieter. Emotions may be softer.
+
+Let this sense of open field become a bit more obvious.`,
+            duration: 15
+        },
+        // Spaciousness Check
+        {
+            id: 'spaciousness-check',
+            type: 'scale',
+            content: `How spacious or open does your inner experience feel right now?`,
+            stateKey: 'spaciousness_1',
+            options: [
+                { value: 1, label: 'Very tight' },
+                { value: 2, label: 'A bit tight' },
+                { value: 3, label: 'Neutral' },
+                { value: 4, label: 'Somewhat spacious' },
+                { value: 5, label: 'Very spacious' }
+            ],
+            branches: {
+                1: 'response-tight',
+                2: 'response-tight',
+                3: 'response-neutral',
+                4: 'response-open',
+                5: 'response-open'
+            }
+        },
+        {
+            id: 'response-tight',
+            type: 'text',
+            content: `Thank you for your honesty.
+
+If it feels tight, that is completely okay.
+
+For you in this round, the important thing is just to get familiar with how it feels right now. You do not need to force openness. We will come back to this many times.`,
+            next: 'search-me'
+        },
+        {
+            id: 'response-neutral',
+            type: 'text',
+            content: `Neutral is also fine.
+
+We will still look carefully at what is present and what is not in this neutral field.`,
+            next: 'search-me'
+        },
+        {
+            id: 'response-open',
+            type: 'text',
+            content: `Good.
+
+You are already sensing some space in the body and mind.
+
+We will explore what is, and what is not, inside this space.`,
+            next: 'search-me'
+        },
+        // Searching for "Me"
+        {
+            id: 'search-me',
+            type: 'text',
+            content: `Now, inside this inner field, see if you can find a solid center, a stable "me".
+
+First, let your attention drift toward the left side of your inner space.
+
+Do you find a clearly defined "me" over there? Just check.
+
+Now toward the right side. Is there a solid "me" on the right?`,
+            milestone: true
+        },
+        {
+            id: 'search-me-2',
+            type: 'text',
+            content: `Now in front of you. Somewhere in the chest, face, or just ahead of the body.
+
+Is there a definite "me" there?
+
+Now behind you. In the back, or just behind your spine.
+
+Is there a clearly located owner of experience there?`
+        },
+        {
+            id: 'search-me-3',
+            type: 'text',
+            content: `Look below the body. Legs, feet, floor, space under you.
+
+Is "me" sitting there as a solid center?
+
+Now above the head. In the space above and around the skull.
+
+Is "me" up there?`
+        },
+        {
+            id: 'search-me-pause',
+            type: 'pause',
+            content: `Finally, feel toward what you think of as the center.
+
+If you do not think about it, and only feel:
+
+Is there a stable, solid "me" in the middle of this experience?
+
+Take a few breaths to quietly check.`,
+            duration: 15
+        },
+        {
+            id: 'me-found-check',
+            type: 'choice',
+            content: `Right now, can you find a solid "me" anywhere in this space?`,
+            stateKey: 'me_found',
+            options: [
+                { value: 'yes', label: 'Yes, clearly' },
+                { value: 'vaguely', label: 'Vaguely' },
+                { value: 'no', label: 'No, not really' }
+            ],
+            branches: {
+                'yes': 'me-found-yes',
+                'vaguely': 'me-found-vague',
+                'no': 'me-found-no'
+            }
+        },
+        {
+            id: 'me-found-no',
+            type: 'text',
+            content: `Good.
+
+Even if it is just for a moment, you are seeing that experience can be here without a clear owner.
+
+You do not need to hold on to this. It is enough that you have noticed it.`,
+            next: 'clarity-check'
+        },
+        {
+            id: 'me-found-vague',
+            type: 'text',
+            content: `That is very common.
+
+You may sense a kind of center, but it is not very clear.
+
+We will come back to that center later and get to know it better.
+
+For now, notice that the overall field has a lot of space and not much solidity.`,
+            next: 'clarity-check'
+        },
+        {
+            id: 'me-found-yes',
+            type: 'text',
+            content: `Perfect.
+
+That clear "me-feeling" is exactly what we will investigate soon.
+
+For now, just notice that even this strong center is one part of a larger field of sensation.`,
+            next: 'clarity-check'
+        },
+        // Clarity Check
+        {
+            id: 'clarity-check',
+            type: 'choice',
+            content: `Does this spaciousness feel clear and bright, or a bit foggy or sleepy?`,
+            stateKey: 'clarity',
+            options: [
+                { value: 'clear', label: 'Clear enough' },
+                { value: 'foggy', label: 'A bit foggy or sleepy' }
+            ],
+            branches: {
+                'clear': 'mode1-summary',
+                'foggy': 'clarity-boost'
+            }
+        },
+        {
+            id: 'clarity-boost',
+            type: 'text',
+            content: `Sometimes peace can feel a bit dull or sleepy.
+
+Let us sharpen your attention briefly.
+
+Imagine you just heard a soft but unexpected sound somewhere in the room.
+
+Let your posture become a little more alert. Spine gently tall.
+
+Inside the closed eyes, let the feeling be bright.
+
+Ears open, listening in all directions.
+
+As if your whole body is "eyes and ears" for a short while.`,
+            next: 'clarity-boost-pause'
+        },
+        {
+            id: 'clarity-boost-pause',
+            type: 'pause',
+            content: `Stay like this for about twenty seconds.`,
+            duration: 20,
+            next: 'clarity-boost-relax'
+        },
+        {
+            id: 'clarity-boost-relax',
+            type: 'text',
+            content: `Now let that alertness relax again.
+
+Settle back into the open field.
+
+Often this little burst of attention makes the silence clearer.`,
+            next: 'mode1-summary'
+        },
+        // Mode 1 Summary
+        {
+            id: 'mode1-summary',
+            type: 'text',
+            content: `For a short time now, you have:
+
+Relaxed the body.
+
+Noticed open space where tension used to be.
+
+Felt the inner field as one spacious unit.
+
+And looked for a solid "me" inside it.
+
+Even a brief recognition that experience can be here without a clear owner is important.`,
+            milestone: true
+        },
+        {
+            id: 'mode1-transition',
+            type: 'text',
+            content: `Now we will move to the second mode.`
+        },
+        // Mode 2 - Evoking the "Me-Knot"
+        {
+            id: 'mode2-intro',
+            type: 'text',
+            content: `In this mode we do something a bit unusual.
+
+We call up the sense of "me" on purpose, so that it can be examined like any other object in experience.
+
+Nothing is forced.
+
+If at any point this feels like too much for today, you can ease off or stop the practice. That is completely okay.`,
+            milestone: true
+        },
+        {
+            id: 'mode2-calling',
+            type: 'text',
+            content: `Let your body stay relatively relaxed.
+
+You do not need to throw away the spaciousness we touched.
+
+From here, choose one word inside your mind:
+
+"I." Or "me." Or "mine."
+
+Pick whichever feels most charged or meaningful to you.`
+        },
+        {
+            id: 'mode2-calling-2',
+            type: 'pause',
+            content: `In a moment, you will repeat that word silently three to five times with real feeling. Not mechanically.
+
+You let that word point directly to yourself.
+
+Go ahead and do that now.
+
+Repeat it a few times inside.
+
+Then pause and simply feel what shows up.`,
+            duration: 15
+        },
+        // Where is it felt?
+        {
+            id: 'me-location',
+            type: 'choice',
+            content: `Now, notice where this "me" is most strongly felt.`,
+            stateKey: 'me_location',
+            options: [
+                { value: 'head', label: 'Head / face' },
+                { value: 'throat', label: 'Throat / neck' },
+                { value: 'chest', label: 'Chest / heart' },
+                { value: 'gut', label: 'Stomach / solar plexus / gut' },
+                { value: 'other', label: 'Other' }
+            ],
+            milestone: true
+        },
+        {
+            id: 'me-intensity',
+            type: 'scale',
+            content: `How intense is this sensation?`,
+            stateKey: 'me_intensity',
+            options: [
+                { value: 1, label: 'Very faint' },
+                { value: 2, label: 'Mild' },
+                { value: 3, label: 'Moderate' },
+                { value: 4, label: 'Strong' },
+                { value: 5, label: 'Very intense' }
+            ]
+        },
+        {
+            id: 'mode2-investigate-intro',
+            type: 'text',
+            content: `Good.
+
+We will stay with that place for a little while and get to know it as clearly as we can.
+
+Whatever is here is allowed to be here.
+
+You do not need to fix it or make it spiritual.`
+        },
+        // Investigating the Knot
+        {
+            id: 'mode2-investigate',
+            type: 'text',
+            content: `Bring your attention gently but steadily to that region.
+
+This cluster of sensations that appeared when you repeated "I" or "me" or "mine".
+
+For the next minute, you will observe it like a scientist studying something under a microscope.`,
+            milestone: true
+        },
+        {
+            id: 'mode2-investigate-2',
+            type: 'text',
+            content: `First, feel into the middle of this cluster.
+
+Does it seem to have a shape? Round, narrow, dense, cloudy, sharp?
+
+Let the mind answer softly.
+
+Is there a sense of size? Is it as big as a coin? As big as a fist? Larger? Smaller?`
+        },
+        {
+            id: 'mode2-investigate-3',
+            type: 'pause',
+            content: `Does it feel still, or does it move, pulse, vibrate?
+
+If you move your attention to what feels like the edges of this cluster, do you sense a border where it ends and other sensations begin?
+
+Or does it just fade into the rest of the body?
+
+Take a few breaths to explore.`,
+            duration: 25
+        },
+        {
+            id: 'mode2-awareness',
+            type: 'pause',
+            content: `Now notice something important.
+
+The simple awareness that knows these sensations right now.
+
+Is that awareness stuck inside the sensation?
+
+Or does the sensation appear inside that awareness?
+
+Do not think too hard. Feel it directly.`,
+            duration: 15
+        },
+        // Subject or Object?
+        {
+            id: 'subject-object',
+            type: 'choice',
+            content: `Right now, how does this "me-sensation" feel to you?`,
+            stateKey: 'subject_object',
+            options: [
+                { value: 'subject', label: 'This feels like what I truly am' },
+                { value: 'object', label: 'This feels like something happening in me' },
+                { value: 'unsure', label: 'Not sure' }
+            ],
+            branches: {
+                'subject': 'response-subject',
+                'object': 'response-object',
+                'unsure': 'response-unsure'
+            },
+            milestone: true
+        },
+        {
+            id: 'response-subject',
+            type: 'text',
+            content: `Thank you for answering honestly.
+
+This is exactly why we are doing this practice.
+
+Stay with this sensation a bit longer.
+
+Look even more closely, without trying to get rid of it.`,
+            next: 'response-subject-2'
+        },
+        {
+            id: 'response-subject-2',
+            type: 'pause',
+            content: `Is it completely solid and unchanging?
+
+Or does it already have some movement, some texture, some fluctuation?
+
+Anything that can be watched like this belongs on the side of "things that appear".
+
+Let that sink in gently.`,
+            duration: 15,
+            next: 'unwind'
+        },
+        {
+            id: 'response-object',
+            type: 'pause',
+            content: `Beautiful.
+
+You are already sensing a gap.
+
+There is this cluster of sensation.
+
+And there is the one that notices it.
+
+We are not pushing the sensation away.
+
+We are simply letting it move from "subject" to "object".
+
+Keep feeling it with this sense that it is appearing in something wider.`,
+            duration: 15,
+            next: 'unwind'
+        },
+        {
+            id: 'response-unsure',
+            type: 'pause',
+            content: `"Not sure" is also a very honest place.
+
+You do not have to force any conclusion.
+
+Just keep feeling:
+
+There is the sensation.
+
+There is the awareness of it.
+
+Your system is learning the difference even if the mind cannot name it yet.`,
+            duration: 15,
+            next: 'unwind'
+        },
+        // Let It Unwind
+        {
+            id: 'unwind',
+            type: 'text',
+            content: `Stay with this "me-sensation" for a few more breaths.
+
+If it feels stronger, that is okay.
+
+If it softens, that is okay.
+
+You are not here to win against it.
+
+You are here to see it clearly.`
+        },
+        {
+            id: 'unwind-2',
+            type: 'pause',
+            content: `As you stay with it, also notice the space around it.
+
+The area just outside it. The air around the body.
+
+The wider field inside which this knot appears.
+
+Let your attention include both the knot and the surrounding space.
+
+Then allow your attention to widen to the whole body again.`,
+            duration: 25
+        },
+        // Return to Mode 1
+        {
+            id: 'return-mode1',
+            type: 'text',
+            content: `Now let us return again to the spacious mode.
+
+For the next minute, let go of any effort to look for "me".
+
+Let sensations do whatever they do.
+
+Let thoughts do whatever they do.`,
+            milestone: true
+        },
+        {
+            id: 'return-mode1-2',
+            type: 'pause',
+            content: `Simply notice the whole inner field as space in which everything appears.
+
+Feel the whole body as one open field.
+
+Hear the sounds.
+
+Notice that awareness is already here, before you do anything about it.
+
+For a little while, just rest as this open awareness.`,
+            duration: 25
+        },
+        // Comparison
+        {
+            id: 'comparison',
+            type: 'choice',
+            content: `Right now, how present does the "me" feel compared to earlier?`,
+            stateKey: 'me_comparison',
+            options: [
+                { value: 'stronger', label: 'Stronger than before' },
+                { value: 'same', label: 'About the same' },
+                { value: 'lighter', label: 'Lighter / less sticky' }
+            ],
+            branches: {
+                'stronger': 'comparison-stronger',
+                'same': 'comparison-same',
+                'lighter': 'comparison-lighter'
+            }
+        },
+        {
+            id: 'comparison-stronger',
+            type: 'text',
+            content: `That is okay.
+
+Sometimes when we bring light to the sense of "me", it reacts and feels stronger for a while.
+
+It is like stirring something that has been sitting at the bottom for a long time.
+
+The important thing is that it is no longer completely hidden.
+
+In future sessions, we will do more cycles. For today, just notice that even this stronger "me-feeling" is appearing inside the same open awareness.`,
+            next: 'integration'
+        },
+        {
+            id: 'comparison-same',
+            type: 'text',
+            content: `Good.
+
+You are learning to move between these two modes with more awareness.
+
+Over time, the difference will become clearer and the "me-knot" will feel less convincing.`,
+            next: 'integration'
+        },
+        {
+            id: 'comparison-lighter',
+            type: 'text',
+            content: `Beautiful.
+
+That lightening is exactly the kind of shift that matters here.
+
+We are not aiming for dramatic fireworks.
+
+We are aiming for the knot of "me" to slowly lose its grip.`,
+            next: 'integration'
+        },
+        // Integration
+        {
+            id: 'integration',
+            type: 'text',
+            content: `In this session you have visited two modes.
+
+One mode where experience is open and selfless, and no clear "me" can be found.
+
+Another mode where the sense of "me" appears as sensations and energy in the body.
+
+Both modes appear in the same awareness.`,
+            milestone: true
+        },
+        {
+            id: 'integration-2',
+            type: 'text',
+            content: `With this practice, you are training yourself to:
+
+Recognise the selfless spacious mode clearly.
+
+Recognise the "me-knot" as an object in that mode, not as what you are.
+
+Over time, alternating like this weakens the habit of identifying with the knot.
+
+It is like a story that gradually stops making sense.`
+        },
+        // Reflection
+        {
+            id: 'reflection',
+            type: 'input',
+            content: `In one or two sentences, how would you describe what you noticed during this session?`,
+            stateKey: 'reflection',
+            placeholder: 'Share your reflection...'
+        },
+        {
+            id: 'reflection-response',
+            type: 'text',
+            content: `Thank you.
+
+There is no right way to describe this.
+
+Even something like "it felt a bit more spacious" or "the 'me' felt more like a sensation" is important.`
+        },
+        // Closing
+        {
+            id: 'closing',
+            type: 'text',
+            content: `Before we finish, bring more attention back to your surroundings.
+
+Feel the weight of your body on the chair.
+
+Feel your hands.
+
+Notice the sounds in the room.`,
+            milestone: true
+        },
+        {
+            id: 'closing-2',
+            type: 'text',
+            content: `Take one slightly deeper breath in.
+
+And out.
+
+When you are ready, let your eyes open or become more engaged if they were already open.`
+        },
+        {
+            id: 'closing-3',
+            type: 'text',
+            content: `You can repeat this session or a shorter version another day.
+
+What matters is not doing it perfectly.
+
+What matters is gradually seeing more clearly what you are, and what you are not.
+
+Thank you for practicing.`
+        }
+    ]
+};
+
+// Get practice by ID
+function getPractice(practiceId) {
+    switch (practiceId) {
+        case '2pf-full':
+            return PRACTICE_2PF_FULL;
+        default:
+            return null;
+    }
+}
+
+// Start awaken practice
+async function startAwakenPractice(practiceId) {
+    const practice = getPractice(practiceId);
+    if (!practice) {
+        showToast('Practice not found', 'error');
+        return;
+    }
+    
+    // Initialize session
+    awakenSession.active = true;
+    awakenSession.practiceId = practiceId;
+    awakenSession.currentStepIndex = 0;
+    awakenSession.steps = practice.steps;
+    awakenSession.responses = {};
+    awakenSession.startedAt = new Date().toISOString();
+    
+    // Count milestones for progress
+    awakenSession.totalMilestones = practice.steps.filter(s => s.milestone).length;
+    awakenSession.currentMilestone = 0;
+    
+    // Show session view
+    showView('awakenSession');
+    
+    // Render first step
+    renderSessionStep();
+}
+
+// Render current session step
+function renderSessionStep() {
+    const step = awakenSession.steps[awakenSession.currentStepIndex];
+    if (!step) {
+        completeSession();
+        return;
+    }
+    
+    const textEl = document.getElementById('sessionText');
+    const timerEl = document.getElementById('sessionTimer');
+    const optionsEl = document.getElementById('sessionOptions');
+    const inputEl = document.getElementById('sessionInputContainer');
+    const continueBtn = document.getElementById('sessionContinueBtn');
+    
+    // Reset visibility
+    timerEl.classList.add('hidden');
+    optionsEl.classList.add('hidden');
+    inputEl.classList.add('hidden');
+    continueBtn.classList.remove('hidden');
+    continueBtn.disabled = false;
+    
+    // Set content
+    textEl.innerHTML = step.content.split('\n\n').map(p => `<p>${p}</p>`).join('');
+    
+    // Update progress if milestone
+    if (step.milestone) {
+        awakenSession.currentMilestone++;
+    }
+    renderProgressDots();
+    
+    // Handle step type
+    switch (step.type) {
+        case 'text':
+            // Just show continue button
+            break;
+            
+        case 'pause':
+            continueBtn.classList.add('hidden');
+            timerEl.classList.remove('hidden');
+            startSessionTimer(step.duration);
+            break;
+            
+        case 'scale':
+        case 'choice':
+            continueBtn.classList.add('hidden');
+            optionsEl.classList.remove('hidden');
+            renderOptions(step);
+            break;
+            
+        case 'input':
+            document.getElementById('sessionTextInput').value = '';
+            document.getElementById('sessionTextInput').placeholder = step.placeholder || 'Share your thoughts...';
+            inputEl.classList.remove('hidden');
+            break;
+    }
+}
+
+// Render options for scale/choice steps
+function renderOptions(step) {
+    const optionsEl = document.getElementById('sessionOptions');
+    
+    optionsEl.innerHTML = step.options.map(opt => `
+        <button class="session-option" onclick="selectOption('${step.stateKey}', '${opt.value}', ${step.branches ? 'true' : 'false'})">
+            ${opt.label}
+        </button>
+    `).join('');
+}
+
+// Select an option
+function selectOption(stateKey, value, hasBranches) {
+    awakenSession.responses[stateKey] = value;
+    
+    // Visual feedback
+    document.querySelectorAll('.session-option').forEach(btn => {
+        btn.classList.remove('selected');
+        if (btn.textContent.trim() === document.querySelector(`.session-option[onclick*="'${value}'"]`)?.textContent.trim()) {
+            btn.classList.add('selected');
+        }
+    });
+    
+    // Short delay then advance
+    setTimeout(() => {
+        const step = awakenSession.steps[awakenSession.currentStepIndex];
+        
+        if (hasBranches && step.branches && step.branches[value]) {
+            // Find branch step by id
+            const branchId = step.branches[value];
+            const branchIndex = awakenSession.steps.findIndex(s => s.id === branchId);
+            if (branchIndex !== -1) {
+                awakenSession.currentStepIndex = branchIndex;
+            } else {
+                awakenSession.currentStepIndex++;
+            }
+        } else {
+            awakenSession.currentStepIndex++;
+        }
+        
+        renderSessionStep();
+    }, 300);
+}
+
+// Start session timer
+function startSessionTimer(duration) {
+    awakenSession.timerRemaining = duration;
+    const totalDuration = duration;
+    
+    updateTimerDisplay();
+    
+    awakenSession.timerInterval = setInterval(() => {
+        awakenSession.timerRemaining--;
+        updateTimerDisplay();
+        
+        // Update progress bar
+        const progress = ((totalDuration - awakenSession.timerRemaining) / totalDuration) * 100;
+        document.getElementById('sessionTimerProgress').style.width = `${100 - progress}%`;
+        
+        if (awakenSession.timerRemaining <= 0) {
+            clearInterval(awakenSession.timerInterval);
+            awakenSession.timerInterval = null;
+            advanceSession();
+        }
+    }, 1000);
+}
+
+// Update timer display
+function updateTimerDisplay() {
+    const minutes = Math.floor(awakenSession.timerRemaining / 60);
+    const seconds = awakenSession.timerRemaining % 60;
+    document.getElementById('sessionTimerDisplay').textContent = 
+        `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+// Advance to next step
+function advanceSession() {
+    // Clear any running timer
+    if (awakenSession.timerInterval) {
+        clearInterval(awakenSession.timerInterval);
+        awakenSession.timerInterval = null;
+    }
+    
+    const step = awakenSession.steps[awakenSession.currentStepIndex];
+    
+    // Save input if this was an input step
+    if (step.type === 'input' && step.stateKey) {
+        awakenSession.responses[step.stateKey] = document.getElementById('sessionTextInput').value;
+    }
+    
+    // Handle explicit next step
+    if (step.next) {
+        const nextIndex = awakenSession.steps.findIndex(s => s.id === step.next);
+        if (nextIndex !== -1) {
+            awakenSession.currentStepIndex = nextIndex;
+        } else {
+            awakenSession.currentStepIndex++;
+        }
+    } else {
+        awakenSession.currentStepIndex++;
+    }
+    
+    // Check if we've reached the end
+    if (awakenSession.currentStepIndex >= awakenSession.steps.length) {
+        completeSession();
+        return;
+    }
+    
+    renderSessionStep();
+}
+
+// Render progress dots
+function renderProgressDots() {
+    const progressEl = document.getElementById('sessionProgress');
+    const total = awakenSession.totalMilestones;
+    const current = awakenSession.currentMilestone;
+    
+    let dots = '';
+    for (let i = 0; i < total; i++) {
+        if (i < current - 1) {
+            dots += '<div class="progress-dot completed"></div>';
+        } else if (i === current - 1) {
+            dots += '<div class="progress-dot current"></div>';
+        } else {
+            dots += '<div class="progress-dot"></div>';
+        }
+    }
+    
+    progressEl.innerHTML = dots;
+}
+
+// Confirm exit session
+function confirmExitSession() {
+    document.getElementById('exitSessionModal').classList.add('active');
+}
+
+// Close exit modal
+function closeExitModal() {
+    document.getElementById('exitSessionModal').classList.remove('active');
+}
+
+// Exit session
+function exitSession() {
+    closeExitModal();
+    
+    // Clear timer
+    if (awakenSession.timerInterval) {
+        clearInterval(awakenSession.timerInterval);
+        awakenSession.timerInterval = null;
+    }
+    
+    // Reset session state
+    awakenSession.active = false;
+    awakenSession.practiceId = null;
+    
+    showView('awaken');
+}
+
+// Complete session
+async function completeSession() {
+    // Clear timer if any
+    if (awakenSession.timerInterval) {
+        clearInterval(awakenSession.timerInterval);
+        awakenSession.timerInterval = null;
+    }
+    
+    // Save session to backend
+    try {
+        const params = new URLSearchParams({
+            action: 'saveAwakenSession',
+            userId: state.currentUser.user_id,
+            practiceId: awakenSession.practiceId,
+            startedAt: awakenSession.startedAt,
+            completedAt: new Date().toISOString(),
+            spaciousness_1: awakenSession.responses.spaciousness_1 || '',
+            spaciousness_2: awakenSession.responses.spaciousness_2 || '',
+            me_found: awakenSession.responses.me_found || '',
+            clarity: awakenSession.responses.clarity || '',
+            me_location: awakenSession.responses.me_location || '',
+            me_intensity: awakenSession.responses.me_intensity || '',
+            subject_object: awakenSession.responses.subject_object || '',
+            me_comparison: awakenSession.responses.me_comparison || '',
+            did_second_cycle: 'false',
+            reflection: awakenSession.responses.reflection || ''
+        });
+        
+        await fetch(`${API_URL}?${params.toString()}`);
+    } catch (error) {
+        console.error('Error saving awaken session:', error);
+    }
+    
+    // Build summary
+    const summaryEl = document.getElementById('completeSummary');
+    let summaryHTML = '';
+    
+    if (awakenSession.responses.spaciousness_1) {
+        const labels = ['Very tight', 'A bit tight', 'Neutral', 'Somewhat spacious', 'Very spacious'];
+        summaryHTML += `
+            <div class="summary-item">
+                <span class="summary-label">Initial spaciousness</span>
+                <span class="summary-value">${labels[awakenSession.responses.spaciousness_1 - 1]}</span>
+            </div>
+        `;
+    }
+    
+    if (awakenSession.responses.me_location) {
+        const locationLabels = {
+            'head': 'Head / face',
+            'throat': 'Throat / neck',
+            'chest': 'Chest / heart',
+            'gut': 'Stomach / gut',
+            'other': 'Other'
+        };
+        summaryHTML += `
+            <div class="summary-item">
+                <span class="summary-label">Me-sensation location</span>
+                <span class="summary-value">${locationLabels[awakenSession.responses.me_location]}</span>
+            </div>
+        `;
+    }
+    
+    if (awakenSession.responses.subject_object) {
+        const soLabels = {
+            'subject': 'Felt like true self',
+            'object': 'Felt like sensation in me',
+            'unsure': 'Not sure'
+        };
+        summaryHTML += `
+            <div class="summary-item">
+                <span class="summary-label">Me-sensation perception</span>
+                <span class="summary-value">${soLabels[awakenSession.responses.subject_object]}</span>
+            </div>
+        `;
+    }
+    
+    if (awakenSession.responses.me_comparison) {
+        const compLabels = {
+            'stronger': 'Stronger than before',
+            'same': 'About the same',
+            'lighter': 'Lighter / less sticky'
+        };
+        summaryHTML += `
+            <div class="summary-item">
+                <span class="summary-label">After comparison</span>
+                <span class="summary-value">${compLabels[awakenSession.responses.me_comparison]}</span>
+            </div>
+        `;
+    }
+    
+    summaryEl.innerHTML = summaryHTML || '<p style="text-align: center; color: var(--text-muted);">Session recorded</p>';
+    
+    // Show complete view
+    showView('awakenComplete');
+}
+
+// Finish awaken session (return to launcher)
+function finishAwakenSession() {
+    awakenSession.active = false;
+    awakenSession.practiceId = null;
+    
+    // Refresh completed count
+    updateAwakenLauncher();
+    
+    showView('awaken');
+}
+
+// Update awaken launcher with completed count
+async function updateAwakenLauncher() {
+    if (!state.currentUser) return;
+    
+    try {
+        const data = await apiCall('getAwakenSessions', {
+            userId: state.currentUser.user_id,
+            practiceId: '2pf-full',
+            limit: 1
+        });
+        
+        const count = data?.completedCount || 0;
+        const el = document.getElementById('practice2pfCompleted');
+        if (el) {
+            el.textContent = `✓ ${count} session${count !== 1 ? 's' : ''}`;
+        }
+    } catch (error) {
+        console.error('Error loading awaken sessions:', error);
+    }
 }
 
 // ============================================

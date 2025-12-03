@@ -330,9 +330,86 @@
                 </div>
             </section>
 
+            <!-- Awaken View (Launcher) -->
+            <section id="viewAwaken" class="view">
+                <div class="view-header">
+                    <h2>Awaken</h2>
+                </div>
+
+                <p class="awaken-intro">Guided practices for spiritual awakening</p>
+
+                <!-- 2-Part Formula Practice Card -->
+                <div class="practice-card" onclick="startAwakenPractice('2pf-full')">
+                    <div class="practice-icon">◎</div>
+                    <div class="practice-content">
+                        <h3 class="practice-title">2-Part Formula</h3>
+                        <p class="practice-description">See through the illusion of "me" by alternating between spacious awareness and investigating the sense of self.</p>
+                        <div class="practice-meta">
+                            <span class="practice-duration">⏱ 20-30 min</span>
+                            <span class="practice-completed" id="practice2pfCompleted">✓ 0 sessions</span>
+                        </div>
+                    </div>
+                    <div class="practice-arrow">→</div>
+                </div>
+
+                <p class="coming-soon-text">More practices coming soon...</p>
+            </section>
+
+            <!-- Awaken Session View (Immersive) -->
+            <section id="viewAwakenSession" class="view awaken-session-view">
+                <button class="session-exit-btn" onclick="confirmExitSession()">✕</button>
+                
+                <div class="session-content">
+                    <div class="session-text" id="sessionText">
+                        <!-- Dynamic content inserted here -->
+                    </div>
+                    
+                    <!-- Pause Timer (shown during timed steps) -->
+                    <div class="session-timer hidden" id="sessionTimer">
+                        <div class="timer-display" id="sessionTimerDisplay">0:45</div>
+                        <div class="timer-progress">
+                            <div class="timer-progress-bar" id="sessionTimerProgress"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Options (for scale/choice steps) -->
+                    <div class="session-options hidden" id="sessionOptions">
+                        <!-- Dynamic options inserted here -->
+                    </div>
+                    
+                    <!-- Text Input (for reflection) -->
+                    <div class="session-input hidden" id="sessionInputContainer">
+                        <textarea id="sessionTextInput" placeholder="Share your reflection..." rows="4"></textarea>
+                    </div>
+                </div>
+                
+                <div class="session-footer">
+                    <button class="session-continue-btn" id="sessionContinueBtn" onclick="advanceSession()">Continue</button>
+                    <div class="session-progress" id="sessionProgress">
+                        <!-- Dynamic progress dots -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Awaken Session Complete View -->
+            <section id="viewAwakenComplete" class="view awaken-complete-view">
+                <div class="complete-content">
+                    <div class="complete-icon">✓</div>
+                    <h2 class="complete-title">Session Complete</h2>
+                    <p class="complete-message">Thank you for practicing.</p>
+                    
+                    <div class="complete-summary" id="completeSummary">
+                        <!-- Dynamic summary inserted here -->
+                    </div>
+                    
+                    <button class="btn primary large" onclick="finishAwakenSession()">Return to Awaken</button>
+                </div>
+            </section>
+
             <!-- Statistics View -->
             <section id="viewStats" class="view">
                 <div class="view-header">
+                    <button class="back-btn" onclick="showView('settings')">←</button>
                     <h2>Statistics</h2>
                 </div>
 
@@ -446,6 +523,16 @@
                     <div class="profile-card-arrow">→</div>
                 </div>
 
+                <!-- Statistics Card -->
+                <div class="profile-card" onclick="showView('stats')">
+                    <div class="profile-card-icon">▤</div>
+                    <div class="profile-card-content">
+                        <div class="profile-card-title">Statistics</div>
+                        <div class="profile-card-subtitle">Progress & Charts</div>
+                    </div>
+                    <div class="profile-card-arrow">→</div>
+                </div>
+
                 <div class="settings-section">
                     <h3>Notifications</h3>
                     <div class="settings-row">
@@ -499,7 +586,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Clear Ground v3.1</p>
+                    <p class="version">Clear Ground v3.2</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>
@@ -645,17 +732,17 @@
                 <span class="nav-icon">⌂</span>
                 <span class="nav-label">Home</span>
             </button>
-            <button class="nav-btn" onclick="showView('track')" data-view="track">
-                <span class="nav-icon">◎</span>
-                <span class="nav-label">Track</span>
+            <button class="nav-btn" onclick="showView('awaken')" data-view="awaken">
+                <span class="nav-icon">✦</span>
+                <span class="nav-label">Awaken</span>
             </button>
             <button class="nav-btn" onclick="showView('timer')" data-view="timer">
                 <span class="nav-icon">⏱</span>
                 <span class="nav-label">Energy</span>
             </button>
-            <button class="nav-btn" onclick="showView('stats')" data-view="stats">
-                <span class="nav-icon">▤</span>
-                <span class="nav-label">Stats</span>
+            <button class="nav-btn" onclick="showView('track')" data-view="track">
+                <span class="nav-icon">◎</span>
+                <span class="nav-label">Track</span>
             </button>
             <button class="nav-btn" onclick="showView('settings')" data-view="settings">
                 <span class="nav-icon">⚙</span>
@@ -713,6 +800,20 @@
                 <div class="modal-footer">
                     <button class="btn secondary" onclick="closeAddMarkerModal()">Cancel</button>
                     <button class="btn primary" onclick="addMarker()">Add Marker</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Exit Session Confirmation Modal -->
+        <div id="exitSessionModal" class="modal">
+            <div class="modal-content small">
+                <div class="modal-body" style="text-align: center; padding: var(--space-xl);">
+                    <p style="font-size: 1rem; margin-bottom: var(--space-lg);">Are you sure you want to exit?</p>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: var(--space-xl);">Your progress in this session will be lost.</p>
+                    <div style="display: flex; gap: var(--space-md); justify-content: center;">
+                        <button class="btn secondary" onclick="closeExitModal()">Stay</button>
+                        <button class="btn danger" onclick="exitSession()">Exit</button>
+                    </div>
                 </div>
             </div>
         </div>
