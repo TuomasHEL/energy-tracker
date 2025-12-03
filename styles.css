@@ -2732,7 +2732,7 @@ input:checked + .toggle-slider:before {
     bottom: 0;
     background: var(--bg-primary);
     z-index: 1000;
-    display: flex;
+    display: none;
     flex-direction: column;
     padding: 0;
     overflow: hidden;
@@ -2961,11 +2961,15 @@ input:checked + .toggle-slider:before {
     bottom: 0;
     background: var(--bg-primary);
     z-index: 1000;
-    display: flex;
+    display: none;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     padding: var(--space-xl);
+}
+
+.awaken-complete-view.active {
+    display: flex;
 }
 
 .complete-content {

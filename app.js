@@ -3311,11 +3311,20 @@ function getPractice(practiceId) {
 
 // Start awaken practice
 async function startAwakenPractice(practiceId) {
+    console.log('Starting practice:', practiceId);
+    
     const practice = getPractice(practiceId);
     if (!practice) {
         showToast('Practice not found', 'error');
         return;
     }
+    
+    if (!practice.steps || practice.steps.length === 0) {
+        showToast('Practice has no steps', 'error');
+        return;
+    }
+    
+    console.log('Practice loaded with', practice.steps.length, 'steps');
     
     // Initialize session
     awakenSession.active = true;
@@ -3332,17 +3341,32 @@ async function startAwakenPractice(practiceId) {
     // Show session view
     showView('awakenSession');
     
-    // Render first step
-    renderSessionStep();
+    // Small delay to ensure view is visible, then render first step
+    setTimeout(() => {
+        console.log('Rendering first step, index:', awakenSession.currentStepIndex);
+        renderSessionStep();
+    }, 100);
 }
 
 // Render current session step
 function renderSessionStep() {
+    console.log('renderSessionStep called, index:', awakenSession.currentStepIndex, 'total steps:', awakenSession.steps?.length);
+    
+    if (!awakenSession.steps || awakenSession.steps.length === 0) {
+        console.error('No steps available');
+        showToast('Session error: no steps', 'error');
+        showView('awaken');
+        return;
+    }
+    
     const step = awakenSession.steps[awakenSession.currentStepIndex];
     if (!step) {
+        console.log('No more steps, completing session');
         completeSession();
         return;
     }
+    
+    console.log('Rendering step:', step.id, step.type);
     
     const textEl = document.getElementById('sessionText');
     const timerEl = document.getElementById('sessionTimer');
@@ -3650,6 +3674,7 @@ async function completeSession() {
 
 // Finish awaken session (return to launcher)
 function finishAwakenSession() {
+    console.log('finishAwakenSession called');
     awakenSession.active = false;
     awakenSession.practiceId = null;
     
