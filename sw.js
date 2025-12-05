@@ -1,7 +1,9 @@
 // Clear Ground - Service Worker
-const CACHE_NAME = 'clear-ground-v3.2';
+const CACHE_NAME = 'clear-ground-v3.3';
 const BASE_PATH = '/energy-tracker/';
-const urlsToCache = [
+
+// Static assets to cache immediately
+const STATIC_ASSETS = [
     BASE_PATH,
     BASE_PATH + 'index.html',
     BASE_PATH + 'styles.css',
@@ -10,20 +12,25 @@ const urlsToCache = [
     BASE_PATH + 'icons/icon.svg'
 ];
 
-// Install event
+// Install event - cache static assets
 self.addEventListener('install', event => {
+    console.log('Service worker installing...');
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => {
-                console.log('Opened cache');
-                return cache.addAll(urlsToCache);
+                console.log('Caching static assets');
+                return cache.addAll(STATIC_ASSETS);
+            })
+            .then(() => {
+                console.log('Static assets cached');
             })
     );
     self.skipWaiting();
 });
 
-// Activate event
+// Activate event - clean up old caches
 self.addEventListener('activate', event => {
+    console.log('Service worker activating...');
     event.waitUntil(
         caches.keys().then(cacheNames => {
             return Promise.all(
@@ -39,34 +46,70 @@ self.addEventListener('activate', event => {
     self.clients.claim();
 });
 
-// Fetch event - Network first, fallback to cache
+// Fetch event - Cache-first for static assets, network-first for API
 self.addEventListener('fetch', event => {
     // Skip non-GET requests
     if (event.request.method !== 'GET') return;
     
-    // Skip API calls (let them fail naturally if offline)
-    if (event.request.url.includes('script.google.com')) {
+    const url = new URL(event.request.url);
+    
+    // API calls - network only (app handles offline with localStorage cache)
+    if (url.hostname.includes('script.google.com')) {
+        event.respondWith(
+            fetch(event.request).catch(() => {
+                // Return offline response for API calls
+                return new Response(JSON.stringify({ 
+                    error: 'offline',
+                    message: 'You are offline. Data will sync when connection is restored.'
+                }), {
+                    status: 503,
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            })
+        );
         return;
     }
     
+    // Static assets - Cache first, then network
+    if (STATIC_ASSETS.some(asset => event.request.url.includes(asset.replace(BASE_PATH, '')))) {
+        event.respondWith(
+            caches.match(event.request)
+                .then(cached => {
+                    if (cached) {
+                        // Return cached, but also update cache in background
+                        fetch(event.request)
+                            .then(response => {
+                                if (response.ok) {
+                                    caches.open(CACHE_NAME)
+                                        .then(cache => cache.put(event.request, response));
+                                }
+                            })
+                            .catch(() => {}); // Ignore network errors for background update
+                        return cached;
+                    }
+                    // Not in cache, fetch from network
+                    return fetch(event.request)
+                        .then(response => {
+                            const responseClone = response.clone();
+                            caches.open(CACHE_NAME)
+                                .then(cache => cache.put(event.request, responseClone));
+                            return response;
+                        });
+                })
+        );
+        return;
+    }
+    
+    // Other requests - Network first with cache fallback
     event.respondWith(
         fetch(event.request)
             .then(response => {
-                // Clone the response
                 const responseClone = response.clone();
-                
-                // Cache the fetched response
                 caches.open(CACHE_NAME)
-                    .then(cache => {
-                        cache.put(event.request, responseClone);
-                    });
-                
+                    .then(cache => cache.put(event.request, responseClone));
                 return response;
             })
-            .catch(() => {
-                // Network failed, try cache
-                return caches.match(event.request);
-            })
+            .catch(() => caches.match(event.request))
     );
 });
 

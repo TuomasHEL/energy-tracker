@@ -92,6 +92,77 @@ const state = {
 };
 
 // ============================================
+// LOCAL CACHE MANAGEMENT
+// ============================================
+
+const CACHE_KEY = 'clearground_cache';
+const CACHE_VERSION = 1;
+
+function saveToCache() {
+    try {
+        const cacheData = {
+            version: CACHE_VERSION,
+            timestamp: new Date().toISOString(),
+            currentUserId: state.currentUser?.user_id,
+            users: state.users,
+            markers: state.markers,
+            sessions: state.sessions,
+            progress: state.progress,
+            playlists: state.playlists,
+            transmissions: state.transmissions,
+            intentions: state.intentions
+        };
+        localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+        console.log('Data cached locally');
+    } catch (error) {
+        console.error('Failed to save cache:', error);
+    }
+}
+
+function loadFromCache() {
+    try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (!cached) return false;
+        
+        const data = JSON.parse(cached);
+        if (data.version !== CACHE_VERSION) {
+            console.log('Cache version mismatch, clearing');
+            localStorage.removeItem(CACHE_KEY);
+            return false;
+        }
+        
+        // Restore state from cache
+        state.users = data.users || [];
+        state.markers = data.markers || [];
+        state.sessions = data.sessions || [];
+        state.progress = data.progress || [];
+        state.playlists = data.playlists || [];
+        state.transmissions = data.transmissions || [];
+        state.intentions = data.intentions;
+        
+        // Restore current user
+        if (data.currentUserId) {
+            state.currentUser = state.users.find(u => u.user_id === data.currentUserId);
+        }
+        
+        console.log('Loaded from cache (age:', getTimeSince(data.timestamp), ')');
+        return true;
+    } catch (error) {
+        console.error('Failed to load cache:', error);
+        return false;
+    }
+}
+
+function getTimeSince(isoString) {
+    const diff = Date.now() - new Date(isoString).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h`;
+    return `${Math.floor(hours / 24)}d`;
+}
+
+// ============================================
 // INITIALIZATION
 // ============================================
 
@@ -114,33 +185,72 @@ async function init() {
         // Request notification permission
         await requestNotificationPermission();
         
-        // Load users first
-        await loadUsers();
-        console.log('Users loaded:', state.users.length);
+        // Try to load from cache first (instant startup)
+        const hasCachedData = loadFromCache();
         
-        // Set current user from localStorage or default to first
-        const savedUserId = localStorage.getItem('currentUserId');
-        if (savedUserId && state.users.find(u => u.user_id === savedUserId)) {
-            state.currentUser = state.users.find(u => u.user_id === savedUserId);
-        } else if (state.users.length > 0) {
-            state.currentUser = state.users[0];
-        }
-        console.log('Current user:', state.currentUser?.user_id);
-        
-        // Populate user selector
-        populateUserSelector();
-        
-        // Load markers
-        await loadMarkers();
-        console.log('Markers loaded:', state.markers?.length);
-        
-        // Load initial data for current user
-        if (state.currentUser) {
-            await loadUserData();
-            await loadTransmissions();
-            await loadIntentions();
-            console.log('User data loaded - sessions:', state.sessions?.length, 'progress:', state.progress?.length, 'playlists:', state.playlists?.length);
-            console.log('Transmissions loaded:', state.transmissions?.length);
+        if (hasCachedData && state.users.length > 0) {
+            console.log('Using cached data for instant startup');
+            
+            // Set current user from cache or localStorage
+            const savedUserId = localStorage.getItem('currentUserId');
+            if (savedUserId && state.users.find(u => u.user_id === savedUserId)) {
+                state.currentUser = state.users.find(u => u.user_id === savedUserId);
+            } else if (state.users.length > 0 && !state.currentUser) {
+                state.currentUser = state.users[0];
+            }
+            
+            // Populate UI immediately from cache
+            populateUserSelector();
+            updateDashboard();
+            applySettingsToUI();
+            populateTransmissionsDropdown();
+            renderTransmissionsList();
+            updateProfileView();
+            updateAwakenLauncher();
+            
+            // Hide loading - app is usable now
+            hideLoading();
+            
+            // Sync fresh data in background (don't await)
+            syncDataInBackground();
+        } else {
+            // No cache - load everything from server
+            console.log('No cache, loading from server');
+            
+            await loadUsers();
+            console.log('Users loaded:', state.users.length);
+            
+            const savedUserId = localStorage.getItem('currentUserId');
+            if (savedUserId && state.users.find(u => u.user_id === savedUserId)) {
+                state.currentUser = state.users.find(u => u.user_id === savedUserId);
+            } else if (state.users.length > 0) {
+                state.currentUser = state.users[0];
+            }
+            console.log('Current user:', state.currentUser?.user_id);
+            
+            populateUserSelector();
+            
+            await loadMarkers();
+            console.log('Markers loaded:', state.markers?.length);
+            
+            if (state.currentUser) {
+                await loadUserData();
+                await loadTransmissions();
+                await loadIntentions();
+                console.log('User data loaded');
+            }
+            
+            updateDashboard();
+            applySettingsToUI();
+            populateTransmissionsDropdown();
+            renderTransmissionsList();
+            updateProfileView();
+            updateAwakenLauncher();
+            
+            // Save to cache for next time
+            saveToCache();
+            
+            hideLoading();
         }
         
         // Restore timer if it was running
@@ -155,32 +265,66 @@ async function init() {
         // Setup visibility change handler for background
         setupVisibilityHandler();
         
-        // Update dashboard
-        updateDashboard();
-        
-        // Apply settings to UI
-        applySettingsToUI();
-        
-        // Populate transmissions dropdown
-        populateTransmissionsDropdown();
-        
-        // Render transmissions list in settings
-        renderTransmissionsList();
-        
-        // Update profile view if visible
-        updateProfileView();
-        
-        // Update awaken launcher
-        updateAwakenLauncher();
-        
         console.log('App init completed successfully');
         
     } catch (error) {
         console.error('Init error:', error);
         showToast('Failed to initialize app', 'error');
+        hideLoading();
     }
+}
+
+// Background sync - fetch fresh data without blocking UI
+async function syncDataInBackground() {
+    console.log('Starting background sync...');
     
-    hideLoading();
+    try {
+        // Fetch all data in parallel
+        const [usersData, markersData] = await Promise.all([
+            apiCall('getUsers'),
+            apiCall('getMarkers')
+        ]);
+        
+        state.users = usersData?.users || state.users;
+        state.markers = markersData?.markers || state.markers;
+        
+        // Re-resolve current user (might have changed)
+        const savedUserId = localStorage.getItem('currentUserId');
+        if (savedUserId) {
+            const user = state.users.find(u => u.user_id === savedUserId);
+            if (user) state.currentUser = user;
+        }
+        
+        if (state.currentUser) {
+            const [sessionsData, progressData, playlistsData, transmissionsData, intentionsData] = await Promise.all([
+                apiCall('getSessions', { userId: state.currentUser.user_id, limit: 100 }),
+                apiCall('getProgress', { userId: state.currentUser.user_id, limit: 100 }),
+                apiCall('getPlaylists', { userId: state.currentUser.user_id }),
+                apiCall('getTransmissions', { userId: state.currentUser.user_id }),
+                apiCall('getIntentions', { userId: state.currentUser.user_id })
+            ]);
+            
+            state.sessions = sessionsData?.sessions || state.sessions;
+            state.progress = progressData?.progress || state.progress;
+            state.playlists = playlistsData?.playlists || state.playlists;
+            state.transmissions = transmissionsData?.transmissions || state.transmissions;
+            state.intentions = intentionsData?.intentions || state.intentions;
+        }
+        
+        // Update UI with fresh data
+        populateUserSelector();
+        updateDashboard();
+        populateTransmissionsDropdown();
+        renderTransmissionsList();
+        
+        // Save fresh data to cache
+        saveToCache();
+        
+        console.log('Background sync complete');
+    } catch (error) {
+        console.error('Background sync failed:', error);
+        // Don't show error - app is still usable with cached data
+    }
 }
 
 // ============================================
@@ -566,6 +710,9 @@ function setupVisibilityHandler() {
             saveTimerState();
             savePlaylistState();
         } else {
+            // Page became visible - catch up on any elapsed time
+            
+            // Handle standalone timer
             if (state.timer.isRunning && !state.timer.isPaused) {
                 const now = new Date();
                 const remaining = Math.max(0, Math.round((state.timer.endTime - now) / 1000));
@@ -578,20 +725,9 @@ function setupVisibilityHandler() {
                 }
             }
             
-            // Restore playlist timer if running
+            // Handle playlist runner - may need to catch up multiple items
             if (state.playlistRunner.isRunning && !state.playlistRunner.isPaused) {
-                const now = new Date();
-                const remaining = Math.max(0, Math.round((state.playlistRunner.itemEndTime - now) / 1000));
-                
-                if (remaining <= 0) {
-                    clearInterval(state.playlistRunner.itemTimer);
-                    playCompletionSound();
-                    vibrate([100, 50, 100]);
-                    nextPlaylistItem();
-                } else {
-                    state.playlistRunner.itemRemaining = remaining;
-                    updatePlaylistItemTimer();
-                }
+                catchUpPlaylist();
             }
         }
     });
@@ -600,6 +736,148 @@ function setupVisibilityHandler() {
         saveTimerState();
         savePlaylistState();
     });
+}
+
+// Catch up playlist when returning from background
+async function catchUpPlaylist() {
+    const runner = state.playlistRunner;
+    if (!runner.isRunning || runner.isPaused) return;
+    
+    const now = new Date();
+    
+    // Clear existing interval
+    if (runner.itemTimer) {
+        clearInterval(runner.itemTimer);
+        runner.itemTimer = null;
+    }
+    
+    // Check if current item has elapsed
+    let remaining = Math.round((runner.itemEndTime - now) / 1000);
+    
+    if (remaining <= 0) {
+        console.log('Playlist item elapsed while in background, catching up...');
+        
+        // Calculate how much time has passed since item should have ended
+        let elapsedSinceEnd = Math.abs(remaining);
+        
+        // Save the completed item
+        const currentItem = runner.items[runner.currentIndex];
+        if (state.currentUser && currentItem) {
+            try {
+                await apiCall('saveSession', {
+                    userId: state.currentUser.user_id,
+                    markerId: currentItem.marker_id !== 'custom' ? currentItem.marker_id : '',
+                    startTime: new Date(runner.itemEndTime.getTime() - currentItem.duration * 60 * 1000).toISOString(),
+                    endTime: runner.itemEndTime.toISOString(),
+                    durationMinutes: currentItem.duration,
+                    energyType: currentItem.transmission || '',
+                    intensity: currentItem.intensity || 'medium',
+                    notes: `Program: ${runner.playlist.name}${currentItem.customNote ? ' - ' + currentItem.customNote : ''}`
+                });
+            } catch (error) {
+                console.error('Failed to save catch-up session:', error);
+            }
+        }
+        
+        // Move to next item
+        runner.currentIndex++;
+        
+        // Skip through any items that would have fully elapsed
+        while (runner.currentIndex < runner.items.length) {
+            const nextItem = runner.items[runner.currentIndex];
+            const nextDurationSec = nextItem.duration * 60;
+            
+            if (elapsedSinceEnd >= nextDurationSec) {
+                // This item also fully elapsed, save it and move on
+                console.log('Skipping fully elapsed item:', runner.currentIndex);
+                elapsedSinceEnd -= nextDurationSec;
+                
+                if (state.currentUser) {
+                    try {
+                        await apiCall('saveSession', {
+                            userId: state.currentUser.user_id,
+                            markerId: nextItem.marker_id !== 'custom' ? nextItem.marker_id : '',
+                            startTime: new Date(now.getTime() - elapsedSinceEnd * 1000 - nextDurationSec * 1000).toISOString(),
+                            endTime: new Date(now.getTime() - elapsedSinceEnd * 1000).toISOString(),
+                            durationMinutes: nextItem.duration,
+                            energyType: nextItem.transmission || '',
+                            intensity: nextItem.intensity || 'medium',
+                            notes: `Program: ${runner.playlist.name} (auto-completed)${nextItem.customNote ? ' - ' + nextItem.customNote : ''}`
+                        });
+                    } catch (error) {
+                        console.error('Failed to save skipped session:', error);
+                    }
+                }
+                
+                runner.currentIndex++;
+            } else {
+                // This item is partially elapsed, start it with remaining time
+                break;
+            }
+        }
+        
+        // Check if playlist is complete
+        if (runner.currentIndex >= runner.items.length) {
+            playCompletionSound();
+            vibrate([200, 100, 200, 100, 300]);
+            showToast('Program completed!', 'success');
+            stopPlaylist();
+            return;
+        }
+        
+        // Start the current item with adjusted time
+        const currentItemNow = runner.items[runner.currentIndex];
+        const remainingForItem = (currentItemNow.duration * 60) - elapsedSinceEnd;
+        
+        runner.itemEndTime = new Date(now.getTime() + remainingForItem * 1000);
+        runner.itemRemaining = Math.max(0, remainingForItem);
+        
+        // Play sound to indicate we caught up
+        playCompletionSound();
+        
+        // Update UI
+        updatePlaylistItemTimer();
+        document.getElementById('runnerItemName').textContent = 
+            currentItemNow.marker_name || currentItemNow.customNote || 'Energy Work';
+        document.getElementById('runnerCurrentItem').textContent = 
+            `Item ${runner.currentIndex + 1} of ${runner.items.length}`;
+        
+        savePlaylistState();
+        
+        // Restart the interval
+        startPlaylistInterval();
+    } else {
+        // Item hasn't elapsed, just update display and restart interval
+        runner.itemRemaining = remaining;
+        updatePlaylistItemTimer();
+        startPlaylistInterval();
+    }
+}
+
+// Start/restart playlist interval timer
+function startPlaylistInterval() {
+    const runner = state.playlistRunner;
+    
+    // Clear any existing interval
+    if (runner.itemTimer) {
+        clearInterval(runner.itemTimer);
+    }
+    
+    runner.itemTimer = setInterval(() => {
+        if (runner.isPaused) return;
+        
+        const now = new Date();
+        runner.itemRemaining = Math.max(0, Math.round((runner.itemEndTime - now) / 1000));
+        
+        updatePlaylistItemTimer();
+        
+        if (runner.itemRemaining <= 0) {
+            clearInterval(runner.itemTimer);
+            playCompletionSound();
+            vibrate([100, 50, 100]);
+            nextPlaylistItem();
+        }
+    }, 1000);
 }
 
 // ============================================
@@ -1490,6 +1768,7 @@ async function saveAssessment() {
         
         renderMarkersList();
         updateDashboard();
+        saveToCache(); // Keep cache in sync
         
     } catch (error) {
         showToast('Failed to save assessment', 'error');
@@ -1674,6 +1953,7 @@ async function endTimer(completed = false) {
                 : `Session saved: ${durationMinutes} minutes`;
             showToast(message, 'success');
             updateDashboard();
+            saveToCache(); // Keep cache in sync
             
         } catch (error) {
             showToast('Failed to save session', 'error');
@@ -1978,6 +2258,7 @@ async function savePlaylist() {
         closePlaylistModal();
         renderPlaylists();
         showToast('Program saved!', 'success');
+        saveToCache(); // Keep cache in sync
         
     } catch (error) {
         showToast('Failed to save program', 'error');
@@ -2165,21 +2446,8 @@ function startPlaylistItem() {
     updatePlaylistItemTimer();
     savePlaylistState();
     
-    runner.itemTimer = setInterval(() => {
-        if (runner.isPaused) return;
-        
-        const now = new Date();
-        runner.itemRemaining = Math.max(0, Math.round((runner.itemEndTime - now) / 1000));
-        
-        updatePlaylistItemTimer();
-        
-        if (runner.itemRemaining <= 0) {
-            clearInterval(runner.itemTimer);
-            playCompletionSound();
-            vibrate([100, 50, 100]);
-            nextPlaylistItem();
-        }
-    }, 1000);
+    // Use the centralized interval function
+    startPlaylistInterval();
 }
 
 function updatePlaylistItemTimer() {
