@@ -140,6 +140,10 @@ function loadFromCache() {
         state.transmissions = data.transmissions || [];
         state.intentions = data.intentions;
         
+        // Derive categories from markers
+        const categorySet = new Set(state.markers.map(m => m.category));
+        state.categories = Array.from(categorySet).sort();
+        
         // Restore current user
         if (data.currentUserId) {
             state.currentUser = state.users.find(u => u.user_id === data.currentUserId);
@@ -201,6 +205,8 @@ async function init() {
             
             // Populate UI immediately from cache
             populateUserSelector();
+            populateCategoryFilters();
+            populateTimerMarkerSelect();
             updateDashboard();
             applySettingsToUI();
             populateTransmissionsDropdown();
@@ -1129,6 +1135,8 @@ function showView(viewName) {
             case 'settings':
                 renderSettings();
                 applySettingsToUI();
+                break;
+            case 'transmissions':
                 renderTransmissionsList();
                 break;
             case 'playlists':
@@ -1787,6 +1795,15 @@ function setDuration(minutes) {
     document.getElementById('customDuration').value = minutes;
 }
 
+// Update header logo pulsing state based on active timers
+function updateHeaderLogo() {
+    const logo = document.getElementById('headerLogo');
+    if (!logo) return;
+    
+    const isActive = state.timer.isRunning || state.playlistRunner.isRunning;
+    logo.classList.toggle('active', isActive);
+}
+
 async function startTimer() {
     const markerSelect = document.getElementById('timerMarkerSelect');
     const markerId = markerSelect.value;
@@ -1853,6 +1870,7 @@ async function startTimer() {
     updateTimerDisplay();
     state.timer.interval = setInterval(timerTick, 1000);
     
+    updateHeaderLogo();
     showToast(`Timer started: ${duration} minutes`, 'success');
 }
 
@@ -1963,6 +1981,7 @@ async function endTimer(completed = false) {
     }
     
     resetTimer();
+    updateHeaderLogo();
 }
 
 function resetTimer() {
@@ -2006,12 +2025,14 @@ function resetTimer() {
 function renderPlaylists() {
     const container = document.getElementById('playlistsList');
     const playlists = state.playlists || [];
+    const bottomBtn = document.getElementById('addProgramBottomBtn');
     
     console.log('Rendering playlists, count:', playlists.length);
     
     if (state.playlistRunner.isRunning) {
         container.classList.add('hidden');
         document.getElementById('playlistRunner').classList.remove('hidden');
+        if (bottomBtn) bottomBtn.style.display = 'none';
     } else {
         container.classList.remove('hidden');
         document.getElementById('playlistRunner').classList.add('hidden');
@@ -2019,8 +2040,12 @@ function renderPlaylists() {
     
     if (playlists.length === 0) {
         container.innerHTML = '<p class="empty-state">No programs yet. Create one!</p>';
+        if (bottomBtn) bottomBtn.style.display = 'none';
         return;
     }
+    
+    // Show bottom button when there are playlists
+    if (bottomBtn) bottomBtn.style.display = 'block';
     
     container.innerHTML = playlists.map(pl => {
         let items = [];
@@ -2410,6 +2435,7 @@ async function runPlaylist(playlistId) {
     pauseBtn.innerHTML = '<span class="btn-icon">⏸</span> Pause';
     
     startPlaylistItem();
+    updateHeaderLogo();
 }
 
 function startPlaylistItem() {
@@ -2551,6 +2577,8 @@ function stopPlaylist() {
     
     document.getElementById('playlistRunner').classList.add('hidden');
     document.getElementById('playlistsList').classList.remove('hidden');
+    
+    updateHeaderLogo();
 }
 
 // ============================================
@@ -3734,11 +3762,11 @@ function startSessionTimer(duration) {
     awakenSession.timerRemaining = duration;
     const totalDuration = duration;
     
-    updateTimerDisplay();
+    updateSessionTimerDisplay();
     
     awakenSession.timerInterval = setInterval(() => {
         awakenSession.timerRemaining--;
-        updateTimerDisplay();
+        updateSessionTimerDisplay();
         
         // Update progress bar
         const progress = ((totalDuration - awakenSession.timerRemaining) / totalDuration) * 100;
@@ -3752,8 +3780,8 @@ function startSessionTimer(duration) {
     }, 1000);
 }
 
-// Update timer display
-function updateTimerDisplay() {
+// Update awaken session timer display
+function updateSessionTimerDisplay() {
     const minutes = Math.floor(awakenSession.timerRemaining / 60);
     const seconds = awakenSession.timerRemaining % 60;
     document.getElementById('sessionTimerDisplay').textContent = 

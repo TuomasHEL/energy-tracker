@@ -38,7 +38,7 @@
         <!-- Global Header -->
         <header class="global-header">
             <div class="global-header-left">
-                <img src="icons/icon.svg" alt="" class="global-header-icon">
+                <img src="icons/icon.svg" alt="" class="global-header-icon" id="headerLogo">
                 <span class="global-header-title">Clear Ground</span>
             </div>
             <select id="currentUser" class="user-selector">
@@ -277,6 +277,8 @@
                     <p class="empty-state">No programs yet</p>
                 </div>
 
+                <button class="btn secondary full-width" id="addProgramBottomBtn" onclick="showCreatePlaylist()" style="margin-top: var(--space-md); display: none;">+ New Program</button>
+
                 <!-- Create/Edit Playlist Modal -->
                 <div id="playlistModal" class="modal">
                     <div class="modal-content large">
@@ -333,7 +335,7 @@
             <!-- Awaken View (Launcher) -->
             <section id="viewAwaken" class="view">
                 <div class="view-header">
-                    <h2>Awaken</h2>
+                    <h2>Recognize</h2>
                 </div>
 
                 <p class="awaken-intro">Guided practices for spiritual awakening</p>
@@ -402,7 +404,7 @@
                         <!-- Dynamic summary inserted here -->
                     </div>
                     
-                    <button class="btn primary large" onclick="finishAwakenSession()">Return to Awaken</button>
+                    <button class="btn primary large" onclick="finishAwakenSession()">Return to Recognize</button>
                 </div>
             </section>
 
@@ -533,6 +535,16 @@
                     <div class="profile-card-arrow">→</div>
                 </div>
 
+                <!-- Energy Transmissions Card -->
+                <div class="profile-card" onclick="showView('transmissions')">
+                    <div class="profile-card-icon">⚡</div>
+                    <div class="profile-card-content">
+                        <div class="profile-card-title">Energy Transmissions</div>
+                        <div class="profile-card-subtitle">Custom energy types</div>
+                    </div>
+                    <div class="profile-card-arrow">→</div>
+                </div>
+
                 <div class="settings-section">
                     <h3>Notifications</h3>
                     <div class="settings-row">
@@ -558,16 +570,6 @@
                 </div>
 
                 <div class="settings-section">
-                    <h3>Energy Transmissions</h3>
-                    <p class="settings-hint" style="margin-bottom: var(--space-md);">Custom energy types for timer & playlists</p>
-                    <div id="transmissionsList" class="transmissions-list"></div>
-                    <div class="add-transmission-row">
-                        <input type="text" id="newTransmissionName" placeholder="New transmission name...">
-                        <button class="btn small" onclick="addTransmission()">Add</button>
-                    </div>
-                </div>
-
-                <div class="settings-section">
                     <h3>Users</h3>
                     <div id="usersList" class="users-list"></div>
                     <button class="btn secondary" onclick="showAddUserModal()">+ Add User</button>
@@ -586,7 +588,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Clear Ground v3.3</p>
+                    <p class="version">Clear Ground v3.4</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>
@@ -724,6 +726,23 @@
 
                 <p class="privacy-note">🔒 Your intentions are private and only visible to you.</p>
             </section>
+
+            <!-- Transmissions View -->
+            <section id="viewTransmissions" class="view">
+                <div class="view-header">
+                    <button class="back-btn" onclick="showView('settings')">←</button>
+                    <h2>Energy Transmissions</h2>
+                </div>
+
+                <p class="settings-hint" style="margin-bottom: var(--space-lg);">Custom energy types for timer & programs. These represent different healing modalities or energy sources you work with.</p>
+                
+                <div id="transmissionsList" class="transmissions-list"></div>
+                
+                <div class="add-transmission-row" style="margin-top: var(--space-lg);">
+                    <input type="text" id="newTransmissionName" placeholder="New transmission name...">
+                    <button class="btn small" onclick="addTransmission()">Add</button>
+                </div>
+            </section>
         </main>
 
         <!-- Bottom Navigation -->
@@ -734,7 +753,7 @@
             </button>
             <button class="nav-btn" onclick="showView('awaken')" data-view="awaken">
                 <span class="nav-icon">✦</span>
-                <span class="nav-label">Awaken</span>
+                <span class="nav-label">Recognize</span>
             </button>
             <button class="nav-btn" onclick="showView('timer')" data-view="timer">
                 <span class="nav-icon">⏱</span>

@@ -214,6 +214,23 @@ body {
 .global-header-icon {
     width: 28px;
     height: 28px;
+    transition: all var(--transition-normal);
+}
+
+.global-header-icon.active {
+    animation: header-pulse 2s ease-in-out infinite;
+    filter: drop-shadow(0 0 6px var(--accent-primary));
+}
+
+@keyframes header-pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.7;
+        transform: scale(1.05);
+    }
 }
 
 .global-header-title {
