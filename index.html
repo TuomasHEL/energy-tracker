@@ -167,10 +167,77 @@
             <section id="viewTimer" class="view">
                 <div class="view-header">
                     <h2>Energy Work</h2>
+                    <div class="mode-toggle">
+                        <span class="mode-label" id="modeLabelSimple">Simple</span>
+                        <label class="toggle">
+                            <input type="checkbox" id="advancedModeToggle" onchange="toggleEnergyMode()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="mode-label" id="modeLabelAdvanced">Advanced</span>
+                    </div>
                 </div>
 
-                <!-- Timer Setup (shown when no timer running) -->
-                <div id="timerSetup" class="timer-setup">
+                <!-- Simple Mode Setup -->
+                <div id="simpleSetup" class="simple-setup">
+                    <div class="simple-section">
+                        <label class="simple-label">Work on:</label>
+                        <div class="work-options">
+                            <button class="work-option" data-work="wisdom" onclick="selectWorkOption('wisdom')">
+                                <span class="work-icon">◇</span>
+                                <span class="work-name">Wisdom</span>
+                            </button>
+                            <button class="work-option" data-work="healing" onclick="selectWorkOption('healing')">
+                                <span class="work-icon">♡</span>
+                                <span class="work-name">Healing</span>
+                            </button>
+                            <button class="work-option active" data-work="vitality" onclick="selectWorkOption('vitality')">
+                                <span class="work-icon">✦</span>
+                                <span class="work-name">Vitality</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="simple-section">
+                        <label class="simple-label">Duration:</label>
+                        <div class="duration-selector">
+                            <button class="duration-btn" onclick="adjustSimpleDuration(-15)">−</button>
+                            <span class="duration-display" id="simpleDurationDisplay">60 min</span>
+                            <button class="duration-btn" onclick="adjustSimpleDuration(15)">+</button>
+                        </div>
+                    </div>
+
+                    <div class="simple-start-container">
+                        <button class="simple-start-btn" onclick="startSimpleSession()">
+                            <img src="icons/icon.svg" alt="Start" class="simple-start-icon">
+                        </button>
+                        <p class="simple-start-hint">Tap to begin</p>
+                    </div>
+                </div>
+
+                <!-- Simple Mode Active -->
+                <div id="simpleActive" class="simple-active hidden">
+                    <div class="simple-active-work" id="simpleActiveWork">Vitality</div>
+                    
+                    <div class="simple-timer-container">
+                        <button class="simple-logo-btn pulsing" onclick="toggleSimpleTimerDisplay()">
+                            <img src="icons/icon.svg" alt="" class="simple-logo-icon">
+                        </button>
+                        <div class="simple-timer" id="simpleTimerDisplay" onclick="toggleSimpleTimerDisplay()">00:00:00</div>
+                        <div class="simple-timer-label" id="simpleTimerLabel">remaining</div>
+                    </div>
+
+                    <div class="simple-controls">
+                        <button class="btn secondary" onclick="pauseTimer()" id="simplePauseBtn">
+                            <span class="btn-icon">⏸</span> Pause
+                        </button>
+                        <button class="btn danger" onclick="endTimer()">
+                            <span class="btn-icon">⏹</span> End
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Advanced Mode Setup (shown when no timer running) -->
+                <div id="timerSetup" class="timer-setup hidden">
                     <div class="form-group">
                         <label>What are you working on?</label>
                         <select id="timerMarkerSelect">
@@ -226,7 +293,7 @@
                     </button>
                 </div>
 
-                <!-- Active Timer (shown when timer running) -->
+                <!-- Advanced Mode Active Timer (shown when timer running) -->
                 <div id="timerActive" class="timer-active hidden">
                     <div class="timer-display">
                         <div class="timer-icon-pulse">
@@ -588,7 +655,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Clear Ground v3.4</p>
+                    <p class="version">Clear Ground v3.5</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>

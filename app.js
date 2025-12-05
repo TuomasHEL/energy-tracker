@@ -271,6 +271,9 @@ async function init() {
         // Setup visibility change handler for background
         setupVisibilityHandler();
         
+        // Initialize energy mode preference
+        initEnergyMode();
+        
         console.log('App init completed successfully');
         
     } catch (error) {
@@ -1789,6 +1792,163 @@ async function saveAssessment() {
 // TIMER
 // ============================================
 
+// Simple mode state
+const simpleMode = {
+    selectedWork: 'vitality',
+    duration: 60,
+    showElapsed: false,
+    isSimpleSession: false
+};
+
+// Work type to transmission mapping
+const WORK_TRANSMISSIONS = {
+    wisdom: 'Shift Shift',
+    healing: 'Onelove',
+    vitality: 'Neigong'
+};
+
+// Toggle between simple and advanced mode
+function toggleEnergyMode() {
+    const isAdvanced = document.getElementById('advancedModeToggle').checked;
+    
+    // Don't allow mode switch while timer is running
+    if (state.timer.isRunning) {
+        document.getElementById('advancedModeToggle').checked = !isAdvanced;
+        showToast('Cannot switch mode while session is running', 'error');
+        return;
+    }
+    
+    document.getElementById('simpleSetup').classList.toggle('hidden', isAdvanced);
+    document.getElementById('timerSetup').classList.toggle('hidden', !isAdvanced);
+    
+    // Update mode label styling
+    document.getElementById('modeLabelSimple').style.color = isAdvanced ? 'var(--text-muted)' : 'var(--text-primary)';
+    document.getElementById('modeLabelAdvanced').style.color = isAdvanced ? 'var(--text-primary)' : 'var(--text-muted)';
+    
+    // Save preference
+    localStorage.setItem('energyModeAdvanced', isAdvanced);
+}
+
+// Select work option in simple mode
+function selectWorkOption(work) {
+    simpleMode.selectedWork = work;
+    
+    document.querySelectorAll('.work-option').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.work === work);
+    });
+}
+
+// Adjust simple mode duration
+function adjustSimpleDuration(delta) {
+    simpleMode.duration = Math.max(15, Math.min(180, simpleMode.duration + delta));
+    document.getElementById('simpleDurationDisplay').textContent = `${simpleMode.duration} min`;
+}
+
+// Start simple session
+async function startSimpleSession() {
+    await ensureNotificationPermission();
+    
+    if (!state.audioContext) {
+        state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    const workName = capitalize(simpleMode.selectedWork);
+    const transmission = WORK_TRANSMISSIONS[simpleMode.selectedWork];
+    const duration = simpleMode.duration;
+    
+    const now = new Date();
+    const durationSeconds = duration * 60;
+    const endTime = new Date(now.getTime() + durationSeconds * 1000);
+    
+    state.timer = {
+        isRunning: true,
+        isPaused: false,
+        startTime: now,
+        endTime: endTime,
+        duration: durationSeconds,
+        remaining: durationSeconds,
+        marker: null,
+        customWork: workName,
+        targetName: workName,
+        energyType: transmission,
+        intensity: 'medium',
+        notes: '',
+        interval: null
+    };
+    
+    simpleMode.isSimpleSession = true;
+    simpleMode.showElapsed = false;
+    
+    saveTimerState();
+    
+    // Show simple active view
+    document.getElementById('simpleSetup').classList.add('hidden');
+    document.getElementById('simpleActive').classList.remove('hidden');
+    document.getElementById('simpleActiveWork').textContent = workName;
+    document.getElementById('simpleTimerLabel').textContent = 'remaining';
+    
+    // Hide mode toggle during session
+    document.querySelector('.mode-toggle').style.display = 'none';
+    
+    updateSimpleTimerDisplay();
+    state.timer.interval = setInterval(simpleTimerTick, 1000);
+    
+    updateHeaderLogo();
+    showToast(`${workName} session started: ${duration} minutes`, 'success');
+}
+
+// Simple timer tick
+function simpleTimerTick() {
+    if (state.timer.isPaused) return;
+    
+    const now = new Date();
+    state.timer.remaining = Math.max(0, Math.round((state.timer.endTime - now) / 1000));
+    
+    updateSimpleTimerDisplay();
+    
+    if (state.timer.remaining <= 0) {
+        endTimer(true);
+    }
+}
+
+// Update simple timer display
+function updateSimpleTimerDisplay() {
+    let displaySeconds;
+    
+    if (simpleMode.showElapsed) {
+        displaySeconds = state.timer.duration - state.timer.remaining;
+    } else {
+        displaySeconds = state.timer.remaining;
+    }
+    
+    const hours = Math.floor(displaySeconds / 3600);
+    const minutes = Math.floor((displaySeconds % 3600) / 60);
+    const seconds = displaySeconds % 60;
+    
+    document.getElementById('simpleTimerDisplay').textContent = 
+        `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
+// Toggle between remaining/elapsed display
+function toggleSimpleTimerDisplay() {
+    simpleMode.showElapsed = !simpleMode.showElapsed;
+    document.getElementById('simpleTimerLabel').textContent = 
+        simpleMode.showElapsed ? 'elapsed' : 'remaining';
+    updateSimpleTimerDisplay();
+}
+
+// Initialize energy mode from saved preference
+function initEnergyMode() {
+    const isAdvanced = localStorage.getItem('energyModeAdvanced') === 'true';
+    document.getElementById('advancedModeToggle').checked = isAdvanced;
+    
+    document.getElementById('simpleSetup').classList.toggle('hidden', isAdvanced);
+    document.getElementById('timerSetup').classList.toggle('hidden', !isAdvanced);
+    
+    document.getElementById('modeLabelSimple').style.color = isAdvanced ? 'var(--text-muted)' : 'var(--text-primary)';
+    document.getElementById('modeLabelAdvanced').style.color = isAdvanced ? 'var(--text-primary)' : 'var(--text-muted)';
+}
+
 function setDuration(minutes) {
     document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
     event.target.classList.add('active');
@@ -1907,14 +2067,19 @@ function pad(num) {
 
 function pauseTimer() {
     state.timer.isPaused = !state.timer.isPaused;
-    const btn = document.getElementById('pauseBtn');
+    
+    // Update both pause buttons
+    const advancedBtn = document.getElementById('pauseBtn');
+    const simpleBtn = document.getElementById('simplePauseBtn');
     
     if (state.timer.isPaused) {
-        btn.innerHTML = '<span class="btn-icon">▶</span> Resume';
+        advancedBtn.innerHTML = '<span class="btn-icon">▶</span> Resume';
+        simpleBtn.innerHTML = '<span class="btn-icon">▶</span> Resume';
         showToast('Timer paused', 'success');
     } else {
         state.timer.endTime = new Date(Date.now() + state.timer.remaining * 1000);
-        btn.innerHTML = '<span class="btn-icon">⏸</span> Pause';
+        advancedBtn.innerHTML = '<span class="btn-icon">⏸</span> Pause';
+        simpleBtn.innerHTML = '<span class="btn-icon">⏸</span> Pause';
         showToast('Timer resumed', 'success');
     }
     
@@ -2003,9 +2168,19 @@ function resetTimer() {
     
     localStorage.removeItem('timerState');
     
-    document.getElementById('timerSetup').classList.remove('hidden');
-    document.getElementById('timerActive').classList.add('hidden');
+    // Reset simple mode views
+    if (simpleMode.isSimpleSession) {
+        document.getElementById('simpleActive').classList.add('hidden');
+        document.getElementById('simpleSetup').classList.remove('hidden');
+        document.querySelector('.mode-toggle').style.display = '';
+        simpleMode.isSimpleSession = false;
+    } else {
+        // Reset advanced mode views
+        document.getElementById('timerSetup').classList.remove('hidden');
+        document.getElementById('timerActive').classList.add('hidden');
+    }
     
+    // Reset advanced mode form
     document.getElementById('timerMarkerSelect').value = '';
     document.getElementById('customWorkName').value = '';
     document.getElementById('customDuration').value = '';

@@ -1045,6 +1045,282 @@ input:checked + .toggle-slider:before {
 }
 
 /* ============================================
+   ENERGY MODE TOGGLE
+   ============================================ */
+
+.mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.mode-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    transition: color var(--transition-fast);
+}
+
+#modeLabelSimple {
+    color: var(--text-primary);
+}
+
+.mode-toggle input:checked ~ #modeLabelSimple,
+.mode-toggle:has(input:checked) #modeLabelSimple {
+    color: var(--text-muted);
+}
+
+.mode-toggle:has(input:checked) #modeLabelAdvanced {
+    color: var(--text-primary);
+}
+
+/* ============================================
+   SIMPLE MODE
+   ============================================ */
+
+.simple-setup {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: var(--space-lg);
+}
+
+.simple-section {
+    width: 100%;
+    margin-bottom: var(--space-xl);
+    text-align: center;
+}
+
+.simple-label {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-md);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Work Options */
+.work-options {
+    display: flex;
+    gap: var(--space-md);
+    justify-content: center;
+}
+
+.work-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-lg);
+    background: var(--bg-surface);
+    border: 2px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    min-width: 90px;
+    font-family: inherit;
+}
+
+.work-option:hover {
+    border-color: var(--accent-primary);
+    background: rgba(139, 92, 246, 0.05);
+}
+
+.work-option.active {
+    border-color: var(--accent-primary);
+    background: rgba(139, 92, 246, 0.15);
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+}
+
+.work-icon {
+    font-size: 1.75rem;
+    color: var(--text-muted);
+    transition: color var(--transition-fast);
+}
+
+.work-option.active .work-icon {
+    color: var(--accent-primary);
+}
+
+.work-name {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.work-option.active .work-name {
+    color: var(--text-primary);
+}
+
+/* Duration Selector */
+.duration-selector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-lg);
+}
+
+.duration-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.duration-btn:hover {
+    border-color: var(--accent-primary);
+    background: rgba(139, 92, 246, 0.1);
+}
+
+.duration-btn:active {
+    transform: scale(0.95);
+}
+
+.duration-display {
+    font-size: 2rem;
+    font-weight: 300;
+    color: var(--text-primary);
+    min-width: 120px;
+    text-align: center;
+}
+
+/* Simple Start Button */
+.simple-start-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: var(--space-xl);
+}
+
+.simple-start-btn {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-primary), #a78bfa);
+    border: none;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);
+}
+
+.simple-start-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 30px rgba(139, 92, 246, 0.5);
+}
+
+.simple-start-btn:active {
+    transform: scale(0.98);
+}
+
+.simple-start-icon {
+    width: 60px;
+    height: 60px;
+    filter: brightness(10);
+}
+
+.simple-start-hint {
+    margin-top: var(--space-md);
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+/* Simple Active Mode */
+.simple-active {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: var(--space-xl);
+    min-height: 400px;
+}
+
+.simple-active-work {
+    font-size: 1.25rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-xl);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.simple-timer-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: var(--space-xl);
+}
+
+.simple-logo-btn {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-primary), #a78bfa);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: var(--space-lg);
+    box-shadow: 0 4px 30px rgba(139, 92, 246, 0.4);
+}
+
+.simple-logo-btn.pulsing {
+    animation: simple-pulse 2s ease-in-out infinite;
+}
+
+@keyframes simple-pulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 4px 30px rgba(139, 92, 246, 0.4);
+    }
+    50% {
+        transform: scale(1.03);
+        box-shadow: 0 6px 40px rgba(139, 92, 246, 0.6);
+    }
+}
+
+.simple-logo-icon {
+    width: 70px;
+    height: 70px;
+    filter: brightness(10);
+}
+
+.simple-timer {
+    font-size: 3rem;
+    font-weight: 200;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-variant-numeric: tabular-nums;
+    transition: color var(--transition-fast);
+}
+
+.simple-timer:hover {
+    color: var(--accent-primary);
+}
+
+.simple-timer-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: var(--space-xs);
+}
+
+.simple-controls {
+    display: flex;
+    gap: var(--space-md);
+    margin-top: auto;
+}
+
+/* ============================================
    TIMER
    ============================================ */
 
