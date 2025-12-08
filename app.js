@@ -1171,6 +1171,9 @@ function showView(viewName) {
             case 'signalHistory':
                 renderSignalHistory('favorites');
                 break;
+            case 'signalSettings':
+                updateSignalSettingsView();
+                break;
         }
     } catch (error) {
         console.error('Error in showView:', error);
@@ -1272,6 +1275,25 @@ function updateStats() {
     renderMarkerBreakdown(filteredSessions);
     renderRecentActivity();
     renderCorrelationView(filteredSessions, filteredProgress);
+    
+    // Update signal stats
+    updateSignalStatsDisplay();
+}
+
+function updateSignalStatsDisplay() {
+    const stats = signalState.stats;
+    const favCount = signalState.history.filter(h => h.isFavorite).length;
+    
+    // Stats page
+    const totalEl = document.getElementById('statsSignalTotal');
+    const streakEl = document.getElementById('statsSignalStreak');
+    const bestEl = document.getElementById('statsSignalBest');
+    const favEl = document.getElementById('statsSignalFavorites');
+    
+    if (totalEl) totalEl.textContent = stats.totalCompleted;
+    if (streakEl) streakEl.textContent = stats.currentStreak;
+    if (bestEl) bestEl.textContent = stats.longestStreak;
+    if (favEl) favEl.textContent = favCount;
 }
 
 function filterSessionsByPeriod(period) {
@@ -4691,7 +4713,9 @@ const signalState = {
     currentSignal: null,
     currentCategory: 'all',
     isFavorited: false,
-    history: [],       // Local history cache
+    steps: [],          // Parsed content steps for reader
+    currentStep: 0,     // Current step in reader
+    history: [],        // Local history cache
     stats: {
         todayCount: 0,
         todayDate: null,
@@ -4831,30 +4855,129 @@ function getRandomSignal() {
     displaySignal(lesson, category === 'all' ? signalState.currentCategory : category);
 }
 
-// Display a signal
+// Display a signal in the step-by-step reader
 function displaySignal(lesson, category) {
     signalState.currentSignal = { ...lesson, category };
     signalState.isFavorited = isSignalFavorited(lesson.id);
     
-    // Update UI
-    document.getElementById('signalPrompt').classList.add('hidden');
-    document.getElementById('signalDisplay').classList.remove('hidden');
+    // Parse content into steps (title + paragraphs)
+    const paragraphs = lesson.content.split('\n\n').filter(p => p.trim());
+    signalState.steps = [
+        { type: 'title', content: lesson.title },
+        ...paragraphs.map(p => ({ type: 'paragraph', content: p.trim() }))
+    ];
+    signalState.currentStep = 0;
     
     // Set category badge
-    const badge = document.getElementById('signalCategoryBadge');
+    const badge = document.getElementById('readerCategoryBadge');
     badge.textContent = category.toUpperCase();
-    badge.className = 'signal-category-badge' + (category === 'create' ? ' create' : '');
+    badge.className = 'signal-reader-badge' + (category === 'create' ? ' create' : '');
     
-    // Set content
-    document.getElementById('signalLessonNumber').textContent = `Lesson ${lesson.number}`;
-    document.getElementById('signalLessonTitle').textContent = lesson.title;
-    document.getElementById('signalContent').textContent = lesson.content;
+    // Set lesson number
+    document.getElementById('readerLessonNumber').textContent = `Lesson ${lesson.number}`;
     
-    // Set favorite state
-    updateFavoriteButton();
+    // Generate dots
+    renderSignalDots();
+    
+    // Show first step
+    renderSignalStep();
+    
+    // Show the reader view
+    document.getElementById('viewSignalReader').classList.add('active');
     
     // Record that signal was shown
     recordSignalShown(lesson, category);
+}
+
+// Render progress dots
+function renderSignalDots() {
+    const dotsContainer = document.getElementById('readerDots');
+    dotsContainer.innerHTML = signalState.steps.map((_, i) => 
+        `<div class="signal-reader-dot ${i === 0 ? 'active' : ''}" data-step="${i}"></div>`
+    ).join('');
+}
+
+// Render current step
+function renderSignalStep() {
+    const step = signalState.steps[signalState.currentStep];
+    const textEl = document.getElementById('readerText');
+    const numberEl = document.getElementById('readerLessonNumber');
+    const navEl = document.querySelector('.signal-reader-nav');
+    const actionsEl = document.getElementById('readerActions');
+    const prevBtn = document.getElementById('readerPrevBtn');
+    const nextBtn = document.getElementById('readerNextBtn');
+    
+    // Animate text change
+    textEl.style.animation = 'none';
+    textEl.offsetHeight; // Trigger reflow
+    textEl.style.animation = 'fadeInUp 0.4s ease';
+    
+    // Set content based on step type
+    if (step.type === 'title') {
+        textEl.textContent = step.content;
+        textEl.classList.add('title-step');
+        numberEl.classList.add('visible');
+    } else {
+        textEl.textContent = step.content;
+        textEl.classList.remove('title-step');
+        numberEl.classList.remove('visible');
+    }
+    
+    // Update dots
+    document.querySelectorAll('.signal-reader-dot').forEach((dot, i) => {
+        dot.classList.toggle('active', i === signalState.currentStep);
+        dot.classList.toggle('completed', i < signalState.currentStep);
+    });
+    
+    // Handle navigation visibility
+    const isFirst = signalState.currentStep === 0;
+    const isLast = signalState.currentStep === signalState.steps.length - 1;
+    
+    prevBtn.disabled = isFirst;
+    prevBtn.style.visibility = isFirst ? 'hidden' : 'visible';
+    
+    if (isLast) {
+        // Last step - show actions instead of nav
+        navEl.classList.add('hidden');
+        actionsEl.classList.remove('hidden');
+        updateReaderFavoriteButton();
+    } else {
+        navEl.classList.remove('hidden');
+        actionsEl.classList.add('hidden');
+    }
+}
+
+// Navigate to previous step
+function prevSignalStep() {
+    if (signalState.currentStep > 0) {
+        signalState.currentStep--;
+        renderSignalStep();
+    }
+}
+
+// Navigate to next step
+function nextSignalStep() {
+    if (signalState.currentStep < signalState.steps.length - 1) {
+        signalState.currentStep++;
+        renderSignalStep();
+    }
+}
+
+// Exit signal reader (X button)
+function exitSignalReader() {
+    document.getElementById('viewSignalReader').classList.remove('active');
+    signalState.currentSignal = null;
+    signalState.steps = [];
+    signalState.currentStep = 0;
+}
+
+// Update favorite button in reader
+function updateReaderFavoriteButton() {
+    const btn = document.getElementById('readerFavoriteBtn');
+    const icon = btn.querySelector('.favorite-icon');
+    
+    btn.classList.toggle('active', signalState.isFavorited);
+    icon.textContent = signalState.isFavorited ? '♥' : '♡';
 }
 
 // Record signal shown in history
@@ -4902,19 +5025,10 @@ function toggleSignalFavorite() {
         historyItem.isFavorite = signalState.isFavorited;
     }
     
-    updateFavoriteButton();
+    updateReaderFavoriteButton();
     saveSignalState();
     
     showToast(signalState.isFavorited ? 'Added to favorites' : 'Removed from favorites', 'success');
-}
-
-// Update favorite button state
-function updateFavoriteButton() {
-    const btn = document.getElementById('signalFavoriteBtn');
-    const icon = btn.querySelector('.favorite-icon');
-    
-    btn.classList.toggle('active', signalState.isFavorited);
-    icon.textContent = signalState.isFavorited ? '♥' : '♡';
 }
 
 // Complete signal (Done button)
@@ -4949,10 +5063,9 @@ function completeSignal() {
     
     showToast('Signal completed! ✓', 'success');
     
-    // Return to prompt (can get another)
-    document.getElementById('signalPrompt').classList.remove('hidden');
-    document.getElementById('signalDisplay').classList.add('hidden');
-    signalState.currentSignal = null;
+    // Exit reader and return to signal view
+    exitSignalReader();
+    showView('signal');
 }
 
 // Skip signal
@@ -4971,10 +5084,9 @@ function skipSignal() {
     
     showToast('Signal skipped', 'success');
     
-    // Return to prompt
-    document.getElementById('signalPrompt').classList.remove('hidden');
-    document.getElementById('signalDisplay').classList.add('hidden');
-    signalState.currentSignal = null;
+    // Exit reader and return to signal view
+    exitSignalReader();
+    showView('signal');
 }
 
 // Switch history tab
@@ -5100,6 +5212,94 @@ function closeSignalDetailModal() {
     // Refresh history list in case favorites changed
     const activeTab = document.querySelector('.history-tab.active')?.dataset.tab || 'favorites';
     renderSignalHistory(activeTab);
+}
+
+// ============================================
+// SIGNAL SETTINGS
+// ============================================
+
+// Update signal settings view
+function updateSignalSettingsView() {
+    const s = signalState.settings;
+    const stats = signalState.stats;
+    
+    // Populate current values
+    document.getElementById('signalGoalValue').textContent = s.signalsPerDay;
+    document.getElementById('signalWindowStart').value = s.windowStart;
+    document.getElementById('signalWindowEnd').value = s.windowEnd;
+    
+    // Categories
+    document.getElementById('signalCatRecognize').checked = s.categoriesEnabled.includes('recognize');
+    document.getElementById('signalCatCreate').checked = s.categoriesEnabled.includes('create');
+    
+    // Ratios
+    document.getElementById('signalRatioRecognize').value = s.categoryRatios.recognize || 50;
+    document.getElementById('signalRatioCreate').value = s.categoryRatios.create || 50;
+    updateCategoryRatios();
+    
+    // Notifications
+    document.getElementById('signalNotificationsEnabled').checked = s.notificationsEnabled;
+    
+    // Stats
+    document.getElementById('settingsSignalTotal').textContent = stats.totalCompleted;
+    document.getElementById('settingsSignalStreak').textContent = stats.currentStreak;
+    document.getElementById('settingsSignalBest').textContent = stats.longestStreak;
+    document.getElementById('settingsSignalFavorites').textContent = 
+        signalState.history.filter(h => h.isFavorite).length;
+}
+
+// Adjust daily goal
+function adjustSignalGoal(delta) {
+    const newValue = Math.max(1, Math.min(10, signalState.settings.signalsPerDay + delta));
+    signalState.settings.signalsPerDay = newValue;
+    document.getElementById('signalGoalValue').textContent = newValue;
+    saveSignalSettings();
+}
+
+// Update category ratio displays
+function updateCategoryRatios() {
+    const recognizeVal = parseInt(document.getElementById('signalRatioRecognize').value);
+    const createVal = parseInt(document.getElementById('signalRatioCreate').value);
+    
+    // Normalize to percentages
+    const total = recognizeVal + createVal;
+    const recognizePct = total > 0 ? Math.round((recognizeVal / total) * 100) : 50;
+    const createPct = total > 0 ? Math.round((createVal / total) * 100) : 50;
+    
+    document.getElementById('recognizeRatio').textContent = `${recognizePct}%`;
+    document.getElementById('createRatio').textContent = `${createPct}%`;
+}
+
+// Save signal settings
+function saveSignalSettings() {
+    const s = signalState.settings;
+    
+    s.signalsPerDay = parseInt(document.getElementById('signalGoalValue').textContent);
+    s.windowStart = parseInt(document.getElementById('signalWindowStart').value);
+    s.windowEnd = parseInt(document.getElementById('signalWindowEnd').value);
+    
+    // Categories enabled
+    s.categoriesEnabled = [];
+    if (document.getElementById('signalCatRecognize').checked) s.categoriesEnabled.push('recognize');
+    if (document.getElementById('signalCatCreate').checked) s.categoriesEnabled.push('create');
+    
+    // Ratios
+    const recognizeVal = parseInt(document.getElementById('signalRatioRecognize').value);
+    const createVal = parseInt(document.getElementById('signalRatioCreate').value);
+    const total = recognizeVal + createVal;
+    
+    s.categoryRatios = {
+        recognize: total > 0 ? Math.round((recognizeVal / total) * 100) : 50,
+        create: total > 0 ? Math.round((createVal / total) * 100) : 50
+    };
+    
+    s.notificationsEnabled = document.getElementById('signalNotificationsEnabled').checked;
+    
+    saveSignalState();
+    updateSignalStats();
+    updateSignalHomeCard();
+    
+    showToast('Settings saved', 'success');
 }
 
 // ============================================

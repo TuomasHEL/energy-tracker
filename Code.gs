@@ -1,5 +1,5 @@
 // Clear Ground - Google Apps Script Backend
-// Version 2.0 - Added Intentions & Transmissions sync
+// Version 3.0 - Added Signal Settings & History
 
 // ============================================
 // CONFIGURATION
@@ -51,6 +51,18 @@ function createSheet(name) {
         'spaciousness_1', 'spaciousness_2', 'me_found', 'clarity',
         'me_location', 'me_intensity', 'subject_object', 'me_comparison',
         'did_second_cycle', 'reflection'
+      ]);
+      break;
+    case 'SignalSettings':
+      sheet.appendRow([
+        'user_id', 'signals_per_day', 'window_start', 'window_end',
+        'categories_enabled', 'category_ratios', 'notifications_enabled', 'updated_at'
+      ]);
+      break;
+    case 'SignalHistory':
+      sheet.appendRow([
+        'record_id', 'user_id', 'lesson_id', 'category', 'status',
+        'is_favorite', 'shown_at', 'completed_at'
       ]);
       break;
   }
@@ -158,6 +170,20 @@ function handleRequest(e) {
         break;
       case 'saveAwakenSession':
         result = saveAwakenSession(params);
+        break;
+        
+      // Signal operations
+      case 'getSignalSettings':
+        result = getSignalSettings(params.userId);
+        break;
+      case 'saveSignalSettings':
+        result = saveSignalSettings(params);
+        break;
+      case 'getSignalHistory':
+        result = getSignalHistory(params.userId, params.limit);
+        break;
+      case 'saveSignalHistory':
+        result = saveSignalHistory(params);
         break;
         
       // Config operations
@@ -809,5 +835,141 @@ function initializeNewSheets() {
   getSheet('Intentions');
   getSheet('Transmissions');
   getSheet('AwakenSessions');
+  getSheet('SignalSettings');
+  getSheet('SignalHistory');
   Logger.log('New sheets created successfully!');
+}
+
+// ============================================
+// SIGNAL FUNCTIONS
+// ============================================
+
+function getSignalSettings(userId) {
+  const sheet = getSheet('SignalSettings');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(userId)) {
+      return {
+        success: true,
+        settings: {
+          user_id: String(data[i][0]),
+          signals_per_day: data[i][1] || 1,
+          window_start: data[i][2] || 8,
+          window_end: data[i][3] || 20,
+          categories_enabled: data[i][4] ? JSON.parse(data[i][4]) : ['recognize', 'create'],
+          category_ratios: data[i][5] ? JSON.parse(data[i][5]) : { recognize: 50, create: 50 },
+          notifications_enabled: data[i][6] !== false,
+          updated_at: data[i][7]
+        }
+      };
+    }
+  }
+  
+  // Return defaults if not found
+  return {
+    success: true,
+    settings: null
+  };
+}
+
+function saveSignalSettings(params) {
+  const sheet = getSheet('SignalSettings');
+  const data = sheet.getDataRange().getValues();
+  const userId = params.userId;
+  const now = new Date().toISOString();
+  
+  let rowIndex = -1;
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(userId)) {
+      rowIndex = i + 1;
+      break;
+    }
+  }
+  
+  const rowData = [
+    userId,
+    parseInt(params.signalsPerDay) || 1,
+    parseInt(params.windowStart) || 8,
+    parseInt(params.windowEnd) || 20,
+    params.categoriesEnabled || '["recognize","create"]',
+    params.categoryRatios || '{"recognize":50,"create":50}',
+    params.notificationsEnabled !== 'false',
+    now
+  ];
+  
+  if (rowIndex > 0) {
+    sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+  } else {
+    sheet.appendRow(rowData);
+  }
+  
+  return { success: true };
+}
+
+function getSignalHistory(userId, limit) {
+  const sheet = getSheet('SignalHistory');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const history = [];
+  const maxResults = parseInt(limit) || 100;
+  
+  for (let i = data.length - 1; i >= 1 && history.length < maxResults; i--) {
+    if (String(data[i][1]) === String(userId)) {
+      history.push({
+        record_id: String(data[i][0]),
+        user_id: String(data[i][1]),
+        lesson_id: data[i][2],
+        category: data[i][3],
+        status: data[i][4],
+        is_favorite: data[i][5] === true || data[i][5] === 'TRUE',
+        shown_at: data[i][6],
+        completed_at: data[i][7]
+      });
+    }
+  }
+  
+  return { success: true, history: history };
+}
+
+function saveSignalHistory(params) {
+  const sheet = getSheet('SignalHistory');
+  const recordId = params.recordId || 'SIG_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  
+  // Check if updating existing record
+  if (params.recordId) {
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(params.recordId)) {
+        const rowIndex = i + 1;
+        const rowData = [
+          params.recordId,
+          params.userId,
+          params.lessonId,
+          params.category,
+          params.status,
+          params.isFavorite === true || params.isFavorite === 'true',
+          params.shownAt,
+          params.completedAt || ''
+        ];
+        sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+        return { success: true, record_id: params.recordId };
+      }
+    }
+  }
+  
+  // New record
+  sheet.appendRow([
+    recordId,
+    params.userId,
+    params.lessonId,
+    params.category,
+    params.status,
+    params.isFavorite === true || params.isFavorite === 'true',
+    params.shownAt || new Date().toISOString(),
+    params.completedAt || ''
+  ]);
+  
+  return { success: true, record_id: recordId };
 }

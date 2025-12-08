@@ -137,31 +137,47 @@
 
                 <!-- Signal Display (when showing a signal) -->
                 <div id="signalDisplay" class="signal-display hidden">
-                    <div class="signal-card-full">
-                        <div class="signal-category-badge" id="signalCategoryBadge">RECOGNIZE</div>
-                        
-                        <h3 class="signal-lesson-number" id="signalLessonNumber">Lesson 1</h3>
-                        <h2 class="signal-lesson-title" id="signalLessonTitle">Loading...</h2>
-                        
-                        <div class="signal-content" id="signalContent">
-                            <!-- Lesson content will be inserted here -->
-                        </div>
-                        
-                        <div class="signal-actions">
-                            <button class="signal-favorite-btn" id="signalFavoriteBtn" onclick="toggleSignalFavorite()">
-                                <span class="favorite-icon">♡</span>
-                            </button>
-                        </div>
-                        
-                        <div class="signal-buttons">
-                            <button class="btn secondary" onclick="skipSignal()">Skip</button>
-                            <button class="btn primary" onclick="completeSignal()">✓ Done</button>
-                        </div>
+                    <!-- This will be replaced by fullscreen reader -->
+                </div>
+            </section>
+
+            <!-- Signal Reader (Full-screen step-by-step view) -->
+            <section id="viewSignalReader" class="view signal-reader-view">
+                <button class="signal-reader-exit" onclick="exitSignalReader()">✕</button>
+                
+                <div class="signal-reader-content">
+                    <!-- Category badge -->
+                    <div class="signal-reader-badge" id="readerCategoryBadge">RECOGNIZE</div>
+                    
+                    <!-- Lesson number (shown on title step) -->
+                    <div class="signal-reader-number" id="readerLessonNumber">Lesson 1</div>
+                    
+                    <!-- Main content area -->
+                    <div class="signal-reader-text" id="readerText">
+                        <!-- Step content appears here -->
                     </div>
                     
-                    <button class="btn secondary full-width signal-another-btn" onclick="getRandomSignal()">
-                        Get Another Signal
+                    <!-- Progress dots -->
+                    <div class="signal-reader-dots" id="readerDots">
+                        <!-- Dots generated dynamically -->
+                    </div>
+                </div>
+                
+                <!-- Navigation -->
+                <div class="signal-reader-nav">
+                    <button class="signal-nav-btn" id="readerPrevBtn" onclick="prevSignalStep()">← Back</button>
+                    <button class="signal-nav-btn primary" id="readerNextBtn" onclick="nextSignalStep()">Next →</button>
+                </div>
+                
+                <!-- Final actions (shown on last step) -->
+                <div class="signal-reader-actions hidden" id="readerActions">
+                    <button class="signal-favorite-btn" id="readerFavoriteBtn" onclick="toggleSignalFavorite()">
+                        <span class="favorite-icon">♡</span>
                     </button>
+                    <div class="signal-final-buttons">
+                        <button class="btn secondary" onclick="skipSignal()">Skip</button>
+                        <button class="btn primary" onclick="completeSignal()">✓ Done</button>
+                    </div>
                 </div>
             </section>
 
@@ -665,6 +681,28 @@
                         <p class="chart-description">Time spent vs. progress improvement</p>
                         <div id="correlationView" class="correlation-list"></div>
                     </div>
+
+                    <div class="chart-card">
+                        <h3>Signal Progress</h3>
+                        <div class="signal-stats-grid">
+                            <div class="signal-stat-item">
+                                <span class="signal-stat-value" id="statsSignalTotal">0</span>
+                                <span class="signal-stat-label">Total Completed</span>
+                            </div>
+                            <div class="signal-stat-item">
+                                <span class="signal-stat-value" id="statsSignalStreak">0</span>
+                                <span class="signal-stat-label">Current Streak</span>
+                            </div>
+                            <div class="signal-stat-item">
+                                <span class="signal-stat-value" id="statsSignalBest">0</span>
+                                <span class="signal-stat-label">Best Streak</span>
+                            </div>
+                            <div class="signal-stat-item">
+                                <span class="signal-stat-value" id="statsSignalFavorites">0</span>
+                                <span class="signal-stat-label">Favorites</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -732,6 +770,16 @@
                     <div class="profile-card-arrow">→</div>
                 </div>
 
+                <!-- Signal Preferences Card -->
+                <div class="profile-card" onclick="showView('signalSettings')">
+                    <div class="profile-card-icon">📡</div>
+                    <div class="profile-card-content">
+                        <div class="profile-card-title">Signal Preferences</div>
+                        <div class="profile-card-subtitle">Daily signals & categories</div>
+                    </div>
+                    <div class="profile-card-arrow">→</div>
+                </div>
+
                 <div class="settings-section">
                     <h3>Notifications</h3>
                     <div class="settings-row">
@@ -775,7 +823,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Clear Ground v3.6</p>
+                    <p class="version">Clear Ground v3.8</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>
@@ -928,6 +976,118 @@
                 <div class="add-transmission-row" style="margin-top: var(--space-lg);">
                     <input type="text" id="newTransmissionName" placeholder="New transmission name...">
                     <button class="btn small" onclick="addTransmission()">Add</button>
+                </div>
+            </section>
+
+            <!-- Signal Settings View -->
+            <section id="viewSignalSettings" class="view">
+                <div class="view-header">
+                    <button class="back-btn" onclick="showView('settings')">←</button>
+                    <h2>Signal Preferences</h2>
+                </div>
+
+                <!-- Daily Goal -->
+                <div class="signal-settings-section">
+                    <h3>Daily Goal</h3>
+                    <p class="settings-hint">How many signals per day?</p>
+                    <div class="signal-goal-selector">
+                        <button class="signal-goal-btn" onclick="adjustSignalGoal(-1)">−</button>
+                        <span class="signal-goal-value" id="signalGoalValue">1</span>
+                        <button class="signal-goal-btn" onclick="adjustSignalGoal(1)">+</button>
+                    </div>
+                </div>
+
+                <!-- Time Window -->
+                <div class="signal-settings-section">
+                    <h3>Time Window</h3>
+                    <p class="settings-hint">When can signals appear?</p>
+                    <div class="signal-time-row">
+                        <select id="signalWindowStart" onchange="saveSignalSettings()">
+                            <option value="6">6:00 AM</option>
+                            <option value="7">7:00 AM</option>
+                            <option value="8" selected>8:00 AM</option>
+                            <option value="9">9:00 AM</option>
+                            <option value="10">10:00 AM</option>
+                        </select>
+                        <span>to</span>
+                        <select id="signalWindowEnd" onchange="saveSignalSettings()">
+                            <option value="18">6:00 PM</option>
+                            <option value="19">7:00 PM</option>
+                            <option value="20" selected>8:00 PM</option>
+                            <option value="21">9:00 PM</option>
+                            <option value="22">10:00 PM</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Categories -->
+                <div class="signal-settings-section">
+                    <h3>Categories</h3>
+                    <p class="settings-hint">Enable categories and adjust their ratio</p>
+                    
+                    <div class="signal-category-setting">
+                        <div class="signal-category-header">
+                            <label class="toggle">
+                                <input type="checkbox" id="signalCatRecognize" checked onchange="saveSignalSettings()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="signal-category-name">Recognize</span>
+                            <span class="signal-category-ratio" id="recognizeRatio">50%</span>
+                        </div>
+                        <input type="range" id="signalRatioRecognize" min="0" max="100" value="50" 
+                               oninput="updateCategoryRatios()" onchange="saveSignalSettings()">
+                    </div>
+                    
+                    <div class="signal-category-setting">
+                        <div class="signal-category-header">
+                            <label class="toggle">
+                                <input type="checkbox" id="signalCatCreate" checked onchange="saveSignalSettings()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="signal-category-name">Create</span>
+                            <span class="signal-category-ratio" id="createRatio">50%</span>
+                        </div>
+                        <input type="range" id="signalRatioCreate" min="0" max="100" value="50" 
+                               oninput="updateCategoryRatios()" onchange="saveSignalSettings()">
+                    </div>
+                </div>
+
+                <!-- Notifications -->
+                <div class="signal-settings-section">
+                    <h3>Notifications</h3>
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            <span>Signal notifications</span>
+                            <span class="settings-hint">Get reminded throughout the day</span>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="signalNotificationsEnabled" checked onchange="saveSignalSettings()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Stats Summary -->
+                <div class="signal-settings-section">
+                    <h3>Your Signal Stats</h3>
+                    <div class="signal-stats-grid">
+                        <div class="signal-stat-item">
+                            <span class="signal-stat-value" id="settingsSignalTotal">0</span>
+                            <span class="signal-stat-label">Total Completed</span>
+                        </div>
+                        <div class="signal-stat-item">
+                            <span class="signal-stat-value" id="settingsSignalStreak">0</span>
+                            <span class="signal-stat-label">Current Streak</span>
+                        </div>
+                        <div class="signal-stat-item">
+                            <span class="signal-stat-value" id="settingsSignalBest">0</span>
+                            <span class="signal-stat-label">Longest Streak</span>
+                        </div>
+                        <div class="signal-stat-item">
+                            <span class="signal-stat-value" id="settingsSignalFavorites">0</span>
+                            <span class="signal-stat-label">Favorites</span>
+                        </div>
+                    </div>
                 </div>
             </section>
         </main>
