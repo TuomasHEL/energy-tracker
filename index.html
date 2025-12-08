@@ -90,7 +90,127 @@
                         <span class="stat-label">Total</span>
                     </div>
                 </div>
+
+                <!-- Signal Card -->
+                <div class="signal-home-card" onclick="showView('signal')">
+                    <div class="signal-home-icon">⚡</div>
+                    <div class="signal-home-content">
+                        <div class="signal-home-title">Daily Signal</div>
+                        <div class="signal-home-stats">
+                            <span id="signalTodayProgress">0 of 1 today</span>
+                            <span class="signal-streak" id="signalStreakDisplay">🔥 0 day streak</span>
+                        </div>
+                    </div>
+                    <div class="signal-home-arrow">→</div>
+                </div>
             </section>
+
+            <!-- Signal View -->
+            <section id="viewSignal" class="view">
+                <div class="view-header">
+                    <h2>Signal</h2>
+                    <button class="btn small secondary" onclick="showView('signalHistory')">History</button>
+                </div>
+
+                <!-- Signal Stats -->
+                <div class="signal-stats-bar">
+                    <span class="signal-today-count">Today: <strong id="signalTodayCount">0</strong> of <strong id="signalDailyGoal">1</strong></span>
+                    <span class="signal-streak-badge">🔥 <span id="signalCurrentStreak">0</span> day streak</span>
+                </div>
+
+                <!-- Signal Prompt (before getting a signal) -->
+                <div id="signalPrompt" class="signal-prompt">
+                    <div class="signal-prompt-icon" onclick="getRandomSignal()">
+                        <span class="signal-bolt">⚡</span>
+                    </div>
+                    <p class="signal-prompt-text">Tap to receive a Signal</p>
+                    
+                    <div class="signal-category-filter">
+                        <label>Category:</label>
+                        <select id="signalCategorySelect" onchange="updateSignalCategory()">
+                            <option value="all">All</option>
+                            <option value="recognize">Recognize</option>
+                            <option value="create">Create</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Signal Display (when showing a signal) -->
+                <div id="signalDisplay" class="signal-display hidden">
+                    <div class="signal-card-full">
+                        <div class="signal-category-badge" id="signalCategoryBadge">RECOGNIZE</div>
+                        
+                        <h3 class="signal-lesson-number" id="signalLessonNumber">Lesson 1</h3>
+                        <h2 class="signal-lesson-title" id="signalLessonTitle">Loading...</h2>
+                        
+                        <div class="signal-content" id="signalContent">
+                            <!-- Lesson content will be inserted here -->
+                        </div>
+                        
+                        <div class="signal-actions">
+                            <button class="signal-favorite-btn" id="signalFavoriteBtn" onclick="toggleSignalFavorite()">
+                                <span class="favorite-icon">♡</span>
+                            </button>
+                        </div>
+                        
+                        <div class="signal-buttons">
+                            <button class="btn secondary" onclick="skipSignal()">Skip</button>
+                            <button class="btn primary" onclick="completeSignal()">✓ Done</button>
+                        </div>
+                    </div>
+                    
+                    <button class="btn secondary full-width signal-another-btn" onclick="getRandomSignal()">
+                        Get Another Signal
+                    </button>
+                </div>
+            </section>
+
+            <!-- Signal History View -->
+            <section id="viewSignalHistory" class="view">
+                <div class="view-header">
+                    <button class="back-btn" onclick="showView('signal')">←</button>
+                    <h2>Signal History</h2>
+                </div>
+
+                <!-- History Tabs -->
+                <div class="signal-history-tabs">
+                    <button class="history-tab active" data-tab="favorites" onclick="switchHistoryTab('favorites')">
+                        ♡ Favorites
+                    </button>
+                    <button class="history-tab" data-tab="completed" onclick="switchHistoryTab('completed')">
+                        ✓ Completed
+                    </button>
+                    <button class="history-tab" data-tab="skipped" onclick="switchHistoryTab('skipped')">
+                        ↷ Skipped
+                    </button>
+                </div>
+
+                <!-- History List -->
+                <div id="signalHistoryList" class="signal-history-list">
+                    <p class="empty-state">No signals yet</p>
+                </div>
+            </section>
+
+            <!-- Signal Detail Modal (for viewing from history) -->
+            <div id="signalDetailModal" class="modal">
+                <div class="modal-content large">
+                    <div class="modal-header">
+                        <span class="signal-category-badge" id="modalSignalCategory">RECOGNIZE</span>
+                        <button class="close-btn" onclick="closeSignalDetailModal()">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <h3 class="signal-lesson-number" id="modalLessonNumber">Lesson 1</h3>
+                        <h2 class="signal-lesson-title" id="modalLessonTitle">Title</h2>
+                        <div class="signal-content" id="modalSignalContent"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="signal-favorite-btn" id="modalFavoriteBtn" onclick="toggleModalFavorite()">
+                            <span class="favorite-icon">♡</span>
+                        </button>
+                        <button class="btn primary" onclick="closeSignalDetailModal()">Close</button>
+                    </div>
+                </div>
+            </div>
 
             <!-- Track Progress View -->
             <section id="viewTrack" class="view">
@@ -655,7 +775,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Clear Ground v3.5</p>
+                    <p class="version">Clear Ground v3.6</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>
@@ -818,6 +938,10 @@
                 <span class="nav-icon">⌂</span>
                 <span class="nav-label">Home</span>
             </button>
+            <button class="nav-btn" onclick="showView('signal')" data-view="signal">
+                <span class="nav-icon">⚡</span>
+                <span class="nav-label">Signal</span>
+            </button>
             <button class="nav-btn" onclick="showView('awaken')" data-view="awaken">
                 <span class="nav-icon">✦</span>
                 <span class="nav-label">Recognize</span>
@@ -825,10 +949,6 @@
             <button class="nav-btn" onclick="showView('timer')" data-view="timer">
                 <span class="nav-icon">⏱</span>
                 <span class="nav-label">Energy</span>
-            </button>
-            <button class="nav-btn" onclick="showView('track')" data-view="track">
-                <span class="nav-icon">◎</span>
-                <span class="nav-label">Track</span>
             </button>
             <button class="nav-btn" onclick="showView('settings')" data-view="settings">
                 <span class="nav-icon">⚙</span>

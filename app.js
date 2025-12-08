@@ -274,6 +274,9 @@ async function init() {
         // Initialize energy mode preference
         initEnergyMode();
         
+        // Initialize signal state
+        initSignalState();
+        
         console.log('App init completed successfully');
         
     } catch (error) {
@@ -1161,6 +1164,12 @@ function showView(viewName) {
                 break;
             case 'awakenComplete':
                 // Complete view handled by completeSession
+                break;
+            case 'signal':
+                updateSignalView();
+                break;
+            case 'signalHistory':
+                renderSignalHistory('favorites');
                 break;
         }
     } catch (error) {
@@ -4603,6 +4612,494 @@ function animate() {
     }
     
     animationFrame = requestAnimationFrame(animate);
+}
+
+// ============================================
+// SIGNAL FEATURE
+// ============================================
+
+// Sample signal data (will be replaced with .md file loading later)
+const SIGNAL_DATA = {
+    recognize: [
+        {
+            id: 'recognize-1',
+            number: 1,
+            title: 'Increase your sense of agency by focusing on what you can control',
+            content: `Feeling powerless often comes from staring at everything you can't change—other people's behavior, the past, the economy, your childhood. Agency begins the moment you pivot your attention to what is still in your hands. This shift is subtle but profound: instead of asking, "Why is this happening to me?" you begin asking, "Given that this is happening, what can I do next?" The facts may not change, but your relationship to them does.
+
+A practical way to build agency is to draw a mental (or literal) circle. Outside the circle: other people's choices, world events, your genetics. Inside: your attitude, your preparation, what you say, how you spend the next 10 minutes. When you feel overwhelmed, name one thing outside your control, then immediately identify one thing inside it and act on that. Send the email. Drink the water. Clean the counter. Make the call.
+
+These small, controllable actions are not trivial; they're votes for a new identity. Over time, you train your brain to look for levers instead of limits. You begin to trust yourself as someone who responds, not just someone life happens to. The circumstances may still be hard, but you're no longer waiting to be rescued—you're participating in your own rescue, one choice at a time.`
+        },
+        {
+            id: 'recognize-2',
+            number: 2,
+            title: 'Say "do" instead of "try" to strengthen commitment',
+            content: `Language doesn't just describe your reality; it shapes it. When you say, "I'll try to work out this week," you're already giving yourself an escape hatch. "Try" leaves the door open for backing out without feeling like you broke a promise. It sounds reasonable, even humble, but it often hides a lack of commitment. "Do," on the other hand, is a line in the sand: "I will work out on Tuesday at 7 a.m."
+
+Start listening to how often you soften your intentions with "try," "maybe," or "hopefully." Instead of beating yourself up, use each one as a signal to get clearer. Swap "I'll try to eat better" for "I will cook dinner at home three nights this week." That tiny linguistic upgrade forces you to be specific: when, where, and what "do" actually means.
+
+This matters because your brain takes your words seriously. When you repeatedly say "I'll try" and then don't follow through, you quietly train yourself not to trust your own promises. When you say "I will" and then act, even in a small way, you build self-respect. You become someone whose word—to yourself—means something. Over time, that integrity creates a much deeper, sturdier confidence than any motivational pep talk.`
+        },
+        {
+            id: 'recognize-3',
+            number: 3,
+            title: 'Treat procrastination as a stress-driven habit you can change',
+            content: `Most people label themselves as "lazy" or "undisciplined" when they procrastinate. That story feels true, but it's incomplete. Procrastination is rarely about the task itself; it's a coping strategy your brain learned to manage uncomfortable feelings—stress, anxiety, self-doubt, overwhelm. In that sense, it's not a character flaw. It's a habit loop: you feel stress, you avoid the task, you get temporary relief, and your brain learns, "Avoiding works!"
+
+Seeing procrastination as a habit is powerful because habits can be changed. You start by noticing the moment right before you put something off. What are you feeling in your body—tight chest, racing thoughts, heavy fatigue? What story is running—"I'll mess this up," "It's too much," "I don't know where to start"? Naming the stress opens a tiny gap between you and the habit.
+
+From there, you can experiment with a different response that still soothes you but moves you forward: starting for five minutes, breaking the task into one tiny step, or using a countdown to launch action. The goal isn't to never feel stress. It's to stop letting stress automatically drive you into avoidance. When you treat procrastination as a learned pattern—not your identity—you reclaim your power to install a new one.`
+        }
+    ],
+    create: [
+        {
+            id: 'create-1',
+            number: 276,
+            title: 'Reframe desired outcomes as memories to produce relief, not longing',
+            content: `Longing keeps the desired object psychologically distant. You imagine it in the future, accompanied by a sense of "not yet" and "not mine." Reframing outcomes as memories flips this script. You imagine yourself remembering the fulfillment, talking about it as if it already happened. This subtle shift often produces a wave of relief, as though the tension of "Will it ever?" has been resolved.
+
+Pick a desire and imagine you are six months or a year past its fulfillment. You're telling a friend how it all unfolded. "It was funny how it started... then this opportunity came... and now it's just part of life." Let yourself feel the afterglow, the casualness that comes once something is integrated into your story. You're no longer reaching for it; you're recollecting it.
+
+Notice how your body responds. If you feel a softening or a sense of "Ah, yes," you're successfully moving from craving to completion emotionally. The point is not to predict exact details but to experience the internal state of "this chapter turned out well." Carry some of that feeling into your day. From this place, you're less likely to act out of desperation and more likely to make choices that belong in the version of your life you just "remembered."`
+        },
+        {
+            id: 'create-2',
+            number: 277,
+            title: 'Use contrast to clarify what you actually want',
+            content: `Sometimes you don't know what you want until you bump into what you don't want. Contrast is one of life's most reliable teachers. That job you hated? It taught you that autonomy matters more than you realized. That relationship that felt off? It showed you the kind of connection you're actually hungry for. Rather than seeing "negative" experiences as failures, treat them as data points sharpening your preferences.
+
+When something feels wrong, don't just push against it. Pause and ask, "What is this showing me about what I do want?" Let the discomfort become a compass. If you feel drained around certain people, that's information about the qualities you value in relationships. If a project bores you, it's pointing toward what genuinely engages your mind.
+
+The key is to pivot from complaint to clarity. Instead of dwelling on "I hate this," translate it: "This tells me I want more creativity, more meaningful challenge, more respect." Once you name the positive desire underneath the negative reaction, you have something to move toward. Contrast isn't meant to trap you—it's meant to launch you into clearer intentions.`
+        },
+        {
+            id: 'create-3',
+            number: 278,
+            title: 'Act as if the bridge will appear',
+            content: `When you set a meaningful intention, you often can't see the full path from here to there. The logical mind wants a detailed roadmap before it will commit. But reality often works differently. You take a step based on a hunch, and only then does the next stepping-stone reveal itself. Acting "as if" isn't about delusion; it's about creating motion so that possibilities can meet you halfway.
+
+Think of it like driving at night with headlights. You can only see a short distance ahead, but you can make the whole journey that way. You don't demand to see the entire road before you turn the key. The same applies to goals and desires. Commit to the direction, take the first small action, and trust that clarity will build as you move.
+
+This doesn't mean ignoring practical concerns. It means refusing to let uncertainty paralyze you. When you act in alignment with what you want—speaking, preparing, reaching out—you send a signal to yourself and the world. Resources, ideas, and people often show up not before you need them, but just in time. The bridge appears under your feet as you walk.`
+        }
+    ]
+};
+
+// Signal state
+const signalState = {
+    currentSignal: null,
+    currentCategory: 'all',
+    isFavorited: false,
+    history: [],       // Local history cache
+    stats: {
+        todayCount: 0,
+        todayDate: null,
+        currentStreak: 0,
+        longestStreak: 0,
+        totalCompleted: 0
+    },
+    settings: {
+        signalsPerDay: 1,
+        windowStart: 8,
+        windowEnd: 20,
+        categoriesEnabled: ['recognize', 'create'],
+        categoryRatios: { recognize: 50, create: 50 },
+        notificationsEnabled: true
+    }
+};
+
+// Initialize signal state from localStorage
+function initSignalState() {
+    try {
+        const saved = localStorage.getItem('signalState');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            Object.assign(signalState.history, parsed.history || []);
+            Object.assign(signalState.stats, parsed.stats || {});
+            Object.assign(signalState.settings, parsed.settings || {});
+        }
+        
+        // Check if it's a new day
+        const today = new Date().toDateString();
+        if (signalState.stats.todayDate !== today) {
+            // Check streak
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            if (signalState.stats.todayDate === yesterday.toDateString() && signalState.stats.todayCount > 0) {
+                // Streak continues
+            } else if (signalState.stats.todayCount > 0) {
+                // Streak broken (missed more than one day)
+                signalState.stats.currentStreak = 0;
+            }
+            
+            // Reset daily count
+            signalState.stats.todayCount = 0;
+            signalState.stats.todayDate = today;
+            saveSignalState();
+        }
+        
+        updateSignalHomeCard();
+    } catch (e) {
+        console.error('Error initializing signal state:', e);
+    }
+}
+
+// Save signal state to localStorage
+function saveSignalState() {
+    try {
+        localStorage.setItem('signalState', JSON.stringify({
+            history: signalState.history,
+            stats: signalState.stats,
+            settings: signalState.settings
+        }));
+    } catch (e) {
+        console.error('Error saving signal state:', e);
+    }
+}
+
+// Update signal view
+function updateSignalView() {
+    updateSignalStats();
+    
+    // Reset to prompt view
+    document.getElementById('signalPrompt').classList.remove('hidden');
+    document.getElementById('signalDisplay').classList.add('hidden');
+    signalState.currentSignal = null;
+    signalState.isFavorited = false;
+}
+
+// Update signal stats display
+function updateSignalStats() {
+    document.getElementById('signalTodayCount').textContent = signalState.stats.todayCount;
+    document.getElementById('signalDailyGoal').textContent = signalState.settings.signalsPerDay;
+    document.getElementById('signalCurrentStreak').textContent = signalState.stats.currentStreak;
+}
+
+// Update signal home card
+function updateSignalHomeCard() {
+    const progressEl = document.getElementById('signalTodayProgress');
+    const streakEl = document.getElementById('signalStreakDisplay');
+    
+    if (progressEl) {
+        progressEl.textContent = `${signalState.stats.todayCount} of ${signalState.settings.signalsPerDay} today`;
+    }
+    if (streakEl) {
+        streakEl.textContent = `🔥 ${signalState.stats.currentStreak} day streak`;
+    }
+}
+
+// Update signal category filter
+function updateSignalCategory() {
+    signalState.currentCategory = document.getElementById('signalCategorySelect').value;
+}
+
+// Get random signal
+function getRandomSignal() {
+    const category = signalState.currentCategory;
+    let availableLessons = [];
+    
+    if (category === 'all') {
+        // Use weighted selection based on ratios
+        const categories = Object.keys(SIGNAL_DATA);
+        const totalWeight = categories.reduce((sum, cat) => sum + (signalState.settings.categoryRatios[cat] || 50), 0);
+        const rand = Math.random() * totalWeight;
+        let cumulative = 0;
+        
+        for (const cat of categories) {
+            cumulative += (signalState.settings.categoryRatios[cat] || 50);
+            if (rand <= cumulative) {
+                availableLessons = SIGNAL_DATA[cat] || [];
+                signalState.currentCategory = cat; // Track which category was selected
+                break;
+            }
+        }
+    } else {
+        availableLessons = SIGNAL_DATA[category] || [];
+    }
+    
+    if (availableLessons.length === 0) {
+        showToast('No signals available in this category', 'error');
+        return;
+    }
+    
+    // Pick random lesson
+    const randomIndex = Math.floor(Math.random() * availableLessons.length);
+    const lesson = availableLessons[randomIndex];
+    
+    // Display the signal
+    displaySignal(lesson, category === 'all' ? signalState.currentCategory : category);
+}
+
+// Display a signal
+function displaySignal(lesson, category) {
+    signalState.currentSignal = { ...lesson, category };
+    signalState.isFavorited = isSignalFavorited(lesson.id);
+    
+    // Update UI
+    document.getElementById('signalPrompt').classList.add('hidden');
+    document.getElementById('signalDisplay').classList.remove('hidden');
+    
+    // Set category badge
+    const badge = document.getElementById('signalCategoryBadge');
+    badge.textContent = category.toUpperCase();
+    badge.className = 'signal-category-badge' + (category === 'create' ? ' create' : '');
+    
+    // Set content
+    document.getElementById('signalLessonNumber').textContent = `Lesson ${lesson.number}`;
+    document.getElementById('signalLessonTitle').textContent = lesson.title;
+    document.getElementById('signalContent').textContent = lesson.content;
+    
+    // Set favorite state
+    updateFavoriteButton();
+    
+    // Record that signal was shown
+    recordSignalShown(lesson, category);
+}
+
+// Record signal shown in history
+function recordSignalShown(lesson, category) {
+    const record = {
+        id: lesson.id,
+        lessonNumber: lesson.number,
+        title: lesson.title,
+        category: category,
+        status: 'shown',
+        isFavorite: false,
+        shownAt: new Date().toISOString(),
+        completedAt: null
+    };
+    
+    // Check if already in history (don't duplicate)
+    const existingIndex = signalState.history.findIndex(h => 
+        h.id === lesson.id && h.shownAt && new Date(h.shownAt).toDateString() === new Date().toDateString()
+    );
+    
+    if (existingIndex === -1) {
+        signalState.history.unshift(record);
+        // Keep history manageable (last 500 entries)
+        if (signalState.history.length > 500) {
+            signalState.history = signalState.history.slice(0, 500);
+        }
+        saveSignalState();
+    }
+}
+
+// Check if signal is favorited
+function isSignalFavorited(lessonId) {
+    return signalState.history.some(h => h.id === lessonId && h.isFavorite);
+}
+
+// Toggle favorite on current signal
+function toggleSignalFavorite() {
+    if (!signalState.currentSignal) return;
+    
+    signalState.isFavorited = !signalState.isFavorited;
+    
+    // Update history
+    const historyItem = signalState.history.find(h => h.id === signalState.currentSignal.id);
+    if (historyItem) {
+        historyItem.isFavorite = signalState.isFavorited;
+    }
+    
+    updateFavoriteButton();
+    saveSignalState();
+    
+    showToast(signalState.isFavorited ? 'Added to favorites' : 'Removed from favorites', 'success');
+}
+
+// Update favorite button state
+function updateFavoriteButton() {
+    const btn = document.getElementById('signalFavoriteBtn');
+    const icon = btn.querySelector('.favorite-icon');
+    
+    btn.classList.toggle('active', signalState.isFavorited);
+    icon.textContent = signalState.isFavorited ? '♥' : '♡';
+}
+
+// Complete signal (Done button)
+function completeSignal() {
+    if (!signalState.currentSignal) return;
+    
+    // Update history
+    const historyItem = signalState.history.find(h => 
+        h.id === signalState.currentSignal.id && h.status === 'shown'
+    );
+    if (historyItem) {
+        historyItem.status = 'completed';
+        historyItem.completedAt = new Date().toISOString();
+    }
+    
+    // Update stats
+    signalState.stats.todayCount++;
+    signalState.stats.totalCompleted++;
+    
+    // Check if this completes daily goal (for streak)
+    if (signalState.stats.todayCount === 1) {
+        // First completion of the day - increment streak
+        signalState.stats.currentStreak++;
+        if (signalState.stats.currentStreak > signalState.stats.longestStreak) {
+            signalState.stats.longestStreak = signalState.stats.currentStreak;
+        }
+    }
+    
+    saveSignalState();
+    updateSignalStats();
+    updateSignalHomeCard();
+    
+    showToast('Signal completed! ✓', 'success');
+    
+    // Return to prompt (can get another)
+    document.getElementById('signalPrompt').classList.remove('hidden');
+    document.getElementById('signalDisplay').classList.add('hidden');
+    signalState.currentSignal = null;
+}
+
+// Skip signal
+function skipSignal() {
+    if (!signalState.currentSignal) return;
+    
+    // Update history
+    const historyItem = signalState.history.find(h => 
+        h.id === signalState.currentSignal.id && h.status === 'shown'
+    );
+    if (historyItem) {
+        historyItem.status = 'skipped';
+    }
+    
+    saveSignalState();
+    
+    showToast('Signal skipped', 'success');
+    
+    // Return to prompt
+    document.getElementById('signalPrompt').classList.remove('hidden');
+    document.getElementById('signalDisplay').classList.add('hidden');
+    signalState.currentSignal = null;
+}
+
+// Switch history tab
+function switchHistoryTab(tab) {
+    // Update tab buttons
+    document.querySelectorAll('.history-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === tab);
+    });
+    
+    renderSignalHistory(tab);
+}
+
+// Render signal history
+function renderSignalHistory(tab = 'favorites') {
+    const container = document.getElementById('signalHistoryList');
+    
+    let filteredHistory = [];
+    
+    switch (tab) {
+        case 'favorites':
+            filteredHistory = signalState.history.filter(h => h.isFavorite);
+            break;
+        case 'completed':
+            filteredHistory = signalState.history.filter(h => h.status === 'completed');
+            break;
+        case 'skipped':
+            filteredHistory = signalState.history.filter(h => h.status === 'skipped');
+            break;
+    }
+    
+    if (filteredHistory.length === 0) {
+        const emptyMessages = {
+            favorites: 'No favorites yet. Tap ♡ on signals you want to revisit.',
+            completed: 'No completed signals yet.',
+            skipped: 'No skipped signals.'
+        };
+        container.innerHTML = `<p class="empty-state">${emptyMessages[tab]}</p>`;
+        return;
+    }
+    
+    container.innerHTML = filteredHistory.map(item => {
+        const date = new Date(item.shownAt || item.completedAt);
+        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        
+        return `
+            <div class="signal-history-item" onclick="showHistorySignal('${item.id}')">
+                <div class="signal-history-item-header">
+                    <span class="signal-history-title">Lesson ${item.lessonNumber}: ${item.title}</span>
+                    ${item.isFavorite ? '<span class="signal-history-favorite">♥</span>' : ''}
+                </div>
+                <div class="signal-history-meta">
+                    <span class="signal-history-category">${item.category}</span>
+                    <span>${dateStr}</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Show signal from history
+function showHistorySignal(lessonId) {
+    // Find the lesson data
+    let lesson = null;
+    let category = null;
+    
+    for (const cat of Object.keys(SIGNAL_DATA)) {
+        const found = SIGNAL_DATA[cat].find(l => l.id === lessonId);
+        if (found) {
+            lesson = found;
+            category = cat;
+            break;
+        }
+    }
+    
+    if (!lesson) {
+        showToast('Signal not found', 'error');
+        return;
+    }
+    
+    // Get favorite status from history
+    const historyItem = signalState.history.find(h => h.id === lessonId);
+    
+    // Show in modal
+    const badge = document.getElementById('modalSignalCategory');
+    badge.textContent = category.toUpperCase();
+    badge.className = 'signal-category-badge' + (category === 'create' ? ' create' : '');
+    
+    document.getElementById('modalLessonNumber').textContent = `Lesson ${lesson.number}`;
+    document.getElementById('modalLessonTitle').textContent = lesson.title;
+    document.getElementById('modalSignalContent').textContent = lesson.content;
+    
+    // Set favorite button state
+    const modalBtn = document.getElementById('modalFavoriteBtn');
+    const modalIcon = modalBtn.querySelector('.favorite-icon');
+    modalBtn.classList.toggle('active', historyItem?.isFavorite);
+    modalIcon.textContent = historyItem?.isFavorite ? '♥' : '♡';
+    modalBtn.dataset.lessonId = lessonId;
+    
+    document.getElementById('signalDetailModal').classList.add('active');
+}
+
+// Toggle favorite from modal
+function toggleModalFavorite() {
+    const btn = document.getElementById('modalFavoriteBtn');
+    const lessonId = btn.dataset.lessonId;
+    
+    const historyItem = signalState.history.find(h => h.id === lessonId);
+    if (historyItem) {
+        historyItem.isFavorite = !historyItem.isFavorite;
+        
+        const icon = btn.querySelector('.favorite-icon');
+        btn.classList.toggle('active', historyItem.isFavorite);
+        icon.textContent = historyItem.isFavorite ? '♥' : '♡';
+        
+        saveSignalState();
+        showToast(historyItem.isFavorite ? 'Added to favorites' : 'Removed from favorites', 'success');
+    }
+}
+
+// Close signal detail modal
+function closeSignalDetailModal() {
+    document.getElementById('signalDetailModal').classList.remove('active');
+    // Refresh history list in case favorites changed
+    const activeTab = document.querySelector('.history-tab.active')?.dataset.tab || 'favorites';
+    renderSignalHistory(activeTab);
 }
 
 // ============================================

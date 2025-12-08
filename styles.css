@@ -3346,6 +3346,352 @@ input:checked + .toggle-slider:before {
     }
 }
 
+/* ============================================
+   SIGNAL FEATURE
+   ============================================ */
+
+/* Signal Home Card (Dashboard) */
+.signal-home-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-lg);
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(139, 92, 246, 0.05));
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: var(--radius-lg);
+    margin-top: var(--space-lg);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.signal-home-card:hover {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(139, 92, 246, 0.1));
+    border-color: var(--accent-primary);
+}
+
+.signal-home-icon {
+    font-size: 1.75rem;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(139, 92, 246, 0.2);
+    border-radius: 50%;
+}
+
+.signal-home-content {
+    flex: 1;
+}
+
+.signal-home-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--space-xs);
+}
+
+.signal-home-stats {
+    display: flex;
+    gap: var(--space-md);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.signal-streak {
+    color: var(--warning);
+}
+
+.signal-home-arrow {
+    font-size: 1.25rem;
+    color: var(--text-muted);
+}
+
+/* Signal Stats Bar */
+.signal-stats-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-md) var(--space-lg);
+    background: var(--bg-surface);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-lg);
+}
+
+.signal-today-count {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.signal-today-count strong {
+    color: var(--text-primary);
+}
+
+.signal-streak-badge {
+    font-size: 0.9rem;
+    color: var(--warning);
+}
+
+/* Signal Prompt */
+.signal-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--space-2xl) var(--space-lg);
+}
+
+.signal-prompt-icon {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-primary), #a78bfa);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    box-shadow: 0 4px 30px rgba(139, 92, 246, 0.4);
+    animation: signal-pulse 2.5s ease-in-out infinite;
+}
+
+.signal-prompt-icon:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 40px rgba(139, 92, 246, 0.5);
+}
+
+.signal-prompt-icon:active {
+    transform: scale(0.98);
+}
+
+@keyframes signal-pulse {
+    0%, 100% {
+        box-shadow: 0 4px 30px rgba(139, 92, 246, 0.4);
+    }
+    50% {
+        box-shadow: 0 4px 50px rgba(139, 92, 246, 0.6);
+    }
+}
+
+.signal-bolt {
+    font-size: 4rem;
+    filter: brightness(10);
+}
+
+.signal-prompt-text {
+    margin-top: var(--space-lg);
+    font-size: 1rem;
+    color: var(--text-muted);
+}
+
+.signal-category-filter {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-top: var(--space-xl);
+}
+
+.signal-category-filter label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.signal-category-filter select {
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+/* Signal Display */
+.signal-display {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.signal-card-full {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl);
+    margin-bottom: var(--space-lg);
+}
+
+.signal-category-badge {
+    display: inline-block;
+    padding: var(--space-xs) var(--space-md);
+    background: rgba(139, 92, 246, 0.2);
+    color: var(--accent-primary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--space-md);
+}
+
+.signal-category-badge.create {
+    background: rgba(59, 130, 246, 0.2);
+    color: #3b82f6;
+}
+
+.signal-lesson-number {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-weight: 400;
+    margin-bottom: var(--space-sm);
+}
+
+.signal-lesson-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--space-lg);
+    line-height: 1.4;
+}
+
+.signal-content {
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+}
+
+.signal-content p {
+    margin-bottom: var(--space-md);
+}
+
+.signal-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding: var(--space-md) 0;
+    border-top: 1px solid var(--border-subtle);
+    margin-top: var(--space-lg);
+}
+
+.signal-favorite-btn {
+    background: none;
+    border: none;
+    padding: var(--space-sm);
+    cursor: pointer;
+    transition: transform var(--transition-fast);
+}
+
+.signal-favorite-btn:hover {
+    transform: scale(1.1);
+}
+
+.signal-favorite-btn .favorite-icon {
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    transition: color var(--transition-fast);
+}
+
+.signal-favorite-btn.active .favorite-icon {
+    color: #ef4444;
+}
+
+.signal-buttons {
+    display: flex;
+    gap: var(--space-md);
+    margin-top: var(--space-md);
+}
+
+.signal-buttons .btn {
+    flex: 1;
+}
+
+.signal-another-btn {
+    margin-top: var(--space-md);
+}
+
+/* Signal History */
+.signal-history-tabs {
+    display: flex;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-lg);
+    overflow-x: auto;
+    padding-bottom: var(--space-xs);
+}
+
+.history-tab {
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+    font-family: inherit;
+}
+
+.history-tab:hover {
+    border-color: var(--accent-primary);
+}
+
+.history-tab.active {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.signal-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.signal-history-item {
+    padding: var(--space-md);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.signal-history-item:hover {
+    border-color: var(--accent-primary);
+    background: rgba(139, 92, 246, 0.05);
+}
+
+.signal-history-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-xs);
+}
+
+.signal-history-title {
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.signal-history-favorite {
+    color: #ef4444;
+    font-size: 0.9rem;
+}
+
+.signal-history-meta {
+    display: flex;
+    gap: var(--space-md);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.signal-history-category {
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
 /* Safe area for notched phones */
 @supports (padding: env(safe-area-inset-bottom)) {
     .content-area {
