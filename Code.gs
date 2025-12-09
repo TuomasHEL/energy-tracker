@@ -1,5 +1,5 @@
 // Clear Ground - Google Apps Script Backend
-// Version 3.0 - Added Signal Settings & History
+// Version 3.1 - Added Signal rating, category order & index
 
 // ============================================
 // CONFIGURATION
@@ -56,13 +56,14 @@ function createSheet(name) {
     case 'SignalSettings':
       sheet.appendRow([
         'user_id', 'signals_per_day', 'window_start', 'window_end',
-        'categories_enabled', 'category_ratios', 'notifications_enabled', 'updated_at'
+        'categories_enabled', 'category_ratios', 'category_order', 'category_index',
+        'notifications_enabled', 'updated_at'
       ]);
       break;
     case 'SignalHistory':
       sheet.appendRow([
         'record_id', 'user_id', 'lesson_id', 'category', 'status',
-        'is_favorite', 'shown_at', 'completed_at'
+        'is_favorite', 'rating', 'shown_at', 'completed_at'
       ]);
       break;
   }
@@ -860,8 +861,10 @@ function getSignalSettings(userId) {
           window_end: data[i][3] || 20,
           categories_enabled: data[i][4] ? JSON.parse(data[i][4]) : ['recognize', 'create'],
           category_ratios: data[i][5] ? JSON.parse(data[i][5]) : { recognize: 50, create: 50 },
-          notifications_enabled: data[i][6] !== false,
-          updated_at: data[i][7]
+          category_order: data[i][6] ? JSON.parse(data[i][6]) : { recognize: 'sequential', create: 'sequential' },
+          category_index: data[i][7] ? JSON.parse(data[i][7]) : { recognize: 0, create: 0 },
+          notifications_enabled: data[i][8] !== false,
+          updated_at: data[i][9]
         }
       };
     }
@@ -895,6 +898,8 @@ function saveSignalSettings(params) {
     parseInt(params.windowEnd) || 20,
     params.categoriesEnabled || '["recognize","create"]',
     params.categoryRatios || '{"recognize":50,"create":50}',
+    params.categoryOrder || '{"recognize":"sequential","create":"sequential"}',
+    params.categoryIndex || '{"recognize":0,"create":0}',
     params.notificationsEnabled !== 'false',
     now
   ];
@@ -924,8 +929,9 @@ function getSignalHistory(userId, limit) {
         category: data[i][3],
         status: data[i][4],
         is_favorite: data[i][5] === true || data[i][5] === 'TRUE',
-        shown_at: data[i][6],
-        completed_at: data[i][7]
+        rating: data[i][6] || null,
+        shown_at: data[i][7],
+        completed_at: data[i][8]
       });
     }
   }
@@ -950,6 +956,7 @@ function saveSignalHistory(params) {
           params.category,
           params.status,
           params.isFavorite === true || params.isFavorite === 'true',
+          params.rating || '',
           params.shownAt,
           params.completedAt || ''
         ];
@@ -967,6 +974,7 @@ function saveSignalHistory(params) {
     params.category,
     params.status,
     params.isFavorite === true || params.isFavorite === 'true',
+    params.rating || '',
     params.shownAt || new Date().toISOString(),
     params.completedAt || ''
   ]);

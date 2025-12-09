@@ -143,9 +143,9 @@
 
             <!-- Signal Reader (Full-screen step-by-step view) -->
             <section id="viewSignalReader" class="view signal-reader-view">
-                <button class="signal-reader-exit" onclick="exitSignalReader()">✕</button>
+                <button class="signal-reader-exit" onclick="confirmExitSignal()">✕</button>
                 
-                <div class="signal-reader-content">
+                <div class="signal-reader-content" id="signalReaderContent">
                     <!-- Category badge -->
                     <div class="signal-reader-badge" id="readerCategoryBadge">RECOGNIZE</div>
                     
@@ -163,23 +163,57 @@
                     </div>
                 </div>
                 
-                <!-- Navigation -->
-                <div class="signal-reader-nav">
+                <!-- Navigation (during lesson) -->
+                <div class="signal-reader-nav" id="readerNav">
                     <button class="signal-nav-btn" id="readerPrevBtn" onclick="prevSignalStep()">← Back</button>
+                    <button class="signal-nav-btn skip" id="readerSkipBtn" onclick="skipSignal()">Skip</button>
                     <button class="signal-nav-btn primary" id="readerNextBtn" onclick="nextSignalStep()">Next →</button>
                 </div>
                 
-                <!-- Final actions (shown on last step) -->
-                <div class="signal-reader-actions hidden" id="readerActions">
-                    <button class="signal-favorite-btn" id="readerFavoriteBtn" onclick="toggleSignalFavorite()">
-                        <span class="favorite-icon">♡</span>
-                    </button>
-                    <div class="signal-final-buttons">
-                        <button class="btn secondary" onclick="skipSignal()">Skip</button>
-                        <button class="btn primary" onclick="completeSignal()">✓ Done</button>
+                <!-- End Screen (shown after last content step) -->
+                <div class="signal-end-screen hidden" id="signalEndScreen">
+                    <div class="signal-end-icon">✓</div>
+                    <h2 class="signal-end-title">Well done.</h2>
+                    <p class="signal-end-message">Take a moment to contemplate what was most meaningful for you in this Signal.</p>
+                    
+                    <div class="signal-rating">
+                        <p class="signal-rating-label">Did this resonate with you?</p>
+                        <div class="signal-rating-buttons">
+                            <button class="signal-rating-btn" data-rating="down" onclick="rateSignal('down')">
+                                <span class="rating-icon">👎</span>
+                            </button>
+                            <button class="signal-rating-btn" data-rating="up" onclick="rateSignal('up')">
+                                <span class="rating-icon">👍</span>
+                            </button>
+                        </div>
                     </div>
+                    
+                    <div class="signal-end-actions">
+                        <button class="signal-favorite-btn large" id="readerFavoriteBtn" onclick="toggleSignalFavorite()">
+                            <span class="favorite-icon">♡</span>
+                            <span class="favorite-text">Save to Favorites</span>
+                        </button>
+                    </div>
+                    
+                    <button class="btn primary large signal-done-btn" onclick="completeSignal()">
+                        ✓ Complete
+                    </button>
                 </div>
             </section>
+
+            <!-- Exit Signal Confirmation Modal -->
+            <div id="exitSignalModal" class="modal small">
+                <div class="modal-content">
+                    <div class="modal-body" style="text-align: center; padding: var(--space-xl);">
+                        <p style="margin-bottom: var(--space-lg);">Are you sure you want to exit this Signal?</p>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: var(--space-xl);">Your progress will not be saved.</p>
+                        <div style="display: flex; gap: var(--space-md);">
+                            <button class="btn secondary" onclick="closeExitSignalModal()" style="flex: 1;">Continue</button>
+                            <button class="btn danger" onclick="confirmExitSignalNow()" style="flex: 1;">Exit</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <!-- Signal History View -->
             <section id="viewSignalHistory" class="view">
@@ -823,7 +857,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Clear Ground v3.8</p>
+                    <p class="version">Clear Ground v3.9</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>
@@ -1036,6 +1070,11 @@
                         </div>
                         <input type="range" id="signalRatioRecognize" min="0" max="100" value="50" 
                                oninput="updateCategoryRatios()" onchange="saveSignalSettings()">
+                        <div class="signal-order-toggle">
+                            <span class="order-label">Order:</span>
+                            <button class="order-btn active" data-order="sequential" data-cat="recognize" onclick="setSignalOrder('recognize', 'sequential')">1→2→3</button>
+                            <button class="order-btn" data-order="random" data-cat="recognize" onclick="setSignalOrder('recognize', 'random')">Random</button>
+                        </div>
                     </div>
                     
                     <div class="signal-category-setting">
@@ -1049,6 +1088,11 @@
                         </div>
                         <input type="range" id="signalRatioCreate" min="0" max="100" value="50" 
                                oninput="updateCategoryRatios()" onchange="saveSignalSettings()">
+                        <div class="signal-order-toggle">
+                            <span class="order-label">Order:</span>
+                            <button class="order-btn active" data-order="sequential" data-cat="create" onclick="setSignalOrder('create', 'sequential')">1→2→3</button>
+                            <button class="order-btn" data-order="random" data-cat="create" onclick="setSignalOrder('create', 'random')">Random</button>
+                        </div>
                     </div>
                 </div>
 

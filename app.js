@@ -4713,9 +4713,10 @@ const signalState = {
     currentSignal: null,
     currentCategory: 'all',
     isFavorited: false,
-    steps: [],          // Parsed content steps for reader
-    currentStep: 0,     // Current step in reader
-    history: [],        // Local history cache
+    currentRating: null,    // 'up' or 'down'
+    steps: [],              // Parsed content steps for reader
+    currentStep: 0,         // Current step in reader
+    history: [],            // Local history cache
     stats: {
         todayCount: 0,
         todayDate: null,
@@ -4729,6 +4730,8 @@ const signalState = {
         windowEnd: 20,
         categoriesEnabled: ['recognize', 'create'],
         categoryRatios: { recognize: 50, create: 50 },
+        categoryOrder: { recognize: 'sequential', create: 'sequential' },  // 'sequential' or 'random'
+        categoryIndex: { recognize: 0, create: 0 },  // Current index for sequential mode
         notificationsEnabled: true
     }
 };
@@ -4820,12 +4823,21 @@ function updateSignalCategory() {
 
 // Get random signal
 function getRandomSignal() {
-    const category = signalState.currentCategory;
+    let category = signalState.currentCategory;
+    let selectedCategory = category;
     let availableLessons = [];
     
     if (category === 'all') {
-        // Use weighted selection based on ratios
-        const categories = Object.keys(SIGNAL_DATA);
+        // Use weighted selection based on ratios to pick a category
+        const categories = Object.keys(SIGNAL_DATA).filter(cat => 
+            signalState.settings.categoriesEnabled.includes(cat)
+        );
+        
+        if (categories.length === 0) {
+            showToast('No categories enabled', 'error');
+            return;
+        }
+        
         const totalWeight = categories.reduce((sum, cat) => sum + (signalState.settings.categoryRatios[cat] || 50), 0);
         const rand = Math.random() * totalWeight;
         let cumulative = 0;
@@ -4833,32 +4845,52 @@ function getRandomSignal() {
         for (const cat of categories) {
             cumulative += (signalState.settings.categoryRatios[cat] || 50);
             if (rand <= cumulative) {
-                availableLessons = SIGNAL_DATA[cat] || [];
-                signalState.currentCategory = cat; // Track which category was selected
+                selectedCategory = cat;
                 break;
             }
         }
-    } else {
-        availableLessons = SIGNAL_DATA[category] || [];
     }
+    
+    availableLessons = SIGNAL_DATA[selectedCategory] || [];
     
     if (availableLessons.length === 0) {
         showToast('No signals available in this category', 'error');
         return;
     }
     
-    // Pick random lesson
-    const randomIndex = Math.floor(Math.random() * availableLessons.length);
-    const lesson = availableLessons[randomIndex];
+    // Get lesson based on order setting (sequential or random)
+    const orderMode = signalState.settings.categoryOrder[selectedCategory] || 'sequential';
+    let lesson;
+    
+    if (orderMode === 'sequential') {
+        // Get current index for this category
+        let currentIndex = signalState.settings.categoryIndex[selectedCategory] || 0;
+        
+        // Wrap around if past end
+        if (currentIndex >= availableLessons.length) {
+            currentIndex = 0;
+        }
+        
+        lesson = availableLessons[currentIndex];
+        
+        // Increment index for next time
+        signalState.settings.categoryIndex[selectedCategory] = currentIndex + 1;
+        saveSignalState();
+    } else {
+        // Random selection
+        const randomIndex = Math.floor(Math.random() * availableLessons.length);
+        lesson = availableLessons[randomIndex];
+    }
     
     // Display the signal
-    displaySignal(lesson, category === 'all' ? signalState.currentCategory : category);
+    displaySignal(lesson, selectedCategory);
 }
 
 // Display a signal in the step-by-step reader
 function displaySignal(lesson, category) {
     signalState.currentSignal = { ...lesson, category };
     signalState.isFavorited = isSignalFavorited(lesson.id);
+    signalState.currentRating = null;
     
     // Parse content into steps (title + paragraphs)
     const paragraphs = lesson.content.split('\n\n').filter(p => p.trim());
@@ -4879,11 +4911,22 @@ function displaySignal(lesson, category) {
     // Generate dots
     renderSignalDots();
     
+    // Reset end screen
+    document.getElementById('signalEndScreen').classList.add('hidden');
+    document.getElementById('readerNav').classList.remove('hidden');
+    document.querySelector('.signal-reader-content').classList.remove('hidden');
+    
+    // Reset rating buttons
+    document.querySelectorAll('.signal-rating-btn').forEach(btn => btn.classList.remove('selected'));
+    
     // Show first step
     renderSignalStep();
     
     // Show the reader view
     document.getElementById('viewSignalReader').classList.add('active');
+    
+    // Setup swipe handlers
+    setupSignalSwipe();
     
     // Record that signal was shown
     recordSignalShown(lesson, category);
@@ -4902,8 +4945,7 @@ function renderSignalStep() {
     const step = signalState.steps[signalState.currentStep];
     const textEl = document.getElementById('readerText');
     const numberEl = document.getElementById('readerLessonNumber');
-    const navEl = document.querySelector('.signal-reader-nav');
-    const actionsEl = document.getElementById('readerActions');
+    const navEl = document.getElementById('readerNav');
     const prevBtn = document.getElementById('readerPrevBtn');
     const nextBtn = document.getElementById('readerNextBtn');
     
@@ -4936,15 +4978,11 @@ function renderSignalStep() {
     prevBtn.disabled = isFirst;
     prevBtn.style.visibility = isFirst ? 'hidden' : 'visible';
     
-    if (isLast) {
-        // Last step - show actions instead of nav
-        navEl.classList.add('hidden');
-        actionsEl.classList.remove('hidden');
-        updateReaderFavoriteButton();
-    } else {
-        navEl.classList.remove('hidden');
-        actionsEl.classList.add('hidden');
-    }
+    // Change button text on last step
+    nextBtn.textContent = isLast ? 'Finish →' : 'Next →';
+    
+    // Always show nav during content steps
+    navEl.classList.remove('hidden');
 }
 
 // Navigate to previous step
@@ -4960,24 +4998,130 @@ function nextSignalStep() {
     if (signalState.currentStep < signalState.steps.length - 1) {
         signalState.currentStep++;
         renderSignalStep();
+    } else {
+        // On last step - show end screen
+        showSignalEndScreen();
     }
 }
 
-// Exit signal reader (X button)
+// Show the end screen
+function showSignalEndScreen() {
+    // Hide content and nav
+    document.querySelector('.signal-reader-content').classList.add('hidden');
+    document.getElementById('readerNav').classList.add('hidden');
+    
+    // Show end screen
+    document.getElementById('signalEndScreen').classList.remove('hidden');
+    
+    // Update favorite button state
+    updateReaderFavoriteButton();
+}
+
+// Exit signal reader (X button) - with confirmation
+function confirmExitSignal() {
+    document.getElementById('exitSignalModal').classList.add('active');
+}
+
+function closeExitSignalModal() {
+    document.getElementById('exitSignalModal').classList.remove('active');
+}
+
+function confirmExitSignalNow() {
+    closeExitSignalModal();
+    exitSignalReader();
+}
+
+// Actually exit the reader
 function exitSignalReader() {
     document.getElementById('viewSignalReader').classList.remove('active');
     signalState.currentSignal = null;
     signalState.steps = [];
     signalState.currentStep = 0;
+    signalState.currentRating = null;
+}
+
+// Rate signal (thumbs up/down)
+function rateSignal(rating) {
+    signalState.currentRating = rating;
+    
+    // Update UI
+    document.querySelectorAll('.signal-rating-btn').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.rating === rating);
+    });
+    
+    // Store rating in history
+    if (signalState.currentSignal) {
+        const historyItem = signalState.history.find(h => h.id === signalState.currentSignal.id);
+        if (historyItem) {
+            historyItem.rating = rating;
+            saveSignalState();
+        }
+    }
+}
+
+// Setup swipe navigation
+function setupSignalSwipe() {
+    const content = document.getElementById('signalReaderContent');
+    let touchStartX = 0;
+    let touchEndX = 0;
+    const minSwipeDistance = 50;
+    
+    const handleTouchStart = (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+    };
+    
+    const handleTouchEnd = (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+    };
+    
+    const handleSwipe = () => {
+        const distance = touchEndX - touchStartX;
+        
+        if (Math.abs(distance) < minSwipeDistance) return;
+        
+        if (distance > 0) {
+            // Swipe right - go back
+            prevSignalStep();
+        } else {
+            // Swipe left - go forward
+            nextSignalStep();
+        }
+    };
+    
+    // Remove existing listeners if any
+    content.removeEventListener('touchstart', handleTouchStart);
+    content.removeEventListener('touchend', handleTouchEnd);
+    
+    // Add new listeners
+    content.addEventListener('touchstart', handleTouchStart, { passive: true });
+    content.addEventListener('touchend', handleTouchEnd, { passive: true });
+}
+
+// Set signal order for a category
+function setSignalOrder(category, order) {
+    signalState.settings.categoryOrder[category] = order;
+    
+    // Update UI
+    document.querySelectorAll(`.order-btn[data-cat="${category}"]`).forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.order === order);
+    });
+    
+    saveSignalState();
+    showToast(`${capitalize(category)}: ${order === 'sequential' ? 'Sequential' : 'Random'} order`, 'success');
 }
 
 // Update favorite button in reader
 function updateReaderFavoriteButton() {
     const btn = document.getElementById('readerFavoriteBtn');
     const icon = btn.querySelector('.favorite-icon');
+    const text = btn.querySelector('.favorite-text');
     
     btn.classList.toggle('active', signalState.isFavorited);
     icon.textContent = signalState.isFavorited ? '♥' : '♡';
+    if (text) {
+        text.textContent = signalState.isFavorited ? 'Saved to Favorites' : 'Save to Favorites';
+    }
 }
 
 // Record signal shown in history
@@ -4989,6 +5133,7 @@ function recordSignalShown(lesson, category) {
         category: category,
         status: 'shown',
         isFavorite: false,
+        rating: null,  // 'up' or 'down'
         shownAt: new Date().toISOString(),
         completedAt: null
     };
@@ -5236,6 +5381,17 @@ function updateSignalSettingsView() {
     document.getElementById('signalRatioRecognize').value = s.categoryRatios.recognize || 50;
     document.getElementById('signalRatioCreate').value = s.categoryRatios.create || 50;
     updateCategoryRatios();
+    
+    // Order buttons
+    const recognizeOrder = s.categoryOrder?.recognize || 'sequential';
+    const createOrder = s.categoryOrder?.create || 'sequential';
+    
+    document.querySelectorAll('.order-btn[data-cat="recognize"]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.order === recognizeOrder);
+    });
+    document.querySelectorAll('.order-btn[data-cat="create"]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.order === createOrder);
+    });
     
     // Notifications
     document.getElementById('signalNotificationsEnabled').checked = s.notificationsEnabled;
