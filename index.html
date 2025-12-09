@@ -857,7 +857,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Clear Ground v3.9</p>
+                    <p class="version">Clear Ground v4.1</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>
@@ -1059,39 +1059,98 @@
                     <h3>Categories</h3>
                     <p class="settings-hint">Enable categories and adjust their ratio</p>
                     
+                    <!-- Foundations -->
                     <div class="signal-category-setting">
                         <div class="signal-category-header">
                             <label class="toggle">
-                                <input type="checkbox" id="signalCatRecognize" checked onchange="saveSignalSettings()">
+                                <input type="checkbox" id="signalCat-foundations" checked onchange="saveSignalSettings()">
                                 <span class="toggle-slider"></span>
                             </label>
-                            <span class="signal-category-name">Recognize</span>
-                            <span class="signal-category-ratio" id="recognizeRatio">50%</span>
+                            <span class="signal-category-name">Foundations</span>
+                            <span class="signal-category-ratio" id="ratio-foundations">20%</span>
                         </div>
-                        <input type="range" id="signalRatioRecognize" min="0" max="100" value="50" 
+                        <input type="range" id="signalRatio-foundations" min="0" max="100" value="20" 
                                oninput="updateCategoryRatios()" onchange="saveSignalSettings()">
                         <div class="signal-order-toggle">
                             <span class="order-label">Order:</span>
-                            <button class="order-btn active" data-order="sequential" data-cat="recognize" onclick="setSignalOrder('recognize', 'sequential')">1→2→3</button>
-                            <button class="order-btn" data-order="random" data-cat="recognize" onclick="setSignalOrder('recognize', 'random')">Random</button>
+                            <button class="order-btn active" data-order="sequential" data-cat="foundations" onclick="setSignalOrder('foundations', 'sequential')">1→2→3</button>
+                            <button class="order-btn" data-order="random" data-cat="foundations" onclick="setSignalOrder('foundations', 'random')">Random</button>
                         </div>
                     </div>
                     
+                    <!-- Presence -->
                     <div class="signal-category-setting">
                         <div class="signal-category-header">
                             <label class="toggle">
-                                <input type="checkbox" id="signalCatCreate" checked onchange="saveSignalSettings()">
+                                <input type="checkbox" id="signalCat-presence" checked onchange="saveSignalSettings()">
                                 <span class="toggle-slider"></span>
                             </label>
-                            <span class="signal-category-name">Create</span>
-                            <span class="signal-category-ratio" id="createRatio">50%</span>
+                            <span class="signal-category-name">Presence</span>
+                            <span class="signal-category-ratio" id="ratio-presence">20%</span>
                         </div>
-                        <input type="range" id="signalRatioCreate" min="0" max="100" value="50" 
+                        <input type="range" id="signalRatio-presence" min="0" max="100" value="20" 
                                oninput="updateCategoryRatios()" onchange="saveSignalSettings()">
                         <div class="signal-order-toggle">
                             <span class="order-label">Order:</span>
-                            <button class="order-btn active" data-order="sequential" data-cat="create" onclick="setSignalOrder('create', 'sequential')">1→2→3</button>
-                            <button class="order-btn" data-order="random" data-cat="create" onclick="setSignalOrder('create', 'random')">Random</button>
+                            <button class="order-btn active" data-order="sequential" data-cat="presence" onclick="setSignalOrder('presence', 'sequential')">1→2→3</button>
+                            <button class="order-btn" data-order="random" data-cat="presence" onclick="setSignalOrder('presence', 'random')">Random</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Collective Wisdom -->
+                    <div class="signal-category-setting">
+                        <div class="signal-category-header">
+                            <label class="toggle">
+                                <input type="checkbox" id="signalCat-collective-wisdom" checked onchange="saveSignalSettings()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="signal-category-name">Collective Wisdom</span>
+                            <span class="signal-category-ratio" id="ratio-collective-wisdom">20%</span>
+                        </div>
+                        <input type="range" id="signalRatio-collective-wisdom" min="0" max="100" value="20" 
+                               oninput="updateCategoryRatios()" onchange="saveSignalSettings()">
+                        <div class="signal-order-toggle">
+                            <span class="order-label">Order:</span>
+                            <button class="order-btn active" data-order="sequential" data-cat="collective-wisdom" onclick="setSignalOrder('collective-wisdom', 'sequential')">1→2→3</button>
+                            <button class="order-btn" data-order="random" data-cat="collective-wisdom" onclick="setSignalOrder('collective-wisdom', 'random')">Random</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Creation -->
+                    <div class="signal-category-setting">
+                        <div class="signal-category-header">
+                            <label class="toggle">
+                                <input type="checkbox" id="signalCat-creation" checked onchange="saveSignalSettings()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="signal-category-name">Creation</span>
+                            <span class="signal-category-ratio" id="ratio-creation">20%</span>
+                        </div>
+                        <input type="range" id="signalRatio-creation" min="0" max="100" value="20" 
+                               oninput="updateCategoryRatios()" onchange="saveSignalSettings()">
+                        <div class="signal-order-toggle">
+                            <span class="order-label">Order:</span>
+                            <button class="order-btn active" data-order="sequential" data-cat="creation" onclick="setSignalOrder('creation', 'sequential')">1→2→3</button>
+                            <button class="order-btn" data-order="random" data-cat="creation" onclick="setSignalOrder('creation', 'random')">Random</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Life, Business & Beyond -->
+                    <div class="signal-category-setting">
+                        <div class="signal-category-header">
+                            <label class="toggle">
+                                <input type="checkbox" id="signalCat-thought-leaders" checked onchange="saveSignalSettings()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="signal-category-name">Life, Business & Beyond</span>
+                            <span class="signal-category-ratio" id="ratio-thought-leaders">20%</span>
+                        </div>
+                        <input type="range" id="signalRatio-thought-leaders" min="0" max="100" value="20" 
+                               oninput="updateCategoryRatios()" onchange="saveSignalSettings()">
+                        <div class="signal-order-toggle">
+                            <span class="order-label">Order:</span>
+                            <button class="order-btn active" data-order="sequential" data-cat="thought-leaders" onclick="setSignalOrder('thought-leaders', 'sequential')">1→2→3</button>
+                            <button class="order-btn" data-order="random" data-cat="thought-leaders" onclick="setSignalOrder('thought-leaders', 'random')">Random</button>
                         </div>
                     </div>
                 </div>
@@ -1109,6 +1168,17 @@
                             <span class="toggle-slider"></span>
                         </label>
                     </div>
+                </div>
+
+                <!-- Lesson Content -->
+                <div class="signal-settings-section">
+                    <h3>Lesson Content</h3>
+                    <div class="signal-lesson-info" id="lessonCountsContainer">
+                        <!-- Dynamically populated -->
+                    </div>
+                    <button class="btn secondary full-width" onclick="refreshSignalLessons()" style="margin-top: var(--space-md);">
+                        ↻ Check for New Lessons
+                    </button>
                 </div>
 
                 <!-- Stats Summary -->

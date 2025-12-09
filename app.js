@@ -277,6 +277,12 @@ async function init() {
         // Initialize signal state
         initSignalState();
         
+        // Load signal lessons (async, non-blocking)
+        loadSignalLessons().then(() => {
+            console.log('Signal lessons loaded');
+            updateSignalView();
+        }).catch(e => console.warn('Signal lessons load error:', e));
+        
         console.log('App init completed successfully');
         
     } catch (error) {
@@ -4641,72 +4647,265 @@ function animate() {
 // ============================================
 
 // Sample signal data (will be replaced with .md file loading later)
-const SIGNAL_DATA = {
-    recognize: [
-        {
-            id: 'recognize-1',
-            number: 1,
-            title: 'Increase your sense of agency by focusing on what you can control',
-            content: `Feeling powerless often comes from staring at everything you can't change—other people's behavior, the past, the economy, your childhood. Agency begins the moment you pivot your attention to what is still in your hands. This shift is subtle but profound: instead of asking, "Why is this happening to me?" you begin asking, "Given that this is happening, what can I do next?" The facts may not change, but your relationship to them does.
+// ============================================
+// SIGNAL LESSON DATA
+// ============================================
 
-A practical way to build agency is to draw a mental (or literal) circle. Outside the circle: other people's choices, world events, your genetics. Inside: your attitude, your preparation, what you say, how you spend the next 10 minutes. When you feel overwhelmed, name one thing outside your control, then immediately identify one thing inside it and act on that. Send the email. Drink the water. Clean the counter. Make the call.
-
-These small, controllable actions are not trivial; they're votes for a new identity. Over time, you train your brain to look for levers instead of limits. You begin to trust yourself as someone who responds, not just someone life happens to. The circumstances may still be hard, but you're no longer waiting to be rescued—you're participating in your own rescue, one choice at a time.`
-        },
-        {
-            id: 'recognize-2',
-            number: 2,
-            title: 'Say "do" instead of "try" to strengthen commitment',
-            content: `Language doesn't just describe your reality; it shapes it. When you say, "I'll try to work out this week," you're already giving yourself an escape hatch. "Try" leaves the door open for backing out without feeling like you broke a promise. It sounds reasonable, even humble, but it often hides a lack of commitment. "Do," on the other hand, is a line in the sand: "I will work out on Tuesday at 7 a.m."
-
-Start listening to how often you soften your intentions with "try," "maybe," or "hopefully." Instead of beating yourself up, use each one as a signal to get clearer. Swap "I'll try to eat better" for "I will cook dinner at home three nights this week." That tiny linguistic upgrade forces you to be specific: when, where, and what "do" actually means.
-
-This matters because your brain takes your words seriously. When you repeatedly say "I'll try" and then don't follow through, you quietly train yourself not to trust your own promises. When you say "I will" and then act, even in a small way, you build self-respect. You become someone whose word—to yourself—means something. Over time, that integrity creates a much deeper, sturdier confidence than any motivational pep talk.`
-        },
-        {
-            id: 'recognize-3',
-            number: 3,
-            title: 'Treat procrastination as a stress-driven habit you can change',
-            content: `Most people label themselves as "lazy" or "undisciplined" when they procrastinate. That story feels true, but it's incomplete. Procrastination is rarely about the task itself; it's a coping strategy your brain learned to manage uncomfortable feelings—stress, anxiety, self-doubt, overwhelm. In that sense, it's not a character flaw. It's a habit loop: you feel stress, you avoid the task, you get temporary relief, and your brain learns, "Avoiding works!"
-
-Seeing procrastination as a habit is powerful because habits can be changed. You start by noticing the moment right before you put something off. What are you feeling in your body—tight chest, racing thoughts, heavy fatigue? What story is running—"I'll mess this up," "It's too much," "I don't know where to start"? Naming the stress opens a tiny gap between you and the habit.
-
-From there, you can experiment with a different response that still soothes you but moves you forward: starting for five minutes, breaking the task into one tiny step, or using a countdown to launch action. The goal isn't to never feel stress. It's to stop letting stress automatically drive you into avoidance. When you treat procrastination as a learned pattern—not your identity—you reclaim your power to install a new one.`
-        }
-    ],
-    create: [
-        {
-            id: 'create-1',
-            number: 276,
-            title: 'Reframe desired outcomes as memories to produce relief, not longing',
-            content: `Longing keeps the desired object psychologically distant. You imagine it in the future, accompanied by a sense of "not yet" and "not mine." Reframing outcomes as memories flips this script. You imagine yourself remembering the fulfillment, talking about it as if it already happened. This subtle shift often produces a wave of relief, as though the tension of "Will it ever?" has been resolved.
-
-Pick a desire and imagine you are six months or a year past its fulfillment. You're telling a friend how it all unfolded. "It was funny how it started... then this opportunity came... and now it's just part of life." Let yourself feel the afterglow, the casualness that comes once something is integrated into your story. You're no longer reaching for it; you're recollecting it.
-
-Notice how your body responds. If you feel a softening or a sense of "Ah, yes," you're successfully moving from craving to completion emotionally. The point is not to predict exact details but to experience the internal state of "this chapter turned out well." Carry some of that feeling into your day. From this place, you're less likely to act out of desperation and more likely to make choices that belong in the version of your life you just "remembered."`
-        },
-        {
-            id: 'create-2',
-            number: 277,
-            title: 'Use contrast to clarify what you actually want',
-            content: `Sometimes you don't know what you want until you bump into what you don't want. Contrast is one of life's most reliable teachers. That job you hated? It taught you that autonomy matters more than you realized. That relationship that felt off? It showed you the kind of connection you're actually hungry for. Rather than seeing "negative" experiences as failures, treat them as data points sharpening your preferences.
-
-When something feels wrong, don't just push against it. Pause and ask, "What is this showing me about what I do want?" Let the discomfort become a compass. If you feel drained around certain people, that's information about the qualities you value in relationships. If a project bores you, it's pointing toward what genuinely engages your mind.
-
-The key is to pivot from complaint to clarity. Instead of dwelling on "I hate this," translate it: "This tells me I want more creativity, more meaningful challenge, more respect." Once you name the positive desire underneath the negative reaction, you have something to move toward. Contrast isn't meant to trap you—it's meant to launch you into clearer intentions.`
-        },
-        {
-            id: 'create-3',
-            number: 278,
-            title: 'Act as if the bridge will appear',
-            content: `When you set a meaningful intention, you often can't see the full path from here to there. The logical mind wants a detailed roadmap before it will commit. But reality often works differently. You take a step based on a hunch, and only then does the next stepping-stone reveal itself. Acting "as if" isn't about delusion; it's about creating motion so that possibilities can meet you halfway.
-
-Think of it like driving at night with headlights. You can only see a short distance ahead, but you can make the whole journey that way. You don't demand to see the entire road before you turn the key. The same applies to goals and desires. Commit to the direction, take the first small action, and trust that clarity will build as you move.
-
-This doesn't mean ignoring practical concerns. It means refusing to let uncertainty paralyze you. When you act in alignment with what you want—speaking, preparing, reaching out—you send a signal to yourself and the world. Resources, ideas, and people often show up not before you need them, but just in time. The bridge appears under your feet as you walk.`
-        }
-    ]
+// GitHub configuration for lesson files
+const SIGNAL_CONFIG = {
+    // Base URL for raw GitHub content (user should update this)
+    baseUrl: 'https://raw.githubusercontent.com/tuomashel/energy-tracker/main/signals',
+    categories: ['foundations', 'presence', 'collective-wisdom', 'creation', 'thought-leaders'],
+    categoryLabels: {
+        'foundations': 'Foundations',
+        'presence': 'Presence',
+        'collective-wisdom': 'Collective Wisdom',
+        'creation': 'Creation',
+        'thought-leaders': 'Life, Business & Beyond'
+    },
+    cacheKey: 'signalLessonsCache',
+    versionKey: 'signalLessonsVersion',
+    // How often to check for updates (in hours)
+    updateCheckInterval: 24
 };
+
+// Lesson data (loaded from cache or fetched)
+let SIGNAL_DATA = {
+    'foundations': [],
+    'presence': [],
+    'collective-wisdom': [],
+    'creation': [],
+    'thought-leaders': []
+};
+
+// Load signal lessons from cache or fetch from GitHub
+async function loadSignalLessons() {
+    try {
+        // First, try to load from cache
+        const cached = localStorage.getItem(SIGNAL_CONFIG.cacheKey);
+        if (cached) {
+            const parsed = JSON.parse(cached);
+            SIGNAL_DATA = parsed.data;
+            console.log('Loaded signal lessons from cache');
+            
+            // Check if we should update in background
+            const lastCheck = localStorage.getItem(SIGNAL_CONFIG.versionKey);
+            const hoursSinceCheck = lastCheck ? 
+                (Date.now() - parseInt(lastCheck)) / (1000 * 60 * 60) : 999;
+            
+            if (hoursSinceCheck > SIGNAL_CONFIG.updateCheckInterval) {
+                // Update in background (don't await)
+                fetchSignalLessonsFromGitHub().catch(e => console.log('Background update failed:', e));
+            }
+            
+            return true;
+        }
+        
+        // No cache - fetch from GitHub
+        return await fetchSignalLessonsFromGitHub();
+        
+    } catch (error) {
+        console.error('Error loading signal lessons:', error);
+        // If all else fails, use fallback sample data
+        loadFallbackLessons();
+        return false;
+    }
+}
+
+// Fetch lessons from GitHub
+async function fetchSignalLessonsFromGitHub() {
+    console.log('Fetching signal lessons from GitHub...');
+    
+    const newData = {};
+    let hasUpdates = false;
+    
+    for (const category of SIGNAL_CONFIG.categories) {
+        try {
+            const url = `${SIGNAL_CONFIG.baseUrl}/${category}.md`;
+            const response = await fetch(url, { cache: 'no-store' });
+            
+            if (!response.ok) {
+                console.warn(`Failed to fetch ${category}.md: ${response.status}`);
+                // Keep existing data for this category
+                newData[category] = SIGNAL_DATA[category] || [];
+                continue;
+            }
+            
+            const markdown = await response.text();
+            const lessons = parseMarkdownLessons(markdown, category);
+            
+            if (lessons.length > 0) {
+                newData[category] = lessons;
+                hasUpdates = true;
+                console.log(`Loaded ${lessons.length} ${category} lessons`);
+            } else {
+                newData[category] = SIGNAL_DATA[category] || [];
+            }
+            
+        } catch (error) {
+            console.warn(`Error fetching ${category} lessons:`, error);
+            newData[category] = SIGNAL_DATA[category] || [];
+        }
+    }
+    
+    // Update data and cache
+    if (hasUpdates) {
+        SIGNAL_DATA = newData;
+        
+        // Save to cache
+        localStorage.setItem(SIGNAL_CONFIG.cacheKey, JSON.stringify({
+            data: SIGNAL_DATA,
+            timestamp: Date.now()
+        }));
+        
+        localStorage.setItem(SIGNAL_CONFIG.versionKey, Date.now().toString());
+        
+        console.log('Signal lessons cached successfully');
+        return true;
+    }
+    
+    return false;
+}
+
+// Parse markdown file into lessons array
+function parseMarkdownLessons(markdown, category) {
+    const lessons = [];
+    
+    // Split by --- separator
+    const sections = markdown.split(/\n---\n/).filter(s => s.trim());
+    
+    for (let i = 0; i < sections.length; i++) {
+        const section = sections[i].trim();
+        if (!section) continue;
+        
+        // Extract title from ### Lesson N: Title format
+        const titleMatch = section.match(/^###\s*Lesson\s*(\d+):\s*(.+?)(?:\n|$)/i);
+        
+        if (titleMatch) {
+            const lessonNumber = parseInt(titleMatch[1]);
+            const title = titleMatch[2].trim();
+            
+            // Content is everything after the title line
+            const contentStart = section.indexOf('\n', titleMatch.index) + 1;
+            const content = section.substring(contentStart).trim();
+            
+            if (content) {
+                lessons.push({
+                    id: `${category}-${lessonNumber}`,
+                    number: lessonNumber,
+                    title: title,
+                    content: content
+                });
+            }
+        } else {
+            // Fallback: Try to extract any heading
+            const headingMatch = section.match(/^#+\s*(.+?)(?:\n|$)/);
+            if (headingMatch) {
+                const title = headingMatch[1].trim();
+                const contentStart = section.indexOf('\n', headingMatch.index) + 1;
+                const content = section.substring(contentStart).trim();
+                
+                if (content) {
+                    lessons.push({
+                        id: `${category}-${i + 1}`,
+                        number: i + 1,
+                        title: title,
+                        content: content
+                    });
+                }
+            }
+        }
+    }
+    
+    // Sort by lesson number
+    lessons.sort((a, b) => a.number - b.number);
+    
+    return lessons;
+}
+
+// Fallback sample lessons if GitHub fetch fails
+function loadFallbackLessons() {
+    SIGNAL_DATA = {
+        'foundations': [
+            {
+                id: 'foundations-1',
+                number: 1,
+                title: 'Building a Strong Foundation',
+                content: `Every transformation begins with a solid foundation. Before you can build higher, you must ensure your base is stable.
+
+Take time to examine your current foundations. What beliefs, habits, and patterns are you building upon?
+
+The strongest structures are built slowly, with attention to each layer. Your development is no different.`
+            }
+        ],
+        'presence': [
+            {
+                id: 'presence-1',
+                number: 1,
+                title: 'The Power of Now',
+                content: `Presence is your natural state, obscured only by thinking. When you're fully here, problems dissolve into situations that can be dealt with.
+
+Notice where your attention is right now. Is it here, or is it lost in past or future?
+
+The present moment is the only moment you ever have. Everything else is memory or imagination.`
+            }
+        ],
+        'collective-wisdom': [
+            {
+                id: 'collective-wisdom-1',
+                number: 1,
+                title: 'Standing on Giants',
+                content: `We don't have to figure everything out alone. Countless teachers, thinkers, and practitioners have walked this path before us.
+
+Their insights are available to us if we're willing to receive them. Not as dogma to follow blindly, but as maps to consider.
+
+The wisdom of the ages is your inheritance. Claim it, test it, and make it your own.`
+            }
+        ],
+        'creation': [
+            {
+                id: 'creation-1',
+                number: 1,
+                title: 'You Are a Creator',
+                content: `Creation is not reserved for artists. Every thought you think, every word you speak, every action you take is an act of creation.
+
+What are you creating with your life? What patterns are you reinforcing? What possibilities are you opening?
+
+When you recognize yourself as a creator, victimhood becomes impossible. You are always making something.`
+            }
+        ],
+        'thought-leaders': [
+            {
+                id: 'thought-leaders-1',
+                number: 1,
+                title: 'Principles in Action',
+                content: `True wisdom isn't just understood—it's applied. The gap between knowing and doing is where most growth opportunities live.
+
+How are you applying what you've learned? Where is your knowledge outpacing your practice?
+
+Life, business, and relationships all respond to the same fundamental principles. See them, and you see everywhere.`
+            }
+        ]
+    };
+    console.log('Loaded fallback signal lessons');
+}
+
+// Force refresh lessons from GitHub
+async function refreshSignalLessons() {
+    showToast('Checking for new lessons...', 'success');
+    const success = await fetchSignalLessonsFromGitHub();
+    if (success) {
+        showToast('Lessons updated!', 'success');
+    } else {
+        showToast('No updates available', 'success');
+    }
+    return success;
+}
+
+// Get lesson count for a category
+function getSignalLessonCount(category) {
+    return SIGNAL_DATA[category]?.length || 0;
+}
 
 // Signal state
 const signalState = {
@@ -4728,10 +4927,28 @@ const signalState = {
         signalsPerDay: 1,
         windowStart: 8,
         windowEnd: 20,
-        categoriesEnabled: ['recognize', 'create'],
-        categoryRatios: { recognize: 50, create: 50 },
-        categoryOrder: { recognize: 'sequential', create: 'sequential' },  // 'sequential' or 'random'
-        categoryIndex: { recognize: 0, create: 0 },  // Current index for sequential mode
+        categoriesEnabled: ['foundations', 'presence', 'collective-wisdom', 'creation', 'thought-leaders'],
+        categoryRatios: { 
+            'foundations': 20, 
+            'presence': 20, 
+            'collective-wisdom': 20, 
+            'creation': 20, 
+            'thought-leaders': 20 
+        },
+        categoryOrder: { 
+            'foundations': 'sequential', 
+            'presence': 'sequential', 
+            'collective-wisdom': 'sequential', 
+            'creation': 'sequential', 
+            'thought-leaders': 'sequential' 
+        },
+        categoryIndex: { 
+            'foundations': 0, 
+            'presence': 0, 
+            'collective-wisdom': 0, 
+            'creation': 0, 
+            'thought-leaders': 0 
+        },
         notificationsEnabled: true
     }
 };
@@ -4788,12 +5005,39 @@ function saveSignalState() {
 // Update signal view
 function updateSignalView() {
     updateSignalStats();
+    updateSignalCategoryOptions();
     
     // Reset to prompt view
     document.getElementById('signalPrompt').classList.remove('hidden');
     document.getElementById('signalDisplay').classList.add('hidden');
     signalState.currentSignal = null;
     signalState.isFavorited = false;
+}
+
+// Update category select options with lesson counts
+function updateSignalCategoryOptions() {
+    const select = document.getElementById('signalCategorySelect');
+    if (!select) return;
+    
+    // Calculate total count
+    let totalCount = 0;
+    for (const cat of SIGNAL_CONFIG.categories) {
+        totalCount += getSignalLessonCount(cat);
+    }
+    
+    // Build options
+    let optionsHtml = `<option value="all">All (${totalCount})</option>`;
+    
+    for (const cat of SIGNAL_CONFIG.categories) {
+        const count = getSignalLessonCount(cat);
+        const label = SIGNAL_CONFIG.categoryLabels[cat] || cat;
+        optionsHtml += `<option value="${cat}">${label} (${count})</option>`;
+    }
+    
+    select.innerHTML = optionsHtml;
+    
+    // Restore selected value
+    select.value = signalState.currentCategory;
 }
 
 // Update signal stats display
@@ -4902,8 +5146,9 @@ function displaySignal(lesson, category) {
     
     // Set category badge
     const badge = document.getElementById('readerCategoryBadge');
-    badge.textContent = category.toUpperCase();
-    badge.className = 'signal-reader-badge' + (category === 'create' ? ' create' : '');
+    const categoryLabel = SIGNAL_CONFIG.categoryLabels[category] || category;
+    badge.textContent = categoryLabel.toUpperCase();
+    badge.className = 'signal-reader-badge ' + category;
     
     // Set lesson number
     document.getElementById('readerLessonNumber').textContent = `Lesson ${lesson.number}`;
@@ -5316,8 +5561,9 @@ function showHistorySignal(lessonId) {
     
     // Show in modal
     const badge = document.getElementById('modalSignalCategory');
-    badge.textContent = category.toUpperCase();
-    badge.className = 'signal-category-badge' + (category === 'create' ? ' create' : '');
+    const categoryLabel = SIGNAL_CONFIG.categoryLabels[category] || category;
+    badge.textContent = categoryLabel.toUpperCase();
+    badge.className = 'signal-category-badge ' + category;
     
     document.getElementById('modalLessonNumber').textContent = `Lesson ${lesson.number}`;
     document.getElementById('modalLessonTitle').textContent = lesson.title;
@@ -5373,28 +5619,44 @@ function updateSignalSettingsView() {
     document.getElementById('signalWindowStart').value = s.windowStart;
     document.getElementById('signalWindowEnd').value = s.windowEnd;
     
-    // Categories
-    document.getElementById('signalCatRecognize').checked = s.categoriesEnabled.includes('recognize');
-    document.getElementById('signalCatCreate').checked = s.categoriesEnabled.includes('create');
+    // Categories - loop through all
+    for (const cat of SIGNAL_CONFIG.categories) {
+        const checkbox = document.getElementById(`signalCat-${cat}`);
+        const slider = document.getElementById(`signalRatio-${cat}`);
+        
+        if (checkbox) {
+            checkbox.checked = s.categoriesEnabled.includes(cat);
+        }
+        if (slider) {
+            slider.value = s.categoryRatios[cat] || 20;
+        }
+        
+        // Order buttons
+        const order = s.categoryOrder?.[cat] || 'sequential';
+        document.querySelectorAll(`.order-btn[data-cat="${cat}"]`).forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.order === order);
+        });
+    }
     
-    // Ratios
-    document.getElementById('signalRatioRecognize').value = s.categoryRatios.recognize || 50;
-    document.getElementById('signalRatioCreate').value = s.categoryRatios.create || 50;
     updateCategoryRatios();
-    
-    // Order buttons
-    const recognizeOrder = s.categoryOrder?.recognize || 'sequential';
-    const createOrder = s.categoryOrder?.create || 'sequential';
-    
-    document.querySelectorAll('.order-btn[data-cat="recognize"]').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.order === recognizeOrder);
-    });
-    document.querySelectorAll('.order-btn[data-cat="create"]').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.order === createOrder);
-    });
     
     // Notifications
     document.getElementById('signalNotificationsEnabled').checked = s.notificationsEnabled;
+    
+    // Lesson counts - generate dynamically
+    const container = document.getElementById('lessonCountsContainer');
+    if (container) {
+        container.innerHTML = SIGNAL_CONFIG.categories.map(cat => {
+            const count = getSignalLessonCount(cat);
+            const label = SIGNAL_CONFIG.categoryLabels[cat] || cat;
+            return `
+                <div class="lesson-count-row">
+                    <span class="lesson-category-name">${label}</span>
+                    <span class="lesson-count">${count} lesson${count !== 1 ? 's' : ''}</span>
+                </div>
+            `;
+        }).join('');
+    }
     
     // Stats
     document.getElementById('settingsSignalTotal').textContent = stats.totalCompleted;
@@ -5414,16 +5676,26 @@ function adjustSignalGoal(delta) {
 
 // Update category ratio displays
 function updateCategoryRatios() {
-    const recognizeVal = parseInt(document.getElementById('signalRatioRecognize').value);
-    const createVal = parseInt(document.getElementById('signalRatioCreate').value);
+    // Get all slider values
+    const values = {};
+    let total = 0;
     
-    // Normalize to percentages
-    const total = recognizeVal + createVal;
-    const recognizePct = total > 0 ? Math.round((recognizeVal / total) * 100) : 50;
-    const createPct = total > 0 ? Math.round((createVal / total) * 100) : 50;
+    for (const cat of SIGNAL_CONFIG.categories) {
+        const slider = document.getElementById(`signalRatio-${cat}`);
+        if (slider) {
+            values[cat] = parseInt(slider.value) || 0;
+            total += values[cat];
+        }
+    }
     
-    document.getElementById('recognizeRatio').textContent = `${recognizePct}%`;
-    document.getElementById('createRatio').textContent = `${createPct}%`;
+    // Update percentage displays
+    for (const cat of SIGNAL_CONFIG.categories) {
+        const ratioEl = document.getElementById(`ratio-${cat}`);
+        if (ratioEl) {
+            const pct = total > 0 ? Math.round((values[cat] / total) * 100) : 0;
+            ratioEl.textContent = `${pct}%`;
+        }
+    }
 }
 
 // Save signal settings
@@ -5434,20 +5706,30 @@ function saveSignalSettings() {
     s.windowStart = parseInt(document.getElementById('signalWindowStart').value);
     s.windowEnd = parseInt(document.getElementById('signalWindowEnd').value);
     
-    // Categories enabled
+    // Categories enabled - loop through all
     s.categoriesEnabled = [];
-    if (document.getElementById('signalCatRecognize').checked) s.categoriesEnabled.push('recognize');
-    if (document.getElementById('signalCatCreate').checked) s.categoriesEnabled.push('create');
+    const values = {};
+    let total = 0;
     
-    // Ratios
-    const recognizeVal = parseInt(document.getElementById('signalRatioRecognize').value);
-    const createVal = parseInt(document.getElementById('signalRatioCreate').value);
-    const total = recognizeVal + createVal;
+    for (const cat of SIGNAL_CONFIG.categories) {
+        const checkbox = document.getElementById(`signalCat-${cat}`);
+        const slider = document.getElementById(`signalRatio-${cat}`);
+        
+        if (checkbox?.checked) {
+            s.categoriesEnabled.push(cat);
+        }
+        
+        if (slider) {
+            values[cat] = parseInt(slider.value) || 0;
+            total += values[cat];
+        }
+    }
     
-    s.categoryRatios = {
-        recognize: total > 0 ? Math.round((recognizeVal / total) * 100) : 50,
-        create: total > 0 ? Math.round((createVal / total) * 100) : 50
-    };
+    // Normalize ratios to percentages
+    s.categoryRatios = {};
+    for (const cat of SIGNAL_CONFIG.categories) {
+        s.categoryRatios[cat] = total > 0 ? Math.round((values[cat] / total) * 100) : 20;
+    }
     
     s.notificationsEnabled = document.getElementById('signalNotificationsEnabled').checked;
     
