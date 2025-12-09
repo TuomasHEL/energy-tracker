@@ -4755,15 +4755,19 @@ async function fetchSignalLessonsFromGitHub() {
     if (hasUpdates) {
         SIGNAL_DATA = newData;
         
-        // Save to cache
-        localStorage.setItem(SIGNAL_CONFIG.cacheKey, JSON.stringify({
-            data: SIGNAL_DATA,
-            timestamp: Date.now()
-        }));
+        // Save to cache (with error handling for quota exceeded)
+        try {
+            localStorage.setItem(SIGNAL_CONFIG.cacheKey, JSON.stringify({
+                data: SIGNAL_DATA,
+                timestamp: Date.now()
+            }));
+            localStorage.setItem(SIGNAL_CONFIG.versionKey, Date.now().toString());
+            console.log('Signal lessons cached successfully');
+        } catch (e) {
+            console.warn('Failed to cache lessons (storage quota?):', e);
+            // Continue without caching - data is still in memory
+        }
         
-        localStorage.setItem(SIGNAL_CONFIG.versionKey, Date.now().toString());
-        
-        console.log('Signal lessons cached successfully');
         return true;
     }
     
@@ -4774,48 +4778,59 @@ async function fetchSignalLessonsFromGitHub() {
 function parseMarkdownLessons(markdown, category) {
     const lessons = [];
     
-    // Split by --- separator
-    const sections = markdown.split(/\n---\n/).filter(s => s.trim());
+    // Split by --- separator (flexible: handles multiple newlines/whitespace around it)
+    const sections = markdown.split(/\n+\s*---\s*\n+/).filter(s => s.trim());
+    
+    console.log(`Parsing ${category}: found ${sections.length} sections`);
     
     for (let i = 0; i < sections.length; i++) {
         const section = sections[i].trim();
         if (!section) continue;
         
-        // Extract title from ### Lesson N: Title format
-        const titleMatch = section.match(/^###\s*Lesson\s*(\d+):\s*(.+?)(?:\n|$)/i);
+        // Extract title from ### Lesson N: Title format (anywhere in section)
+        const titleMatch = section.match(/###\s*Lesson\s*(\d+):\s*(.+?)(?:\n|$)/i);
         
         if (titleMatch) {
             const lessonNumber = parseInt(titleMatch[1]);
             const title = titleMatch[2].trim();
             
             // Content is everything after the title line
-            const contentStart = section.indexOf('\n', titleMatch.index) + 1;
-            const content = section.substring(contentStart).trim();
+            const titleEndIndex = titleMatch.index + titleMatch[0].length;
+            let content = section.substring(titleEndIndex).trim();
             
-            if (content) {
+            // If no content, use a placeholder
+            if (!content) {
+                content = 'Content coming soon.';
+            }
+            
+            lessons.push({
+                id: `${category}-${lessonNumber}`,
+                number: lessonNumber,
+                title: title,
+                content: content
+            });
+        } else {
+            // Fallback: Try to extract any heading (for non-standard formats)
+            const headingMatch = section.match(/^#+\s*(.+?)(?:\n|$)/m);
+            if (headingMatch) {
+                const title = headingMatch[1].trim();
+                // Skip part/section headers
+                if (title.toLowerCase().startsWith('part ') || title.toLowerCase().includes('section')) {
+                    continue;
+                }
+                const contentStart = section.indexOf('\n', headingMatch.index) + 1;
+                let content = section.substring(contentStart).trim();
+                
+                if (!content) {
+                    content = 'Content coming soon.';
+                }
+                
                 lessons.push({
-                    id: `${category}-${lessonNumber}`,
-                    number: lessonNumber,
+                    id: `${category}-${i + 1}`,
+                    number: i + 1,
                     title: title,
                     content: content
                 });
-            }
-        } else {
-            // Fallback: Try to extract any heading
-            const headingMatch = section.match(/^#+\s*(.+?)(?:\n|$)/);
-            if (headingMatch) {
-                const title = headingMatch[1].trim();
-                const contentStart = section.indexOf('\n', headingMatch.index) + 1;
-                const content = section.substring(contentStart).trim();
-                
-                if (content) {
-                    lessons.push({
-                        id: `${category}-${i + 1}`,
-                        number: i + 1,
-                        title: title,
-                        content: content
-                    });
-                }
             }
         }
     }
@@ -4823,6 +4838,7 @@ function parseMarkdownLessons(markdown, category) {
     // Sort by lesson number
     lessons.sort((a, b) => a.number - b.number);
     
+    console.log(`Parsed ${lessons.length} lessons from ${category}`);
     return lessons;
 }
 
