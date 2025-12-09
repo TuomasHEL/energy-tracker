@@ -283,6 +283,9 @@ async function init() {
             updateSignalView();
         }).catch(e => console.warn('Signal lessons load error:', e));
         
+        // Initialize signal notifications
+        initSignalNotifications();
+        
         console.log('App init completed successfully');
         
     } catch (error) {
@@ -4984,6 +4987,12 @@ function initSignalState() {
         }
         
         updateSignalHomeCard();
+        
+        // Sync with backend after a short delay (non-blocking)
+        setTimeout(() => {
+            syncSignalDataWithBackend().catch(e => console.warn('Signal sync error:', e));
+        }, 1000);
+        
     } catch (e) {
         console.error('Error initializing signal state:', e);
     }
@@ -5058,6 +5067,65 @@ function updateSignalHomeCard() {
     if (streakEl) {
         streakEl.textContent = `🔥 ${signalState.stats.currentStreak} day streak`;
     }
+}
+
+// Recalculate stats from history (after backend sync)
+function recalculateSignalStats() {
+    const today = new Date().toDateString();
+    
+    // Count today's completions
+    const todayCompletions = signalState.history.filter(h => 
+        h.status === 'completed' && 
+        h.completedAt && 
+        new Date(h.completedAt).toDateString() === today
+    ).length;
+    
+    // Total completions
+    const totalCompleted = signalState.history.filter(h => h.status === 'completed').length;
+    
+    // Calculate streak from history
+    let currentStreak = 0;
+    let longestStreak = signalState.stats.longestStreak || 0;
+    
+    // Get unique days with completions, sorted descending
+    const completionDays = [...new Set(
+        signalState.history
+            .filter(h => h.status === 'completed' && h.completedAt)
+            .map(h => new Date(h.completedAt).toDateString())
+    )].sort((a, b) => new Date(b) - new Date(a));
+    
+    if (completionDays.length > 0) {
+        // Check if today or yesterday has completions
+        const todayStr = new Date().toDateString();
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toDateString();
+        
+        if (completionDays[0] === todayStr || completionDays[0] === yesterdayStr) {
+            currentStreak = 1;
+            let checkDate = new Date(completionDays[0]);
+            
+            for (let i = 1; i < completionDays.length; i++) {
+                checkDate.setDate(checkDate.getDate() - 1);
+                if (completionDays[i] === checkDate.toDateString()) {
+                    currentStreak++;
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+    
+    // Update stats
+    signalState.stats.todayCount = todayCompletions;
+    signalState.stats.todayDate = today;
+    signalState.stats.totalCompleted = totalCompleted;
+    signalState.stats.currentStreak = currentStreak;
+    if (currentStreak > longestStreak) {
+        signalState.stats.longestStreak = currentStreak;
+    }
+    
+    saveSignalState();
 }
 
 // Update signal category filter
@@ -5373,6 +5441,7 @@ function updateReaderFavoriteButton() {
 function recordSignalShown(lesson, category) {
     const record = {
         id: lesson.id,
+        lessonId: lesson.id,
         lessonNumber: lesson.number,
         title: lesson.title,
         category: category,
@@ -5395,6 +5464,9 @@ function recordSignalShown(lesson, category) {
             signalState.history = signalState.history.slice(0, 500);
         }
         saveSignalState();
+        
+        // Sync to backend (non-blocking)
+        syncSignalHistoryRecord(record);
     }
 }
 
@@ -5413,6 +5485,9 @@ function toggleSignalFavorite() {
     const historyItem = signalState.history.find(h => h.id === signalState.currentSignal.id);
     if (historyItem) {
         historyItem.isFavorite = signalState.isFavorited;
+        
+        // Sync to backend (non-blocking)
+        syncSignalHistoryRecord(historyItem);
     }
     
     updateReaderFavoriteButton();
@@ -5432,6 +5507,10 @@ function completeSignal() {
     if (historyItem) {
         historyItem.status = 'completed';
         historyItem.completedAt = new Date().toISOString();
+        historyItem.rating = signalState.currentRating;
+        
+        // Sync to backend (non-blocking)
+        syncSignalHistoryRecord(historyItem);
     }
     
     // Update stats
@@ -5451,6 +5530,9 @@ function completeSignal() {
     updateSignalStats();
     updateSignalHomeCard();
     
+    // Sync settings (for categoryIndex updates)
+    syncSignalSettingsToBackend();
+    
     showToast('Signal completed! ✓', 'success');
     
     // Exit reader and return to signal view
@@ -5468,6 +5550,9 @@ function skipSignal() {
     );
     if (historyItem) {
         historyItem.status = 'skipped';
+        
+        // Sync to backend (non-blocking)
+        syncSignalHistoryRecord(historyItem);
     }
     
     saveSignalState();
@@ -5737,7 +5822,380 @@ function saveSignalSettings() {
     updateSignalStats();
     updateSignalHomeCard();
     
+    // Reschedule notifications with new settings
+    rescheduleSignalNotifications();
+    
+    // Sync to backend (non-blocking)
+    syncSignalSettingsToBackend();
+    
     showToast('Settings saved', 'success');
+}
+
+// ============================================
+// SIGNAL BACKEND SYNC
+// ============================================
+
+// Sync signal settings to backend
+async function syncSignalSettingsToBackend() {
+    if (!state.currentUser) return;
+    
+    const s = signalState.settings;
+    
+    try {
+        const response = await fetch(`${API_URL}?action=saveSignalSettings`, {
+            method: 'POST',
+            body: JSON.stringify({
+                userId: state.currentUser.user_id,
+                signalsPerDay: s.signalsPerDay,
+                windowStart: s.windowStart,
+                windowEnd: s.windowEnd,
+                categoriesEnabled: s.categoriesEnabled,
+                categoryRatios: s.categoryRatios,
+                categoryOrder: s.categoryOrder,
+                categoryIndex: s.categoryIndex,
+                notificationsEnabled: s.notificationsEnabled
+            })
+        });
+        
+        const result = await response.json();
+        if (!result.success) {
+            console.warn('Failed to sync signal settings:', result.error);
+        } else {
+            console.log('Signal settings synced to backend');
+        }
+    } catch (error) {
+        console.warn('Error syncing signal settings:', error);
+    }
+}
+
+// Load signal settings from backend
+async function loadSignalSettingsFromBackend() {
+    if (!state.currentUser) return;
+    
+    try {
+        const response = await fetch(`${API_URL}?action=getSignalSettings&userId=${state.currentUser.user_id}`);
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            const data = result.data;
+            
+            // Merge with current settings (backend takes precedence for shared fields)
+            if (data.signalsPerDay) signalState.settings.signalsPerDay = data.signalsPerDay;
+            if (data.windowStart) signalState.settings.windowStart = data.windowStart;
+            if (data.windowEnd) signalState.settings.windowEnd = data.windowEnd;
+            if (data.categoriesEnabled) signalState.settings.categoriesEnabled = data.categoriesEnabled;
+            if (data.categoryRatios) signalState.settings.categoryRatios = data.categoryRatios;
+            if (data.categoryOrder) signalState.settings.categoryOrder = data.categoryOrder;
+            if (data.categoryIndex) signalState.settings.categoryIndex = data.categoryIndex;
+            if (typeof data.notificationsEnabled === 'boolean') {
+                signalState.settings.notificationsEnabled = data.notificationsEnabled;
+            }
+            
+            saveSignalState();
+            console.log('Signal settings loaded from backend');
+        }
+    } catch (error) {
+        console.warn('Error loading signal settings from backend:', error);
+    }
+}
+
+// Sync single history record to backend
+async function syncSignalHistoryRecord(record) {
+    if (!state.currentUser) return;
+    
+    try {
+        const response = await fetch(`${API_URL}?action=saveSignalHistory`, {
+            method: 'POST',
+            body: JSON.stringify({
+                recordId: record.id,
+                lessonId: record.lessonId,
+                userId: state.currentUser.user_id,
+                category: record.category,
+                status: record.status,
+                isFavorite: record.isFavorite,
+                rating: record.rating,
+                shownAt: record.shownAt,
+                completedAt: record.completedAt
+            })
+        });
+        
+        const result = await response.json();
+        if (!result.success) {
+            console.warn('Failed to sync history record:', result.error);
+        }
+    } catch (error) {
+        console.warn('Error syncing history record:', error);
+    }
+}
+
+// Load signal history from backend
+async function loadSignalHistoryFromBackend() {
+    if (!state.currentUser) return;
+    
+    try {
+        const response = await fetch(`${API_URL}?action=getSignalHistory&userId=${state.currentUser.user_id}&limit=100`);
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            // Merge with local history
+            const backendRecords = result.data;
+            const localIds = new Set(signalState.history.map(h => h.id));
+            
+            // Add any records from backend not in local
+            for (const record of backendRecords) {
+                if (!localIds.has(record.record_id)) {
+                    signalState.history.push({
+                        id: record.record_id,
+                        lessonId: record.lesson_id,
+                        category: record.category,
+                        status: record.status,
+                        isFavorite: record.is_favorite,
+                        rating: record.rating,
+                        shownAt: record.shown_at,
+                        completedAt: record.completed_at
+                    });
+                }
+            }
+            
+            // Update local records with backend state (for favorites etc)
+            for (const backendRecord of backendRecords) {
+                const localRecord = signalState.history.find(h => h.id === backendRecord.record_id);
+                if (localRecord) {
+                    localRecord.isFavorite = backendRecord.is_favorite;
+                    localRecord.rating = backendRecord.rating;
+                    localRecord.status = backendRecord.status;
+                }
+            }
+            
+            saveSignalState();
+            console.log('Signal history loaded from backend:', backendRecords.length, 'records');
+        }
+    } catch (error) {
+        console.warn('Error loading signal history from backend:', error);
+    }
+}
+
+// Full signal sync (called on init and user change)
+async function syncSignalDataWithBackend() {
+    await Promise.all([
+        loadSignalSettingsFromBackend(),
+        loadSignalHistoryFromBackend()
+    ]);
+    
+    // Update UI after sync
+    updateSignalView();
+    updateSignalSettingsView();
+    updateSignalHistory();
+    recalculateSignalStats();
+}
+
+// ============================================
+// SIGNAL NOTIFICATIONS
+// ============================================
+
+// Notification state
+const signalNotificationState = {
+    scheduledTimes: [],      // Scheduled notification times for today
+    lastNotificationDate: null,
+    snoozeUntil: null,       // If user clicked "Later", snooze for 30 mins
+    isShowing: false
+};
+
+// Initialize notification scheduling
+function initSignalNotifications() {
+    // Load state from localStorage
+    const saved = localStorage.getItem('signalNotificationState');
+    if (saved) {
+        const parsed = JSON.parse(saved);
+        Object.assign(signalNotificationState, parsed);
+    }
+    
+    // Check if we need to schedule for today
+    const today = new Date().toDateString();
+    if (signalNotificationState.lastNotificationDate !== today) {
+        scheduleSignalNotifications();
+    }
+    
+    // Start checking for notifications
+    checkForSignalNotification();
+    setInterval(checkForSignalNotification, 60000); // Check every minute
+}
+
+// Schedule notifications for today based on settings
+function scheduleSignalNotifications() {
+    const s = signalState.settings;
+    
+    if (!s.notificationsEnabled || s.categoriesEnabled.length === 0) {
+        signalNotificationState.scheduledTimes = [];
+        return;
+    }
+    
+    const now = new Date();
+    const today = now.toDateString();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    // Calculate time window
+    const startHour = s.windowStart;
+    const endHour = s.windowEnd;
+    const windowMinutes = (endHour - startHour) * 60;
+    
+    if (windowMinutes <= 0) {
+        signalNotificationState.scheduledTimes = [];
+        return;
+    }
+    
+    // Generate random times within window
+    const times = [];
+    const signalsToSchedule = s.signalsPerDay - signalState.stats.todayCount;
+    
+    for (let i = 0; i < signalsToSchedule; i++) {
+        // Random minute within window
+        const randomMinute = Math.floor(Math.random() * windowMinutes);
+        const scheduledHour = startHour + Math.floor(randomMinute / 60);
+        const scheduledMinute = randomMinute % 60;
+        
+        // Only schedule if it's in the future
+        if (scheduledHour > currentHour || 
+            (scheduledHour === currentHour && scheduledMinute > currentMinute)) {
+            times.push({
+                hour: scheduledHour,
+                minute: scheduledMinute,
+                triggered: false
+            });
+        }
+    }
+    
+    // Sort by time
+    times.sort((a, b) => (a.hour * 60 + a.minute) - (b.hour * 60 + b.minute));
+    
+    signalNotificationState.scheduledTimes = times;
+    signalNotificationState.lastNotificationDate = today;
+    signalNotificationState.snoozeUntil = null;
+    
+    saveSignalNotificationState();
+    
+    console.log('Scheduled signal notifications:', times);
+}
+
+// Check if it's time to show a notification
+function checkForSignalNotification() {
+    const s = signalState.settings;
+    
+    // Skip if notifications disabled
+    if (!s.notificationsEnabled) return;
+    
+    // Skip if already showing
+    if (signalNotificationState.isShowing) return;
+    
+    // Skip if currently in a signal
+    if (signalState.currentSignal) return;
+    
+    // Check snooze
+    if (signalNotificationState.snoozeUntil) {
+        if (Date.now() < signalNotificationState.snoozeUntil) {
+            return;
+        }
+        signalNotificationState.snoozeUntil = null;
+    }
+    
+    // Check if any scheduled notification is due
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    for (const scheduled of signalNotificationState.scheduledTimes) {
+        if (scheduled.triggered) continue;
+        
+        if (scheduled.hour < currentHour || 
+            (scheduled.hour === currentHour && scheduled.minute <= currentMinute)) {
+            // Time to show notification!
+            scheduled.triggered = true;
+            saveSignalNotificationState();
+            showSignalNotification();
+            return;
+        }
+    }
+}
+
+// Show the notification banner
+function showSignalNotification() {
+    const banner = document.getElementById('signalNotificationBanner');
+    if (!banner) return;
+    
+    signalNotificationState.isShowing = true;
+    
+    // Show banner with animation
+    banner.classList.remove('hidden');
+    requestAnimationFrame(() => {
+        banner.classList.add('visible');
+    });
+    
+    // Also try native notification if permission granted
+    if (Notification.permission === 'granted') {
+        try {
+            const notification = new Notification('Daily Signal', {
+                body: 'Time for a moment of insight',
+                icon: 'icons/icon.svg',
+                tag: 'signal-notification',
+                requireInteraction: true
+            });
+            
+            notification.onclick = () => {
+                window.focus();
+                dismissSignalNotification('now');
+                notification.close();
+            };
+        } catch (e) {
+            console.log('Native notification failed:', e);
+        }
+    }
+}
+
+// Hide the notification banner
+function hideSignalNotification() {
+    const banner = document.getElementById('signalNotificationBanner');
+    if (!banner) return;
+    
+    banner.classList.remove('visible');
+    setTimeout(() => {
+        banner.classList.add('hidden');
+        signalNotificationState.isShowing = false;
+    }, 400);
+}
+
+// Handle notification action
+function dismissSignalNotification(action) {
+    hideSignalNotification();
+    
+    if (action === 'now') {
+        // Go to signal and get a random one
+        showView('signal');
+        setTimeout(() => {
+            getRandomSignal();
+        }, 300);
+    } else if (action === 'later') {
+        // Snooze for 30 minutes
+        signalNotificationState.snoozeUntil = Date.now() + (30 * 60 * 1000);
+        saveSignalNotificationState();
+        showToast('Reminder in 30 minutes', 'success');
+    }
+}
+
+// Save notification state
+function saveSignalNotificationState() {
+    localStorage.setItem('signalNotificationState', JSON.stringify({
+        scheduledTimes: signalNotificationState.scheduledTimes,
+        lastNotificationDate: signalNotificationState.lastNotificationDate,
+        snoozeUntil: signalNotificationState.snoozeUntil
+    }));
+}
+
+// Reschedule when settings change or signal completed
+function rescheduleSignalNotifications() {
+    // Reset for today
+    signalNotificationState.lastNotificationDate = null;
+    scheduleSignalNotifications();
 }
 
 // ============================================
