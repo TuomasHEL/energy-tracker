@@ -4734,7 +4734,10 @@ async function fetchSignalLessonsFromGitHub() {
                 continue;
             }
             
-            const markdown = await response.text();
+            let markdown = await response.text();
+            // Normalize line endings (Windows/Mac -> Unix)
+            markdown = markdown.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            
             const lessons = parseMarkdownLessons(markdown, category);
             
             if (lessons.length > 0) {
@@ -4787,6 +4790,15 @@ function parseMarkdownLessons(markdown, category) {
         const section = sections[i].trim();
         if (!section) continue;
         
+        // Skip TOC and header sections
+        if (section.includes('Table of Contents') || 
+            section.includes('## Table of') ||
+            section.match(/^#\s*Your Title/i) ||
+            section.match(/^\*Source:/m)) {
+            console.log(`Skipping TOC/header section ${i}`);
+            continue;
+        }
+        
         // Extract title from ### Lesson N: Title format (anywhere in section)
         const titleMatch = section.match(/###\s*Lesson\s*(\d+):\s*(.+?)(?:\n|$)/i);
         
@@ -4813,9 +4825,12 @@ function parseMarkdownLessons(markdown, category) {
             // Fallback: Try to extract any heading (for non-standard formats)
             const headingMatch = section.match(/^#+\s*(.+?)(?:\n|$)/m);
             if (headingMatch) {
-                const title = headingMatch[1].trim();
-                // Skip part/section headers
-                if (title.toLowerCase().startsWith('part ') || title.toLowerCase().includes('section')) {
+                const title = headingMatch[1].trim().toLowerCase();
+                // Skip part/section/toc headers
+                if (title.startsWith('part ') || 
+                    title.includes('section') ||
+                    title.includes('table of contents') ||
+                    title.includes('your title')) {
                     continue;
                 }
                 const contentStart = section.indexOf('\n', headingMatch.index) + 1;
@@ -4828,7 +4843,7 @@ function parseMarkdownLessons(markdown, category) {
                 lessons.push({
                     id: `${category}-${i + 1}`,
                     number: i + 1,
-                    title: title,
+                    title: headingMatch[1].trim(),
                     content: content
                 });
             }
@@ -5221,7 +5236,14 @@ function displaySignal(lesson, category) {
     signalState.currentRating = null;
     
     // Parse content into steps (title + paragraphs)
-    const paragraphs = lesson.content.split('\n\n').filter(p => p.trim());
+    // Normalize line endings and split by double newlines (handles \r\n, multiple spaces, etc.)
+    const normalizedContent = lesson.content
+        .replace(/\r\n/g, '\n')     // Windows -> Unix
+        .replace(/\r/g, '\n')       // Old Mac -> Unix
+        .replace(/\n{3,}/g, '\n\n'); // Collapse multiple newlines
+    
+    const paragraphs = normalizedContent.split(/\n\n+/).filter(p => p.trim());
+    
     signalState.steps = [
         { type: 'title', content: lesson.title },
         ...paragraphs.map(p => ({ type: 'paragraph', content: p.trim() }))
