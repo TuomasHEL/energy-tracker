@@ -720,6 +720,54 @@ function restorePlaylistState() {
         let currentIndex = data.currentIndex || 0;
         let itemEndTime = data.itemEndTime ? new Date(data.itemEndTime) : null;
         
+        // Helper function to update the playlist runner UI
+        const updatePlaylistRunnerUI = (items, currentIdx, remaining, isPaused) => {
+            const currentItem = items[currentIdx];
+            
+            // Show correct view and panel
+            showView('timer');
+            document.getElementById('timerSetup')?.classList.add('hidden');
+            document.getElementById('timerActive')?.classList.add('hidden');
+            document.getElementById('playlistsList')?.classList.add('hidden');
+            document.getElementById('playlistRunner')?.classList.remove('hidden');
+            
+            // Program name and progress
+            document.getElementById('runningPlaylistName').textContent = data.playlistName || 'Program';
+            document.getElementById('runnerTotalItems').textContent = items.length;
+            document.getElementById('runnerCurrentItem').textContent = currentIdx + 1;
+            
+            // Current item info
+            document.getElementById('runnerItemName').textContent = currentItem?.name || 'Item';
+            
+            // Build item info text
+            let infoText = '';
+            if (currentItem?.transmission) infoText += currentItem.transmission;
+            if (currentItem?.intensity && currentItem.intensity !== 'medium') {
+                infoText += infoText ? ` • ${capitalize(currentItem.intensity)}` : capitalize(currentItem.intensity);
+            }
+            if (currentItem?.customNote) {
+                infoText += infoText ? ` • ${currentItem.customNote}` : currentItem.customNote;
+            }
+            document.getElementById('runnerItemInfo').textContent = infoText;
+            
+            // Render queue of remaining items
+            const queue = items.slice(currentIdx + 1);
+            document.getElementById('runnerQueue').innerHTML = queue.map(q => `
+                <div class="runner-queue-item">
+                    <span>${q.name}</span>
+                    <span>${q.duration}m</span>
+                </div>
+            `).join('');
+            
+            // Update pause button state
+            const pauseBtn = document.getElementById('playlistPauseBtn');
+            if (isPaused) {
+                pauseBtn.innerHTML = '<span class="btn-icon">▶</span> Resume';
+            } else {
+                pauseBtn.innerHTML = '<span class="btn-icon">⏸</span> Pause';
+            }
+        };
+        
         // If paused, restore paused state
         if (data.isPaused) {
             state.playlistRunner.isRunning = true;
@@ -730,21 +778,9 @@ function restorePlaylistState() {
             state.playlistRunner.pausedAt = data.pausedAt ? new Date(data.pausedAt) : new Date();
             state.playlistRunner.playlist = { playlist_id: data.playlistId, name: data.playlistName || 'Program' };
             
-            // Update UI
-            showView('timer');
-            document.getElementById('timerSetup').classList.add('hidden');
-            document.getElementById('timerActive').classList.remove('hidden');
-            
-            const currentItem = data.items[currentIndex];
-            document.getElementById('timerTargetName').textContent = currentItem?.name || 'Program Item';
-            document.getElementById('timerEnergyType').textContent = currentItem?.transmission || '—';
-            document.getElementById('timerIntensity').textContent = capitalize(currentItem?.intensity || 'medium');
-            document.getElementById('timerNotesDisplay').textContent = currentItem?.customNote || '';
-            
+            updatePlaylistRunnerUI(data.items, currentIndex, data.itemRemaining, true);
             updatePlaylistItemTimer();
-            
-            const pauseBtn = document.getElementById('pauseBtn');
-            pauseBtn.innerHTML = '<span class="btn-icon">▶</span> Resume';
+            updateHeaderLogo();
             
             showToast('Paused program restored', 'success');
             return;
@@ -841,22 +877,13 @@ function restorePlaylistState() {
         state.playlistRunner.itemEndTime = new Date(now.getTime() + remainingSeconds * 1000);
         state.playlistRunner.playlist = { playlist_id: data.playlistId, name: data.playlistName || 'Program' };
         
-        // Update UI
-        showView('timer');
-        document.getElementById('timerSetup').classList.add('hidden');
-        document.getElementById('timerActive').classList.remove('hidden');
-        
-        document.getElementById('timerTargetName').textContent = currentItem.name || 'Program Item';
-        document.getElementById('timerEnergyType').textContent = currentItem.transmission || '—';
-        document.getElementById('timerIntensity').textContent = capitalize(currentItem.intensity || 'medium');
-        document.getElementById('timerNotesDisplay').textContent = currentItem.customNote || '';
-        
-        // Start the timer
+        // Update UI with correct playlist runner elements
+        updatePlaylistRunnerUI(data.items, currentIndex, remainingSeconds, false);
         updatePlaylistItemTimer();
-        state.playlistRunner.itemTimer = setInterval(playlistTimerTick, 1000);
+        updateHeaderLogo();
         
-        // Update progress display
-        updatePlaylistTotal(); updatePlaylistItemTimer();
+        // Start the timer interval
+        state.playlistRunner.itemTimer = setInterval(playlistTimerTick, 1000);
         
         const remainingMin = Math.ceil(remainingSeconds / 60);
         showToast(`Program restored: ${currentIndex + 1}/${data.items.length} (${remainingMin}m left)`, 'success');
