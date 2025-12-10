@@ -692,6 +692,7 @@ function savePlaylistState() {
             isRunning: true,
             isPaused: state.playlistRunner.isPaused,
             playlistId: state.playlistRunner.playlist?.playlist_id,
+            playlistName: state.playlistRunner.playlist?.name || 'Program',
             items: state.playlistRunner.items,
             currentIndex: state.playlistRunner.currentIndex,
             itemEndTime: state.playlistRunner.itemEndTime?.toISOString(),
@@ -710,13 +711,160 @@ function restorePlaylistState() {
     
     try {
         const data = JSON.parse(saved);
-        if (!data.isRunning) {
+        if (!data.isRunning || !data.items || data.items.length === 0) {
             localStorage.removeItem('playlistState');
             return;
         }
-        // For simplicity, we don't fully restore playlists across refreshes
-        localStorage.removeItem('playlistState');
+        
+        const now = new Date();
+        let currentIndex = data.currentIndex || 0;
+        let itemEndTime = data.itemEndTime ? new Date(data.itemEndTime) : null;
+        
+        // If paused, restore paused state
+        if (data.isPaused) {
+            state.playlistRunner.isRunning = true;
+            state.playlistRunner.isPaused = true;
+            state.playlistRunner.items = data.items;
+            state.playlistRunner.currentIndex = currentIndex;
+            state.playlistRunner.itemRemaining = data.itemRemaining;
+            state.playlistRunner.pausedAt = data.pausedAt ? new Date(data.pausedAt) : new Date();
+            state.playlistRunner.playlist = { playlist_id: data.playlistId, name: data.playlistName || 'Program' };
+            
+            // Update UI
+            showView('timer');
+            document.getElementById('timerSetup').classList.add('hidden');
+            document.getElementById('timerActive').classList.remove('hidden');
+            
+            const currentItem = data.items[currentIndex];
+            document.getElementById('timerTargetName').textContent = currentItem?.name || 'Program Item';
+            document.getElementById('timerEnergyType').textContent = currentItem?.transmission || '—';
+            document.getElementById('timerIntensity').textContent = capitalize(currentItem?.intensity || 'medium');
+            document.getElementById('timerNotesDisplay').textContent = currentItem?.customNote || '';
+            
+            updatePlaylistItemTimer();
+            
+            const pauseBtn = document.getElementById('pauseBtn');
+            pauseBtn.innerHTML = '<span class="btn-icon">▶</span> Resume';
+            
+            showToast('Paused program restored', 'success');
+            return;
+        }
+        
+        // Not paused - calculate where we should be based on elapsed time
+        if (!itemEndTime) {
+            localStorage.removeItem('playlistState');
+            return;
+        }
+        
+        // Check if current item has elapsed and skip through completed items
+        let elapsedSinceEnd = Math.round((now - itemEndTime) / 1000);
+        
+        if (elapsedSinceEnd > 0) {
+            // Current item elapsed, need to skip forward
+            console.log('Playlist item(s) elapsed while app was closed, catching up...');
+            
+            // Save the completed item
+            const completedItem = data.items[currentIndex];
+            if (state.currentUser && completedItem) {
+                apiCall('saveSession', {
+                    userId: state.currentUser.user_id,
+                    markerId: completedItem.marker_id !== 'custom' ? completedItem.marker_id : '',
+                    startTime: new Date(itemEndTime.getTime() - completedItem.duration * 60 * 1000).toISOString(),
+                    endTime: itemEndTime.toISOString(),
+                    durationMinutes: completedItem.duration,
+                    energyType: completedItem.transmission || '',
+                    intensity: completedItem.intensity || 'medium',
+                    notes: `Program (auto-completed)${completedItem.customNote ? ' - ' + completedItem.customNote : ''}`
+                }).catch(e => console.error('Failed to save completed item:', e));
+            }
+            
+            currentIndex++;
+            
+            // Skip through any items that fully elapsed
+            while (currentIndex < data.items.length) {
+                const nextItem = data.items[currentIndex];
+                const nextDurationSec = nextItem.duration * 60;
+                
+                if (elapsedSinceEnd >= nextDurationSec) {
+                    // This item also fully elapsed
+                    console.log('Skipping fully elapsed item:', currentIndex);
+                    
+                    if (state.currentUser) {
+                        apiCall('saveSession', {
+                            userId: state.currentUser.user_id,
+                            markerId: nextItem.marker_id !== 'custom' ? nextItem.marker_id : '',
+                            startTime: new Date(now.getTime() - elapsedSinceEnd * 1000).toISOString(),
+                            endTime: new Date(now.getTime() - (elapsedSinceEnd - nextDurationSec) * 1000).toISOString(),
+                            durationMinutes: nextItem.duration,
+                            energyType: nextItem.transmission || '',
+                            intensity: nextItem.intensity || 'medium',
+                            notes: `Program (auto-completed)${nextItem.customNote ? ' - ' + nextItem.customNote : ''}`
+                        }).catch(e => console.error('Failed to save skipped item:', e));
+                    }
+                    
+                    elapsedSinceEnd -= nextDurationSec;
+                    currentIndex++;
+                } else {
+                    // This item is partially elapsed
+                    break;
+                }
+            }
+        }
+        
+        // Check if playlist completed while app was closed
+        if (currentIndex >= data.items.length) {
+            localStorage.removeItem('playlistState');
+            showToast('Program completed while away!', 'success');
+            playCompletionSound();
+            vibrate([200, 100, 200, 100, 300]);
+            return;
+        }
+        
+        // Resume with current item (possibly with reduced time)
+        const currentItem = data.items[currentIndex];
+        let remainingSeconds = currentItem.duration * 60;
+        
+        if (elapsedSinceEnd > 0) {
+            // This item was partially elapsed
+            remainingSeconds = Math.max(1, currentItem.duration * 60 - elapsedSinceEnd);
+        } else if (itemEndTime > now) {
+            // Item hasn't ended yet
+            remainingSeconds = Math.round((itemEndTime - now) / 1000);
+        }
+        
+        // Set up the runner state
+        state.playlistRunner.isRunning = true;
+        state.playlistRunner.isPaused = false;
+        state.playlistRunner.items = data.items;
+        state.playlistRunner.currentIndex = currentIndex;
+        state.playlistRunner.itemRemaining = remainingSeconds;
+        state.playlistRunner.itemEndTime = new Date(now.getTime() + remainingSeconds * 1000);
+        state.playlistRunner.playlist = { playlist_id: data.playlistId, name: data.playlistName || 'Program' };
+        
+        // Update UI
+        showView('timer');
+        document.getElementById('timerSetup').classList.add('hidden');
+        document.getElementById('timerActive').classList.remove('hidden');
+        
+        document.getElementById('timerTargetName').textContent = currentItem.name || 'Program Item';
+        document.getElementById('timerEnergyType').textContent = currentItem.transmission || '—';
+        document.getElementById('timerIntensity').textContent = capitalize(currentItem.intensity || 'medium');
+        document.getElementById('timerNotesDisplay').textContent = currentItem.customNote || '';
+        
+        // Start the timer
+        updatePlaylistItemTimer();
+        state.playlistRunner.itemTimer = setInterval(playlistTimerTick, 1000);
+        
+        // Update progress display
+        updatePlaylistTotal(); updatePlaylistItemTimer();
+        
+        const remainingMin = Math.ceil(remainingSeconds / 60);
+        showToast(`Program restored: ${currentIndex + 1}/${data.items.length} (${remainingMin}m left)`, 'success');
+        
+        console.log(`Playlist restored: item ${currentIndex + 1}/${data.items.length}, ${remainingSeconds}s remaining`);
+        
     } catch (error) {
+        console.error('Error restoring playlist:', error);
         localStorage.removeItem('playlistState');
     }
 }
@@ -884,21 +1032,30 @@ function startPlaylistInterval() {
         clearInterval(runner.itemTimer);
     }
     
-    runner.itemTimer = setInterval(() => {
-        if (runner.isPaused) return;
-        
-        const now = new Date();
-        runner.itemRemaining = Math.max(0, Math.round((runner.itemEndTime - now) / 1000));
-        
-        updatePlaylistItemTimer();
-        
-        if (runner.itemRemaining <= 0) {
-            clearInterval(runner.itemTimer);
-            playCompletionSound();
-            vibrate([100, 50, 100]);
-            nextPlaylistItem();
-        }
-    }, 1000);
+    runner.itemTimer = setInterval(playlistTimerTick, 1000);
+}
+
+// Playlist timer tick - called every second
+function playlistTimerTick() {
+    const runner = state.playlistRunner;
+    if (!runner.isRunning || runner.isPaused) return;
+    
+    const now = new Date();
+    runner.itemRemaining = Math.max(0, Math.round((runner.itemEndTime - now) / 1000));
+    
+    updatePlaylistItemTimer();
+    
+    // Save state periodically (every 30 seconds) for safety
+    if (runner.itemRemaining % 30 === 0) {
+        savePlaylistState();
+    }
+    
+    if (runner.itemRemaining <= 0) {
+        clearInterval(runner.itemTimer);
+        playCompletionSound();
+        vibrate([100, 50, 100]);
+        nextPlaylistItem();
+    }
 }
 
 // ============================================
@@ -2081,6 +2238,11 @@ function timerTick() {
     state.timer.remaining = Math.max(0, Math.round((state.timer.endTime - now) / 1000));
     
     updateTimerDisplay();
+    
+    // Save state periodically (every 30 seconds) for safety
+    if (state.timer.remaining % 30 === 0) {
+        saveTimerState();
+    }
     
     if (state.timer.remaining <= 0) {
         endTimer(true);
