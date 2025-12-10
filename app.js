@@ -286,6 +286,9 @@ async function init() {
         // Initialize signal notifications
         initSignalNotifications();
         
+        // Initialize habit tracker
+        initHabitTracker();
+        
         console.log('App init completed successfully');
         
     } catch (error) {
@@ -1367,6 +1370,12 @@ function showView(viewName) {
             case 'signalSettings':
                 updateSignalSettingsView();
                 break;
+            case 'habits':
+                updateHabitsView();
+                break;
+            case 'habitSettings':
+                updateHabitSettingsView();
+                break;
         }
     } catch (error) {
         console.error('Error in showView:', error);
@@ -1471,6 +1480,9 @@ function updateStats() {
     
     // Update signal stats
     updateSignalStatsDisplay();
+    
+    // Update habit stats
+    updateHabitStats();
 }
 
 function updateSignalStatsDisplay() {
@@ -2366,6 +2378,9 @@ async function endTimer(completed = false) {
             showToast(message, 'success');
             updateDashboard();
             saveToCache(); // Keep cache in sync
+            
+            // Mark energy work habit as completed
+            markEnergyWorkHabit();
             
         } catch (error) {
             showToast('Failed to save session', 'error');
@@ -4835,6 +4850,448 @@ function animate() {
 }
 
 // ============================================
+// HABIT TRACKER FEATURE
+// ============================================
+
+// Default habits configuration
+const DEFAULT_HABITS = [
+    { id: 'energy-work', name: 'Energy Work', icon: '⚡', autoTracked: true, enabled: true },
+    { id: 'meditation', name: 'Meditation', icon: '🧘', autoTracked: false, enabled: true },
+    { id: 'nature', name: 'Time in Nature', icon: '🌿', autoTracked: false, enabled: true },
+    { id: 'gratitude', name: 'Gratitude', icon: '🙏', autoTracked: false, enabled: true },
+    { id: 'signal', name: 'Signal', icon: '📡', autoTracked: true, enabled: true },
+    { id: 'intentions', name: 'Intentions', icon: '🎯', autoTracked: false, enabled: true }
+];
+
+// Habit state
+let habitState = {
+    habits: [],           // All habits (default + custom)
+    completions: {},      // { date: { habitId: true/false } }
+    stats: {
+        currentStreak: 0,
+        longestStreak: 0,
+        totalCompletions: {}  // { habitId: count }
+    }
+};
+
+// Initialize habit tracker
+function initHabitTracker() {
+    loadHabitState();
+    updateHabitsView();
+    updateHabitHomeCard();
+}
+
+// Load habit state from localStorage
+function loadHabitState() {
+    const saved = localStorage.getItem('habitState');
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            habitState = {
+                ...habitState,
+                ...parsed,
+                habits: parsed.habits || [...DEFAULT_HABITS]
+            };
+        } catch (e) {
+            console.error('Error loading habit state:', e);
+            habitState.habits = [...DEFAULT_HABITS];
+        }
+    } else {
+        habitState.habits = [...DEFAULT_HABITS];
+    }
+    
+    // Ensure all default habits exist (in case new ones were added)
+    DEFAULT_HABITS.forEach(defaultHabit => {
+        const exists = habitState.habits.find(h => h.id === defaultHabit.id);
+        if (!exists) {
+            habitState.habits.push({ ...defaultHabit });
+        }
+    });
+    
+    // Initialize completions for today if not exists
+    const today = getTodayDateString();
+    if (!habitState.completions[today]) {
+        habitState.completions[today] = {};
+    }
+    
+    // Check auto-tracked habits for today
+    checkAutoTrackedHabits();
+}
+
+// Save habit state to localStorage
+function saveHabitState() {
+    localStorage.setItem('habitState', JSON.stringify(habitState));
+}
+
+// Get today's date string (YYYY-MM-DD)
+function getTodayDateString() {
+    return new Date().toISOString().split('T')[0];
+}
+
+// Check and update auto-tracked habits based on app activity
+function checkAutoTrackedHabits() {
+    const today = getTodayDateString();
+    
+    // Check for energy work sessions today
+    if (state.sessions) {
+        const todaySessions = state.sessions.filter(s => {
+            const sessionDate = new Date(s.start_time).toISOString().split('T')[0];
+            return sessionDate === today;
+        });
+        if (todaySessions.length > 0) {
+            habitState.completions[today]['energy-work'] = true;
+        }
+    }
+    
+    // Check for signal completions today
+    if (typeof signalState !== 'undefined' && signalState.stats) {
+        if (signalState.stats.todayCount > 0) {
+            habitState.completions[today]['signal'] = true;
+        }
+    }
+    
+    saveHabitState();
+}
+
+// Mark habit as completed when session is saved (called from saveSession)
+function markEnergyWorkHabit() {
+    const today = getTodayDateString();
+    if (!habitState.completions[today]) {
+        habitState.completions[today] = {};
+    }
+    habitState.completions[today]['energy-work'] = true;
+    saveHabitState();
+    updateHabitsView();
+    updateHabitHomeCard();
+}
+
+// Mark signal habit as completed (called from Signal feature)
+function markSignalHabit() {
+    const today = getTodayDateString();
+    if (!habitState.completions[today]) {
+        habitState.completions[today] = {};
+    }
+    habitState.completions[today]['signal'] = true;
+    saveHabitState();
+    updateHabitsView();
+    updateHabitHomeCard();
+}
+
+// Toggle habit completion
+function toggleHabit(habitId) {
+    const today = getTodayDateString();
+    if (!habitState.completions[today]) {
+        habitState.completions[today] = {};
+    }
+    
+    // Check if habit is auto-tracked and completed - don't allow manual unchecking
+    const habit = habitState.habits.find(h => h.id === habitId);
+    if (habit && habit.autoTracked && habitState.completions[today][habitId]) {
+        showToast('This habit is automatically tracked', 'info');
+        return;
+    }
+    
+    habitState.completions[today][habitId] = !habitState.completions[today][habitId];
+    saveHabitState();
+    
+    // Update UI
+    updateHabitsView();
+    updateHabitHomeCard();
+    
+    // Provide feedback
+    if (habitState.completions[today][habitId]) {
+        showToast(`${habit?.name || 'Habit'} completed! ✓`, 'success');
+    }
+}
+
+// Update the habits view
+function updateHabitsView() {
+    const grid = document.getElementById('habitsGrid');
+    if (!grid) return;
+    
+    const today = getTodayDateString();
+    const todayCompletions = habitState.completions[today] || {};
+    
+    // Filter enabled habits only
+    const enabledHabits = habitState.habits.filter(h => h.enabled);
+    
+    if (enabledHabits.length === 0) {
+        grid.innerHTML = `
+            <div class="habits-empty" style="grid-column: span 2;">
+                <p>No habits enabled</p>
+                <button class="btn secondary" onclick="showView('habitSettings')">Configure Habits</button>
+            </div>
+        `;
+        return;
+    }
+    
+    grid.innerHTML = enabledHabits.map(habit => {
+        const isCompleted = todayCompletions[habit.id] || false;
+        const autoClass = habit.autoTracked ? 'auto-tracked' : '';
+        const completedClass = isCompleted ? 'completed' : '';
+        
+        return `
+            <div class="habit-card ${completedClass} ${autoClass}" onclick="toggleHabit('${habit.id}')">
+                <div class="habit-check">${isCompleted ? '✓' : ''}</div>
+                <div class="habit-icon">${habit.icon}</div>
+                <div class="habit-name">${habit.name}</div>
+            </div>
+        `;
+    }).join('');
+    
+    // Update date display
+    const dateEl = document.getElementById('habitsCurrentDate');
+    if (dateEl) {
+        const now = new Date();
+        dateEl.textContent = now.toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+    }
+    
+    // Update summary
+    const completedCount = enabledHabits.filter(h => todayCompletions[h.id]).length;
+    document.getElementById('habitsCompletedCount').textContent = completedCount;
+    
+    // Calculate streak
+    const streak = calculateHabitStreak();
+    document.getElementById('habitsStreakCount').textContent = streak;
+    habitState.stats.currentStreak = streak;
+    if (streak > habitState.stats.longestStreak) {
+        habitState.stats.longestStreak = streak;
+    }
+    saveHabitState();
+}
+
+// Calculate current habit streak (all enabled habits completed)
+function calculateHabitStreak() {
+    const enabledHabits = habitState.habits.filter(h => h.enabled);
+    if (enabledHabits.length === 0) return 0;
+    
+    let streak = 0;
+    const today = new Date();
+    
+    // Check if all habits are completed today first
+    const todayStr = getTodayDateString();
+    const todayCompletions = habitState.completions[todayStr] || {};
+    const allCompletedToday = enabledHabits.every(h => todayCompletions[h.id]);
+    
+    // Start from yesterday if today isn't complete
+    let checkDate = new Date(today);
+    if (!allCompletedToday) {
+        checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+        streak = 1;
+        checkDate.setDate(checkDate.getDate() - 1);
+    }
+    
+    // Count consecutive days going backward
+    for (let i = 0; i < 365; i++) {
+        const dateStr = checkDate.toISOString().split('T')[0];
+        const completions = habitState.completions[dateStr] || {};
+        const allCompleted = enabledHabits.every(h => completions[h.id]);
+        
+        if (allCompleted) {
+            streak++;
+            checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+            break;
+        }
+    }
+    
+    return streak;
+}
+
+// Update habit home card
+function updateHabitHomeCard() {
+    const today = getTodayDateString();
+    const todayCompletions = habitState.completions[today] || {};
+    const enabledHabits = habitState.habits.filter(h => h.enabled);
+    
+    const completedCount = enabledHabits.filter(h => todayCompletions[h.id]).length;
+    const totalCount = enabledHabits.length;
+    
+    const progressEl = document.getElementById('habitTodayProgress');
+    if (progressEl) {
+        progressEl.textContent = `${completedCount} of ${totalCount} today`;
+    }
+    
+    const streakEl = document.getElementById('habitStreakDisplay');
+    if (streakEl) {
+        const streak = habitState.stats.currentStreak || 0;
+        streakEl.textContent = `🔥 ${streak} day streak`;
+    }
+}
+
+// Update habit settings view
+function updateHabitSettingsView() {
+    const list = document.getElementById('habitSettingsList');
+    if (!list) return;
+    
+    // Show default habits with toggle
+    const defaultHabits = habitState.habits.filter(h => 
+        DEFAULT_HABITS.find(d => d.id === h.id)
+    );
+    
+    list.innerHTML = defaultHabits.map(habit => `
+        <div class="habit-setting-row">
+            <div class="habit-setting-info">
+                <span class="habit-setting-icon">${habit.icon}</span>
+                <span class="habit-setting-name">${habit.name}</span>
+                ${habit.autoTracked ? '<span class="habit-setting-auto">Auto-tracked</span>' : ''}
+            </div>
+            <label class="toggle">
+                <input type="checkbox" ${habit.enabled ? 'checked' : ''} 
+                    onchange="toggleHabitEnabled('${habit.id}', this.checked)">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+    `).join('');
+    
+    // Show custom habits
+    const customList = document.getElementById('customHabitsList');
+    if (!customList) return;
+    
+    const customHabits = habitState.habits.filter(h => 
+        !DEFAULT_HABITS.find(d => d.id === h.id)
+    );
+    
+    if (customHabits.length === 0) {
+        customList.innerHTML = '<p class="settings-hint">No custom habits yet</p>';
+    } else {
+        customList.innerHTML = customHabits.map(habit => `
+            <div class="custom-habit-row">
+                <span class="custom-habit-name">${habit.icon} ${habit.name}</span>
+                <button class="custom-habit-delete" onclick="removeCustomHabit('${habit.id}')" title="Delete">×</button>
+            </div>
+        `).join('');
+    }
+}
+
+// Toggle habit enabled/disabled
+function toggleHabitEnabled(habitId, enabled) {
+    const habit = habitState.habits.find(h => h.id === habitId);
+    if (habit) {
+        habit.enabled = enabled;
+        saveHabitState();
+        updateHabitsView();
+        updateHabitHomeCard();
+    }
+}
+
+// Add custom habit
+function addCustomHabit() {
+    const input = document.getElementById('newHabitName');
+    const name = input.value.trim();
+    
+    if (!name) {
+        showToast('Please enter a habit name', 'error');
+        return;
+    }
+    
+    if (name.length > 30) {
+        showToast('Habit name too long (max 30 characters)', 'error');
+        return;
+    }
+    
+    // Generate unique ID
+    const id = 'custom-' + Date.now();
+    
+    // Add to habits list
+    habitState.habits.push({
+        id: id,
+        name: name,
+        icon: '⭐',  // Default icon for custom habits
+        autoTracked: false,
+        enabled: true
+    });
+    
+    saveHabitState();
+    input.value = '';
+    
+    updateHabitSettingsView();
+    updateHabitsView();
+    updateHabitHomeCard();
+    
+    showToast(`Added "${name}"`, 'success');
+}
+
+// Remove custom habit
+function removeCustomHabit(habitId) {
+    const habit = habitState.habits.find(h => h.id === habitId);
+    if (!habit) return;
+    
+    if (confirm(`Remove "${habit.name}"?`)) {
+        habitState.habits = habitState.habits.filter(h => h.id !== habitId);
+        saveHabitState();
+        
+        updateHabitSettingsView();
+        updateHabitsView();
+        updateHabitHomeCard();
+        
+        showToast(`Removed "${habit.name}"`, 'success');
+    }
+}
+
+// Update habit statistics in stats view
+function updateHabitStats() {
+    const grid = document.getElementById('habitStatsGrid');
+    if (!grid) return;
+    
+    const enabledHabits = habitState.habits.filter(h => h.enabled);
+    
+    // Calculate completion rate for each habit (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    let totalPossible = 0;
+    let totalCompleted = 0;
+    
+    grid.innerHTML = enabledHabits.map(habit => {
+        let completed = 0;
+        let possible = 0;
+        
+        for (let i = 0; i < 30; i++) {
+            const checkDate = new Date();
+            checkDate.setDate(checkDate.getDate() - i);
+            const dateStr = checkDate.toISOString().split('T')[0];
+            
+            // Only count days where we have any data (habit was enabled)
+            if (habitState.completions[dateStr]) {
+                possible++;
+                totalPossible++;
+                if (habitState.completions[dateStr][habit.id]) {
+                    completed++;
+                    totalCompleted++;
+                }
+            }
+        }
+        
+        const rate = possible > 0 ? Math.round((completed / possible) * 100) : 0;
+        
+        return `
+            <div class="habit-stat-item">
+                <span class="habit-stat-name">
+                    <span class="habit-stat-icon">${habit.icon}</span>
+                    ${habit.name}
+                </span>
+                <span class="habit-stat-value">${rate}%</span>
+            </div>
+        `;
+    }).join('');
+    
+    // Update summary stats
+    document.getElementById('statsHabitStreak').textContent = 
+        `${habitState.stats.currentStreak || 0} days`;
+    document.getElementById('statsHabitBestStreak').textContent = 
+        `${habitState.stats.longestStreak || 0} days`;
+    
+    const overallRate = totalPossible > 0 ? Math.round((totalCompleted / totalPossible) * 100) : 0;
+    document.getElementById('statsHabitCompletionRate').textContent = `${overallRate}%`;
+}
+
+// ============================================
 // SIGNAL FEATURE
 // ============================================
 
@@ -5756,6 +6213,9 @@ function completeSignal() {
     saveSignalState();
     updateSignalStats();
     updateSignalHomeCard();
+    
+    // Mark signal habit as completed
+    markSignalHabit();
     
     // Sync settings (for categoryIndex updates)
     syncSignalSettingsToBackend();

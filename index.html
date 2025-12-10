@@ -103,6 +103,19 @@
                     </div>
                     <div class="signal-home-arrow">→</div>
                 </div>
+
+                <!-- Habit Tracker Card -->
+                <div class="habit-home-card" onclick="showView('habits')">
+                    <div class="habit-home-icon">✓</div>
+                    <div class="habit-home-content">
+                        <div class="habit-home-title">Daily Habits</div>
+                        <div class="habit-home-stats">
+                            <span id="habitTodayProgress">0 of 6 today</span>
+                            <span class="habit-streak" id="habitStreakDisplay">🔥 0 day streak</span>
+                        </div>
+                    </div>
+                    <div class="habit-home-arrow">→</div>
+                </div>
             </section>
 
             <!-- Signal View -->
@@ -276,6 +289,67 @@
                     <button class="signal-notification-btn primary" onclick="dismissSignalNotification('now')">Read Now</button>
                 </div>
             </div>
+
+            <!-- Habits View -->
+            <section id="viewHabits" class="view">
+                <div class="view-header">
+                    <h2>Daily Habits</h2>
+                </div>
+
+                <!-- Date Display -->
+                <div class="habits-date">
+                    <span id="habitsCurrentDate">Today</span>
+                </div>
+
+                <!-- Habits Grid -->
+                <div class="habits-grid" id="habitsGrid">
+                    <!-- Habits will be dynamically inserted here -->
+                </div>
+
+                <!-- Habits Summary -->
+                <div class="habits-summary">
+                    <div class="habits-summary-item">
+                        <span class="habits-summary-value" id="habitsCompletedCount">0</span>
+                        <span class="habits-summary-label">Completed</span>
+                    </div>
+                    <div class="habits-summary-item">
+                        <span class="habits-summary-value" id="habitsStreakCount">0</span>
+                        <span class="habits-summary-label">Day Streak</span>
+                    </div>
+                </div>
+
+                <!-- Quick Stats Link -->
+                <div class="habits-footer">
+                    <button class="btn secondary" onclick="showView('stats')">View Statistics</button>
+                </div>
+            </section>
+
+            <!-- Habit Settings View -->
+            <section id="viewHabitSettings" class="view">
+                <div class="view-header">
+                    <button class="back-btn" onclick="showView('settings')">←</button>
+                    <h2>Habit Tracker</h2>
+                </div>
+
+                <div class="habit-settings-section">
+                    <h3>Active Habits</h3>
+                    <p class="settings-hint">Toggle habits to show/hide in tracker</p>
+                    <div id="habitSettingsList" class="habit-settings-list">
+                        <!-- Habit toggles will be dynamically inserted here -->
+                    </div>
+                </div>
+
+                <div class="habit-settings-section">
+                    <h3>Custom Habits</h3>
+                    <div id="customHabitsList" class="custom-habits-list">
+                        <!-- Custom habits will be dynamically inserted here -->
+                    </div>
+                    <div class="add-habit-form">
+                        <input type="text" id="newHabitName" placeholder="New habit name..." maxlength="30">
+                        <button class="btn primary" onclick="addCustomHabit()">Add</button>
+                    </div>
+                </div>
+            </section>
 
             <!-- Track Progress View -->
             <section id="viewTrack" class="view">
@@ -752,6 +826,27 @@
                             </div>
                         </div>
                     </div>
+
+                    <div class="chart-card">
+                        <h3>Habit Tracker</h3>
+                        <div class="habit-stats-grid" id="habitStatsGrid">
+                            <!-- Habit stats will be dynamically inserted here -->
+                        </div>
+                        <div class="habit-stats-summary">
+                            <div class="habit-stat-row">
+                                <span>Current Streak</span>
+                                <strong id="statsHabitStreak">0 days</strong>
+                            </div>
+                            <div class="habit-stat-row">
+                                <span>Best Streak</span>
+                                <strong id="statsHabitBestStreak">0 days</strong>
+                            </div>
+                            <div class="habit-stat-row">
+                                <span>Completion Rate</span>
+                                <strong id="statsHabitCompletionRate">0%</strong>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -829,6 +924,16 @@
                     <div class="profile-card-arrow">→</div>
                 </div>
 
+                <!-- Habit Tracker Card -->
+                <div class="profile-card" onclick="showView('habitSettings')">
+                    <div class="profile-card-icon">✓</div>
+                    <div class="profile-card-content">
+                        <div class="profile-card-title">Habit Tracker</div>
+                        <div class="profile-card-subtitle">Manage daily habits</div>
+                    </div>
+                    <div class="profile-card-arrow">→</div>
+                </div>
+
                 <div class="settings-section">
                     <h3>Notifications</h3>
                     <div class="settings-row">
@@ -872,7 +977,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Clear Ground v4.6</p>
+                    <p class="version">Clear Ground v4.7</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>
