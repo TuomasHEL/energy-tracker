@@ -289,6 +289,9 @@ async function init() {
         // Initialize habit tracker
         initHabitTracker();
         
+        // Initialize attunements
+        initAttunements();
+        
         console.log('App init completed successfully');
         
     } catch (error) {
@@ -1375,6 +1378,15 @@ function showView(viewName) {
                 break;
             case 'habitSettings':
                 updateHabitSettingsView();
+                break;
+            case 'attunements':
+                renderAttunementsList();
+                break;
+            case 'myAttunements':
+                renderMyAttunements();
+                break;
+            case 'attunementSettings':
+                renderAdminAttunements();
                 break;
         }
     } catch (error) {
@@ -4847,6 +4859,679 @@ function animate() {
     }
     
     animationFrame = requestAnimationFrame(animate);
+}
+
+// ============================================
+// ATTUNEMENTS FEATURE
+// ============================================
+
+// Attunements state
+let attunementState = {
+    attunements: [],           // All available attunements
+    userAttunements: {},       // { odeljuserI: [{ attunementId, attunedAt, level }] }
+    currentAttunement: null,   // Currently viewing/running
+    currentPage: 0,            // For multi-page description
+    pages: [],                 // Description pages
+    isRunning: false,
+    timer: null,
+    endTime: null,
+    duration: 0,
+    remaining: 0
+};
+
+// Initialize attunements
+function initAttunements() {
+    loadAttunementState();
+    updateAttunementHomeCard();
+}
+
+// Load attunement state from localStorage
+function loadAttunementState() {
+    const saved = localStorage.getItem('attunementState');
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            attunementState.attunements = parsed.attunements || [];
+            attunementState.userAttunements = parsed.userAttunements || {};
+        } catch (e) {
+            console.error('Error loading attunement state:', e);
+        }
+    }
+    
+    // Initialize user's attunements array if needed
+    if (state.currentUser) {
+        const userId = state.currentUser.user_id;
+        if (!attunementState.userAttunements[userId]) {
+            attunementState.userAttunements[userId] = [];
+        }
+    }
+}
+
+// Save attunement state to localStorage
+function saveAttunementState() {
+    localStorage.setItem('attunementState', JSON.stringify({
+        attunements: attunementState.attunements,
+        userAttunements: attunementState.userAttunements
+    }));
+}
+
+// Update home card
+function updateAttunementHomeCard() {
+    const userId = state.currentUser?.user_id;
+    const userAtts = userId ? (attunementState.userAttunements[userId] || []) : [];
+    const visibleAtts = attunementState.attunements.filter(a => a.visible !== false);
+    
+    const receivedEl = document.getElementById('attunementReceivedCount');
+    const availableEl = document.getElementById('attunementAvailableCount');
+    
+    if (receivedEl) receivedEl.textContent = `${userAtts.length} received`;
+    if (availableEl) availableEl.textContent = `${visibleAtts.length} available`;
+}
+
+// Render attunements list (browse view)
+function renderAttunementsList() {
+    const container = document.getElementById('attunementsList');
+    if (!container) return;
+    
+    const userId = state.currentUser?.user_id;
+    const userAtts = userId ? (attunementState.userAttunements[userId] || []) : [];
+    const visibleAtts = attunementState.attunements.filter(a => a.visible !== false);
+    
+    if (visibleAtts.length === 0) {
+        container.innerHTML = `
+            <div class="attunements-empty">
+                <p>No attunements available yet</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Group by series
+    const standalone = visibleAtts.filter(a => !a.seriesId);
+    const series = {};
+    
+    visibleAtts.filter(a => a.seriesId).forEach(a => {
+        if (!series[a.seriesId]) {
+            series[a.seriesId] = {
+                name: a.seriesName,
+                attunements: []
+            };
+        }
+        series[a.seriesId].attunements.push(a);
+    });
+    
+    // Sort series attunements by level
+    Object.values(series).forEach(s => {
+        s.attunements.sort((a, b) => (a.level || 1) - (b.level || 1));
+    });
+    
+    let html = '';
+    
+    // Render standalone attunements
+    standalone.forEach(att => {
+        const received = userAtts.find(ua => ua.attunementId === att.id);
+        html += renderAttunementCard(att, received);
+    });
+    
+    // Render series
+    Object.entries(series).forEach(([seriesId, seriesData]) => {
+        html += `<h3 class="attunement-series-heading">${seriesData.name}</h3>`;
+        
+        seriesData.attunements.forEach((att, index) => {
+            const received = userAtts.find(ua => ua.attunementId === att.id);
+            const prevLevel = index > 0 ? seriesData.attunements[index - 1] : null;
+            const prevReceived = prevLevel ? userAtts.find(ua => ua.attunementId === prevLevel.id) : null;
+            
+            // Check if locked (previous level not received or 30-day cooldown)
+            let locked = false;
+            let lockReason = '';
+            
+            if (index > 0 && !prevReceived) {
+                locked = true;
+                lockReason = `Complete Level ${index} first`;
+            } else if (prevReceived) {
+                const daysSince = Math.floor((Date.now() - new Date(prevReceived.attunedAt).getTime()) / (1000 * 60 * 60 * 24));
+                if (daysSince < 30) {
+                    locked = true;
+                    lockReason = `Available in ${30 - daysSince} days`;
+                }
+            }
+            
+            html += renderAttunementCard(att, received, locked, lockReason);
+        });
+    });
+    
+    container.innerHTML = html;
+}
+
+// Render single attunement card
+function renderAttunementCard(att, received, locked = false, lockReason = '') {
+    const statusClass = received ? 'received' : (locked ? 'locked' : '');
+    const statusIcon = received ? 'received' : (locked ? 'locked' : '');
+    
+    return `
+        <div class="attunement-card ${statusClass}" onclick="openAttunementDetail('${att.id}')">
+            <div class="attunement-card-status ${statusIcon}"></div>
+            <div class="attunement-card-header">
+                <div class="attunement-card-title">${att.name}</div>
+                ${att.seriesName ? `<span class="attunement-card-series">${att.seriesName} Level ${att.level || 1}</span>` : ''}
+            </div>
+            <div class="attunement-card-description">${att.description || ''}</div>
+            <div class="attunement-card-meta">
+                <span>⏱ ${att.duration} min</span>
+                ${locked ? `<span style="color: #FBBF24;">🔒 ${lockReason}</span>` : ''}
+                ${received ? `<span style="color: #10B981;">✓ Received</span>` : ''}
+            </div>
+        </div>
+    `;
+}
+
+// Open attunement detail view
+function openAttunementDetail(attunementId) {
+    const att = attunementState.attunements.find(a => a.id === attunementId);
+    if (!att) return;
+    
+    attunementState.currentAttunement = att;
+    
+    // Parse description into pages (split by double newline)
+    const content = att.description || 'No description available.';
+    attunementState.pages = content.split(/\n\n+/).filter(p => p.trim());
+    attunementState.currentPage = 0;
+    
+    // Update header
+    document.getElementById('attunementDetailName').textContent = att.name;
+    document.getElementById('attunementDetailDuration').textContent = `${att.duration} min`;
+    
+    const seriesBadge = document.getElementById('attunementDetailSeries');
+    if (att.seriesName) {
+        seriesBadge.textContent = `${att.seriesName} Level ${att.level || 1}`;
+        seriesBadge.style.display = 'inline-block';
+    } else {
+        seriesBadge.style.display = 'none';
+    }
+    
+    // Check if locked
+    const lockStatus = checkAttunementLock(att);
+    const lockedMessage = document.getElementById('attunementLockedMessage');
+    const activateBtn = document.getElementById('attunementActivateBtn');
+    
+    if (lockStatus.locked) {
+        lockedMessage.classList.remove('hidden');
+        document.getElementById('attunementLockedText').textContent = lockStatus.reason;
+        activateBtn.classList.add('hidden');
+    } else {
+        lockedMessage.classList.add('hidden');
+    }
+    
+    // Render dots
+    renderAttunementDots();
+    updateAttunementPage();
+    
+    showView('attunementDetail');
+}
+
+// Check if attunement is locked
+function checkAttunementLock(att) {
+    const userId = state.currentUser?.user_id;
+    if (!userId) return { locked: true, reason: 'Please select a user first' };
+    
+    const userAtts = attunementState.userAttunements[userId] || [];
+    
+    // Check if already received
+    if (userAtts.find(ua => ua.attunementId === att.id)) {
+        return { locked: false, received: true };
+    }
+    
+    // Check series requirements
+    if (att.seriesId && att.level > 1) {
+        // Find previous level
+        const prevLevel = attunementState.attunements.find(a => 
+            a.seriesId === att.seriesId && a.level === att.level - 1
+        );
+        
+        if (prevLevel) {
+            const prevReceived = userAtts.find(ua => ua.attunementId === prevLevel.id);
+            
+            if (!prevReceived) {
+                return { locked: true, reason: `Complete Level ${att.level - 1} first` };
+            }
+            
+            // Check 30-day cooldown
+            const daysSince = Math.floor((Date.now() - new Date(prevReceived.attunedAt).getTime()) / (1000 * 60 * 60 * 24));
+            if (daysSince < 30) {
+                return { locked: true, reason: `Available in ${30 - daysSince} days` };
+            }
+        }
+    }
+    
+    return { locked: false };
+}
+
+// Render description page dots
+function renderAttunementDots() {
+    const container = document.getElementById('attunementDots');
+    if (!container) return;
+    
+    container.innerHTML = attunementState.pages.map((_, i) => 
+        `<div class="attunement-dot ${i === attunementState.currentPage ? 'active' : ''}"></div>`
+    ).join('');
+}
+
+// Update current description page
+function updateAttunementPage() {
+    const content = document.getElementById('attunementDetailContent');
+    const prevBtn = document.getElementById('attunementPrevBtn');
+    const nextBtn = document.getElementById('attunementNextBtn');
+    const activateBtn = document.getElementById('attunementActivateBtn');
+    
+    const page = attunementState.pages[attunementState.currentPage] || '';
+    content.innerHTML = `<p>${page}</p>`;
+    
+    // Update buttons
+    prevBtn.classList.toggle('hidden', attunementState.currentPage === 0);
+    
+    const isLastPage = attunementState.currentPage === attunementState.pages.length - 1;
+    nextBtn.classList.toggle('hidden', isLastPage);
+    
+    const lockStatus = checkAttunementLock(attunementState.currentAttunement);
+    if (isLastPage && !lockStatus.locked && !lockStatus.received) {
+        activateBtn.classList.remove('hidden');
+    } else {
+        activateBtn.classList.add('hidden');
+    }
+    
+    // If already received, show different button
+    if (lockStatus.received && isLastPage) {
+        activateBtn.textContent = 'Already Received ✓';
+        activateBtn.classList.remove('hidden');
+        activateBtn.disabled = true;
+    } else {
+        activateBtn.textContent = 'Begin Attunement';
+        activateBtn.disabled = false;
+    }
+    
+    renderAttunementDots();
+}
+
+// Navigate pages
+function prevAttunementPage() {
+    if (attunementState.currentPage > 0) {
+        attunementState.currentPage--;
+        updateAttunementPage();
+    }
+}
+
+function nextAttunementPage() {
+    if (attunementState.currentPage < attunementState.pages.length - 1) {
+        attunementState.currentPage++;
+        updateAttunementPage();
+    }
+}
+
+// Close detail view
+function closeAttunementDetail() {
+    showView('attunements');
+}
+
+// Start attunement process
+async function startAttunement() {
+    const att = attunementState.currentAttunement;
+    if (!att) return;
+    
+    const lockStatus = checkAttunementLock(att);
+    if (lockStatus.locked) {
+        showToast(lockStatus.reason, 'error');
+        return;
+    }
+    
+    if (lockStatus.received) {
+        showToast('You have already received this attunement', 'info');
+        return;
+    }
+    
+    // Request notification permission
+    await ensureNotificationPermission();
+    
+    // Initialize audio context
+    if (!state.audioContext) {
+        state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    // Setup process view
+    document.getElementById('attunementProcessName').textContent = att.name;
+    const seriesEl = document.getElementById('attunementProcessSeries');
+    if (att.seriesName) {
+        seriesEl.textContent = `${att.seriesName} Level ${att.level || 1}`;
+        seriesEl.style.display = 'block';
+    } else {
+        seriesEl.style.display = 'none';
+    }
+    
+    // Set timer
+    attunementState.duration = att.duration * 60; // Convert to seconds
+    attunementState.remaining = attunementState.duration;
+    attunementState.endTime = new Date(Date.now() + attunementState.duration * 1000);
+    attunementState.isRunning = true;
+    
+    updateAttunementTimer();
+    
+    // Start timer interval
+    attunementState.timer = setInterval(attunementTick, 1000);
+    
+    showView('attunementProcess');
+    showToast('Attunement started', 'success');
+}
+
+// Timer tick
+function attunementTick() {
+    if (!attunementState.isRunning) return;
+    
+    const now = new Date();
+    attunementState.remaining = Math.max(0, Math.round((attunementState.endTime - now) / 1000));
+    
+    updateAttunementTimer();
+    
+    if (attunementState.remaining <= 0) {
+        completeAttunement();
+    }
+}
+
+// Update timer display
+function updateAttunementTimer() {
+    const remaining = attunementState.remaining;
+    const hours = Math.floor(remaining / 3600);
+    const minutes = Math.floor((remaining % 3600) / 60);
+    const seconds = remaining % 60;
+    
+    document.getElementById('attunementCountdown').textContent = 
+        `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    
+    const progress = ((attunementState.duration - remaining) / attunementState.duration) * 100;
+    document.getElementById('attunementProgressFill').style.width = `${progress}%`;
+}
+
+// Cancel attunement
+function cancelAttunement() {
+    if (confirm('Are you sure you want to cancel this attunement?')) {
+        clearInterval(attunementState.timer);
+        attunementState.isRunning = false;
+        attunementState.timer = null;
+        showView('attunements');
+        showToast('Attunement cancelled', 'info');
+    }
+}
+
+// Complete attunement
+function completeAttunement() {
+    clearInterval(attunementState.timer);
+    attunementState.isRunning = false;
+    attunementState.timer = null;
+    
+    const att = attunementState.currentAttunement;
+    const userId = state.currentUser?.user_id;
+    
+    if (userId && att) {
+        // Record attunement
+        if (!attunementState.userAttunements[userId]) {
+            attunementState.userAttunements[userId] = [];
+        }
+        
+        attunementState.userAttunements[userId].push({
+            attunementId: att.id,
+            attunedAt: new Date().toISOString(),
+            level: att.level || 1
+        });
+        
+        saveAttunementState();
+    }
+    
+    // Play completion sound
+    playCompletionSound();
+    vibrate([200, 100, 200, 100, 300]);
+    
+    // Show notification if in background
+    if (document.hidden) {
+        showNotification(
+            'Attunement Complete! ✦',
+            `You have received: ${att?.name}`,
+            'attunement-complete'
+        );
+    }
+    
+    // Show completion view
+    document.getElementById('attunementCompleteName').textContent = att?.name || 'Attunement';
+    document.getElementById('attunementUsageContent').innerHTML = att?.usageInstructions || 'No specific instructions.';
+    
+    showView('attunementComplete');
+    updateAttunementHomeCard();
+}
+
+// Finish attunement (close complete view)
+function finishAttunement() {
+    showView('attunements');
+    renderAttunementsList();
+}
+
+// Render My Attunements view
+function renderMyAttunements() {
+    const container = document.getElementById('myAttunementsList');
+    const emptyState = document.getElementById('myAttunementsEmpty');
+    if (!container) return;
+    
+    const userId = state.currentUser?.user_id;
+    const userAtts = userId ? (attunementState.userAttunements[userId] || []) : [];
+    
+    if (userAtts.length === 0) {
+        container.classList.add('hidden');
+        emptyState?.classList.remove('hidden');
+        return;
+    }
+    
+    container.classList.remove('hidden');
+    emptyState?.classList.add('hidden');
+    
+    // Sort by date (newest first)
+    const sortedAtts = [...userAtts].sort((a, b) => 
+        new Date(b.attunedAt) - new Date(a.attunedAt)
+    );
+    
+    container.innerHTML = sortedAtts.map(ua => {
+        const att = attunementState.attunements.find(a => a.id === ua.attunementId);
+        if (!att) return '';
+        
+        const date = new Date(ua.attunedAt).toLocaleDateString();
+        
+        return `
+            <div class="my-attunement-card">
+                ${att.seriesName ? `<span class="my-attunement-series">${att.seriesName} Level ${att.level || 1}</span>` : ''}
+                <div class="my-attunement-header">
+                    <span class="my-attunement-name">${att.name}</span>
+                    <span class="my-attunement-date">${date}</span>
+                </div>
+                ${att.usageInstructions ? `
+                    <div class="my-attunement-usage">
+                        <strong>How to use:</strong><br>
+                        ${att.usageInstructions}
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+// Render admin attunements list
+function renderAdminAttunements() {
+    const container = document.getElementById('adminAttunementsList');
+    const seriesSelect = document.getElementById('newAttunementSeries');
+    if (!container) return;
+    
+    if (attunementState.attunements.length === 0) {
+        container.innerHTML = '<p class="settings-hint">No attunements created yet</p>';
+    } else {
+        container.innerHTML = attunementState.attunements.map(att => `
+            <div class="admin-attunement-row">
+                <div class="admin-attunement-info">
+                    <div class="admin-attunement-name">${att.name}</div>
+                    <div class="admin-attunement-meta">
+                        ${att.seriesName ? `${att.seriesName} L${att.level}` : 'Standalone'} • 
+                        ${att.duration}min • 
+                        ${att.visible !== false ? 'Visible' : 'Hidden'}
+                    </div>
+                </div>
+                <div class="admin-attunement-actions">
+                    <button onclick="toggleAttunementVisibility('${att.id}')" title="${att.visible !== false ? 'Hide' : 'Show'}">
+                        ${att.visible !== false ? '👁' : '👁‍🗨'}
+                    </button>
+                    <button class="delete" onclick="deleteAttunement('${att.id}')" title="Delete">×</button>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    // Update series dropdown
+    if (seriesSelect) {
+        const existingSeries = new Map();
+        attunementState.attunements.forEach(a => {
+            if (a.seriesId && a.seriesName) {
+                existingSeries.set(a.seriesId, a.seriesName);
+            }
+        });
+        
+        seriesSelect.innerHTML = '<option value="">No Series (Standalone)</option>';
+        existingSeries.forEach((name, id) => {
+            seriesSelect.innerHTML += `<option value="${id}">${name}</option>`;
+        });
+    }
+}
+
+// Toggle new series input
+function toggleNewSeriesInput() {
+    const input = document.getElementById('newSeriesName');
+    const select = document.getElementById('newAttunementSeries');
+    const levelGroup = document.getElementById('levelGroup');
+    const btn = document.getElementById('toggleNewSeries');
+    
+    if (input.classList.contains('hidden')) {
+        input.classList.remove('hidden');
+        select.classList.add('hidden');
+        btn.textContent = 'Use Existing';
+        levelGroup.classList.remove('hidden');
+    } else {
+        input.classList.add('hidden');
+        select.classList.remove('hidden');
+        btn.textContent = '+ New Series';
+        
+        // Show level if series selected
+        levelGroup.classList.toggle('hidden', !select.value);
+    }
+}
+
+// Handle series select change
+function onSeriesSelectChange() {
+    const select = document.getElementById('newAttunementSeries');
+    const levelGroup = document.getElementById('levelGroup');
+    const levelInput = document.getElementById('newAttunementLevel');
+    
+    if (select.value) {
+        // Auto-calculate next level
+        const seriesAtts = attunementState.attunements.filter(a => a.seriesId === select.value);
+        const nextLevel = seriesAtts.length > 0 
+            ? Math.max(...seriesAtts.map(a => a.level || 1)) + 1 
+            : 1;
+        levelInput.value = nextLevel;
+        levelGroup.classList.remove('hidden');
+    } else {
+        levelGroup.classList.add('hidden');
+    }
+}
+
+// Add new attunement
+function addAttunement() {
+    const name = document.getElementById('newAttunementName').value.trim();
+    const duration = parseInt(document.getElementById('newAttunementDuration').value) || 30;
+    const description = document.getElementById('newAttunementDescription').value.trim();
+    const usage = document.getElementById('newAttunementUsage').value.trim();
+    
+    if (!name) {
+        showToast('Please enter an attunement name', 'error');
+        return;
+    }
+    
+    // Handle series
+    let seriesId = null;
+    let seriesName = null;
+    let level = 1;
+    
+    const existingSeries = document.getElementById('newAttunementSeries').value;
+    const newSeriesName = document.getElementById('newSeriesName').value.trim();
+    
+    if (newSeriesName) {
+        seriesId = 'series-' + Date.now();
+        seriesName = newSeriesName;
+        level = parseInt(document.getElementById('newAttunementLevel').value) || 1;
+    } else if (existingSeries) {
+        seriesId = existingSeries;
+        const existingAtt = attunementState.attunements.find(a => a.seriesId === existingSeries);
+        seriesName = existingAtt?.seriesName;
+        
+        // Auto-calculate next level
+        const seriesAtts = attunementState.attunements.filter(a => a.seriesId === existingSeries);
+        level = Math.max(...seriesAtts.map(a => a.level || 1)) + 1;
+    }
+    
+    const newAttunement = {
+        id: 'att-' + Date.now(),
+        name,
+        description,
+        usageInstructions: usage,
+        duration,
+        seriesId,
+        seriesName,
+        level,
+        visible: true,
+        createdAt: new Date().toISOString()
+    };
+    
+    attunementState.attunements.push(newAttunement);
+    saveAttunementState();
+    
+    // Clear form
+    document.getElementById('newAttunementName').value = '';
+    document.getElementById('newAttunementDescription').value = '';
+    document.getElementById('newAttunementUsage').value = '';
+    document.getElementById('newAttunementDuration').value = '30';
+    document.getElementById('newSeriesName').value = '';
+    document.getElementById('newAttunementLevel').value = '1';
+    
+    renderAdminAttunements();
+    updateAttunementHomeCard();
+    
+    showToast(`Added "${name}"`, 'success');
+}
+
+// Toggle attunement visibility
+function toggleAttunementVisibility(attId) {
+    const att = attunementState.attunements.find(a => a.id === attId);
+    if (att) {
+        att.visible = att.visible === false ? true : false;
+        saveAttunementState();
+        renderAdminAttunements();
+        updateAttunementHomeCard();
+    }
+}
+
+// Delete attunement
+function deleteAttunement(attId) {
+    const att = attunementState.attunements.find(a => a.id === attId);
+    if (!att) return;
+    
+    if (confirm(`Delete "${att.name}"? This cannot be undone.`)) {
+        attunementState.attunements = attunementState.attunements.filter(a => a.id !== attId);
+        saveAttunementState();
+        renderAdminAttunements();
+        updateAttunementHomeCard();
+        showToast(`Deleted "${att.name}"`, 'success');
+    }
 }
 
 // ============================================

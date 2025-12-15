@@ -116,6 +116,19 @@
                     </div>
                     <div class="habit-home-arrow">→</div>
                 </div>
+
+                <!-- Attunements Card -->
+                <div class="attunement-home-card" onclick="showView('attunements')">
+                    <div class="attunement-home-icon">✦</div>
+                    <div class="attunement-home-content">
+                        <div class="attunement-home-title">Attunements</div>
+                        <div class="attunement-home-stats">
+                            <span id="attunementReceivedCount">0 received</span>
+                            <span class="attunement-available" id="attunementAvailableCount">0 available</span>
+                        </div>
+                    </div>
+                    <div class="attunement-home-arrow">→</div>
+                </div>
             </section>
 
             <!-- Signal View -->
@@ -347,6 +360,170 @@
                     <div class="add-habit-form">
                         <input type="text" id="newHabitName" placeholder="New habit name..." maxlength="30">
                         <button class="btn primary" onclick="addCustomHabit()">Add</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Attunements Browse View -->
+            <section id="viewAttunements" class="view">
+                <div class="view-header">
+                    <h2>Attunements</h2>
+                    <button class="btn small secondary" onclick="showView('myAttunements')">My Attunements</button>
+                </div>
+
+                <p class="attunements-intro">Receive energy attunements for healing and spiritual development</p>
+
+                <!-- Attunements List -->
+                <div class="attunements-list" id="attunementsList">
+                    <!-- Attunements will be dynamically inserted here -->
+                </div>
+            </section>
+
+            <!-- Attunement Detail View -->
+            <section id="viewAttunementDetail" class="view attunement-detail-view">
+                <button class="session-exit-btn" onclick="closeAttunementDetail()">✕</button>
+                
+                <div class="attunement-detail-header">
+                    <span class="attunement-series-badge" id="attunementDetailSeries"></span>
+                    <h2 id="attunementDetailName">Attunement Name</h2>
+                    <div class="attunement-detail-meta">
+                        <span id="attunementDetailDuration">30 min</span>
+                    </div>
+                </div>
+
+                <div class="attunement-detail-content" id="attunementDetailContent">
+                    <!-- Description pages will be shown here -->
+                </div>
+
+                <div class="attunement-detail-nav" id="attunementDetailNav">
+                    <div class="attunement-dots" id="attunementDots"></div>
+                </div>
+
+                <div class="attunement-detail-footer">
+                    <button class="btn secondary" id="attunementPrevBtn" onclick="prevAttunementPage()">← Back</button>
+                    <button class="btn primary" id="attunementNextBtn" onclick="nextAttunementPage()">Continue →</button>
+                    <button class="btn primary hidden" id="attunementActivateBtn" onclick="startAttunement()">Begin Attunement</button>
+                </div>
+
+                <div class="attunement-locked-message hidden" id="attunementLockedMessage">
+                    <div class="locked-icon">🔒</div>
+                    <p id="attunementLockedText">This attunement will be available in X days</p>
+                </div>
+            </section>
+
+            <!-- Attunement Process View (Timer) -->
+            <section id="viewAttunementProcess" class="view attunement-process-view">
+                <div class="attunement-process-header">
+                    <h3 id="attunementProcessName">Attunement Name</h3>
+                    <span class="attunement-process-series" id="attunementProcessSeries"></span>
+                </div>
+
+                <div class="attunement-process-visual">
+                    <div class="attunement-orb">
+                        <div class="attunement-orb-inner">✦</div>
+                    </div>
+                </div>
+
+                <div class="attunement-process-timer">
+                    <div class="attunement-countdown" id="attunementCountdown">00:00:00</div>
+                    <div class="attunement-progress-bar">
+                        <div class="attunement-progress-fill" id="attunementProgressFill"></div>
+                    </div>
+                    <p class="attunement-status" id="attunementStatus">Receiving attunement...</p>
+                </div>
+
+                <div class="attunement-process-controls">
+                    <button class="btn danger" onclick="cancelAttunement()">Cancel</button>
+                </div>
+            </section>
+
+            <!-- Attunement Complete View -->
+            <section id="viewAttunementComplete" class="view attunement-complete-view">
+                <div class="attunement-complete-content">
+                    <div class="attunement-complete-icon">✦</div>
+                    <h2>Attunement Complete</h2>
+                    <p class="attunement-complete-name" id="attunementCompleteName">Divine Healing</p>
+                    
+                    <div class="attunement-usage-info" id="attunementUsageInfo">
+                        <h3>How to Use This Energy</h3>
+                        <div class="usage-content" id="attunementUsageContent">
+                            <!-- Usage instructions will be shown here -->
+                        </div>
+                    </div>
+
+                    <button class="btn primary" onclick="finishAttunement()">Done</button>
+                </div>
+            </section>
+
+            <!-- My Attunements View -->
+            <section id="viewMyAttunements" class="view">
+                <div class="view-header">
+                    <button class="back-btn" onclick="showView('attunements')">←</button>
+                    <h2>My Attunements</h2>
+                </div>
+
+                <div class="my-attunements-list" id="myAttunementsList">
+                    <!-- User's received attunements will be shown here -->
+                </div>
+
+                <div class="my-attunements-empty hidden" id="myAttunementsEmpty">
+                    <p>No attunements received yet</p>
+                    <button class="btn secondary" onclick="showView('attunements')">Browse Attunements</button>
+                </div>
+            </section>
+
+            <!-- Attunement Settings View -->
+            <section id="viewAttunementSettings" class="view">
+                <div class="view-header">
+                    <button class="back-btn" onclick="showView('settings')">←</button>
+                    <h2>Manage Attunements</h2>
+                </div>
+
+                <div class="attunement-settings-section">
+                    <h3>Add New Attunement</h3>
+                    
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" id="newAttunementName" placeholder="Attunement name..." maxlength="50">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Series (Optional)</label>
+                        <select id="newAttunementSeries" onchange="onSeriesSelectChange()">
+                            <option value="">No Series (Standalone)</option>
+                            <!-- Series options will be added dynamically -->
+                        </select>
+                        <input type="text" id="newSeriesName" placeholder="Or create new series..." class="hidden">
+                        <button class="btn small secondary" id="toggleNewSeries" onclick="toggleNewSeriesInput()">+ New Series</button>
+                    </div>
+
+                    <div class="form-group hidden" id="levelGroup">
+                        <label>Level in Series</label>
+                        <input type="number" id="newAttunementLevel" min="1" max="20" value="1">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Duration (minutes)</label>
+                        <input type="number" id="newAttunementDuration" min="1" max="120" value="30">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Description (shown before attunement)</label>
+                        <textarea id="newAttunementDescription" rows="4" placeholder="What is this attunement? What does it do?"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Usage Instructions (shown after attunement)</label>
+                        <textarea id="newAttunementUsage" rows="4" placeholder="How to use this energy after receiving the attunement..."></textarea>
+                    </div>
+
+                    <button class="btn primary" onclick="addAttunement()">Add Attunement</button>
+                </div>
+
+                <div class="attunement-settings-section">
+                    <h3>Existing Attunements</h3>
+                    <div class="admin-attunements-list" id="adminAttunementsList">
+                        <!-- Admin list of attunements will be shown here -->
                     </div>
                 </div>
             </section>
@@ -934,6 +1111,16 @@
                     <div class="profile-card-arrow">→</div>
                 </div>
 
+                <!-- Attunements Settings Card -->
+                <div class="profile-card" onclick="showView('attunementSettings')">
+                    <div class="profile-card-icon">✦</div>
+                    <div class="profile-card-content">
+                        <div class="profile-card-title">Attunements</div>
+                        <div class="profile-card-subtitle">Manage energy attunements</div>
+                    </div>
+                    <div class="profile-card-arrow">→</div>
+                </div>
+
                 <div class="settings-section">
                     <h3>Notifications</h3>
                     <div class="settings-row">
@@ -977,7 +1164,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Clear Ground v4.7</p>
+                    <p class="version">Clear Ground v4.8</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>
