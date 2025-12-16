@@ -5439,17 +5439,24 @@ let shadowState = {
 };
 
 // Initialize shadow feature
-function initShadow() {
-    loadShadowState();
+async function initShadow() {
+    // Load from localStorage first (for instant UI)
+    loadShadowStateFromCache();
     updateShadowUI();
+    
+    // Then sync from backend (non-blocking)
+    loadShadowFromBackend().catch(e => console.warn('Shadow backend load error:', e));
 }
 
-// Load shadow state from localStorage
-function loadShadowState() {
+// Load shadow state from localStorage cache
+function loadShadowStateFromCache() {
     const saved = localStorage.getItem('shadowState');
     if (saved) {
         try {
-            shadowState = { ...shadowState, ...JSON.parse(saved) };
+            const parsed = JSON.parse(saved);
+            shadowState.integrate = { ...shadowState.integrate, ...parsed.integrate };
+            shadowState.process = { ...shadowState.process, ...parsed.process };
+            shadowState.deepClean = { ...shadowState.deepClean, ...parsed.deepClean };
         } catch (e) {
             console.error('Error loading shadow state:', e);
         }
@@ -5459,9 +5466,77 @@ function loadShadowState() {
     updateDeepCleanProgress();
 }
 
-// Save shadow state
+// Load shadow state from backend
+async function loadShadowFromBackend() {
+    if (!state.currentUser) return;
+    
+    try {
+        const result = await apiCall('getShadowProgress', { userId: state.currentUser.user_id });
+        
+        if (result?.shadowProgress) {
+            const progress = result.shadowProgress;
+            
+            // Merge with local state (backend takes precedence if it has data)
+            if (progress.integrateCompleted && progress.integrateCompleted.length > 0) {
+                shadowState.integrate.completed = progress.integrateCompleted;
+            }
+            if (progress.integrateSkipped && progress.integrateSkipped.length > 0) {
+                shadowState.integrate.skipped = progress.integrateSkipped;
+            }
+            if (progress.processCompleted && progress.processCompleted.length > 0) {
+                shadowState.process.completed = progress.processCompleted;
+            }
+            if (progress.processSkipped && progress.processSkipped.length > 0) {
+                shadowState.process.skipped = progress.processSkipped;
+            }
+            if (progress.deepClean && progress.deepClean.status) {
+                shadowState.deepClean = { ...shadowState.deepClean, ...progress.deepClean };
+            }
+            
+            // Update cache and UI
+            saveShadowState();
+            updateShadowUI();
+            console.log('Shadow progress loaded from backend');
+        } else {
+            // Backend is empty - upload local data if we have any
+            const hasLocalData = 
+                shadowState.integrate.completed.length > 0 ||
+                shadowState.integrate.skipped.length > 0 ||
+                shadowState.process.completed.length > 0 ||
+                shadowState.process.skipped.length > 0 ||
+                shadowState.deepClean.status !== 'not_started';
+            
+            if (hasLocalData) {
+                console.log('Uploading local shadow progress to backend...');
+                await syncShadowToBackend();
+            }
+        }
+    } catch (e) {
+        console.error('Error loading shadow from backend:', e);
+    }
+}
+
+// Save shadow state to localStorage
 function saveShadowState() {
     localStorage.setItem('shadowState', JSON.stringify(shadowState));
+}
+
+// Sync shadow state to backend
+async function syncShadowToBackend() {
+    if (!state.currentUser) return;
+    
+    try {
+        await apiCall('saveShadowProgress', {
+            userId: state.currentUser.user_id,
+            integrateCompleted: shadowState.integrate.completed,
+            integrateSkipped: shadowState.integrate.skipped,
+            processCompleted: shadowState.process.completed,
+            processSkipped: shadowState.process.skipped,
+            deepClean: shadowState.deepClean
+        });
+    } catch (e) {
+        console.warn('Error syncing shadow to backend:', e);
+    }
 }
 
 // Update all Shadow UI elements
@@ -5529,6 +5604,12 @@ function updateIntegrateUI() {
     document.getElementById('integratePercentage').textContent = `${percent}%`;
 }
 
+// Integration animation state
+let integrateAnimationState = {
+    timer: null,
+    remaining: 10
+};
+
 function startNextIntegration() {
     // Find next polarity that hasn't been completed or skipped
     const handled = [...shadowState.integrate.completed, ...shadowState.integrate.skipped];
@@ -5553,34 +5634,89 @@ function showIntegrateCard(polarity) {
     document.getElementById('integrateCardNumber').textContent = `${currentNum} of ${total}`;
     document.getElementById('polarityLeft').textContent = polarity.left;
     document.getElementById('polarityRight').textContent = polarity.right;
-    document.getElementById('polarityDescription').textContent = polarity.description || '';
+    document.getElementById('polarityDescription').innerHTML = polarity.description || '';
+    
+    // Reset screens
+    document.getElementById('integrateAnimationScreen').classList.add('hidden');
+    document.getElementById('integrateCompleteScreen').classList.add('hidden');
+    document.getElementById('integrateNav').style.display = 'flex';
+    document.querySelector('.integrate-reader-content').style.display = 'flex';
     
     showView('integrateCard');
 }
 
-function completeIntegration() {
+function startIntegrationAnimation() {
     const polarity = shadowState.integrate.currentPolarity;
     if (!polarity) return;
     
+    // Hide main content and nav, show animation
+    document.getElementById('integrateNav').style.display = 'none';
+    document.querySelector('.integrate-reader-content').style.display = 'none';
+    
+    // Setup animation screen
+    document.getElementById('animPolarityLeft').textContent = polarity.left;
+    document.getElementById('animPolarityRight').textContent = polarity.right;
+    document.getElementById('integrateAnimationScreen').classList.remove('hidden');
+    
+    // Start 10-second countdown
+    integrateAnimationState.remaining = 10;
+    document.getElementById('integrateAnimationTimer').textContent = '10';
+    document.getElementById('integrateAnimationBar').style.width = '0%';
+    
+    integrateAnimationState.timer = setInterval(() => {
+        integrateAnimationState.remaining--;
+        document.getElementById('integrateAnimationTimer').textContent = integrateAnimationState.remaining;
+        const progress = ((10 - integrateAnimationState.remaining) / 10) * 100;
+        document.getElementById('integrateAnimationBar').style.width = `${progress}%`;
+        
+        if (integrateAnimationState.remaining <= 0) {
+            clearInterval(integrateAnimationState.timer);
+            finishIntegrationAnimation();
+        }
+    }, 1000);
+}
+
+function finishIntegrationAnimation() {
+    const polarity = shadowState.integrate.currentPolarity;
+    if (!polarity) return;
+    
+    // Record completion
     shadowState.integrate.completed.push(polarity.id);
     saveShadowState();
+    syncShadowToBackend();
     
-    showToast('Polarity integrated ☯', 'success');
+    // Hide animation, show complete screen
+    document.getElementById('integrateAnimationScreen').classList.add('hidden');
+    document.getElementById('integrateCompleteScreen').classList.remove('hidden');
     
+    // Update complete screen
+    document.getElementById('completePolarityLeft').textContent = polarity.left;
+    document.getElementById('completePolarityRight').textContent = polarity.right;
+    
+    updateIntegrateUI();
+    updateShadowToolCards();
+    
+    // Play sound and vibrate
+    playCompletionSound();
+    vibrate([100, 50, 100]);
+}
+
+function continueIntegration() {
     // Check if more to do
     const handled = [...shadowState.integrate.completed, ...shadowState.integrate.skipped];
     const hasMore = POLARITIES_DATA.some(p => !handled.includes(p.id));
     
     if (hasMore) {
-        // Show next one
         startNextIntegration();
     } else {
         showToast('All polarities integrated!', 'success');
-        closeIntegrateCard();
+        finishIntegration();
     }
-    
-    updateIntegrateUI();
-    updateShadowToolCards();
+}
+
+function finishIntegration() {
+    // Go back to shadow page
+    showView('shadow');
 }
 
 function skipIntegration() {
@@ -5589,6 +5725,7 @@ function skipIntegration() {
     
     shadowState.integrate.skipped.push(polarity.id);
     saveShadowState();
+    syncShadowToBackend();
     
     // Check if more to do
     const handled = [...shadowState.integrate.completed, ...shadowState.integrate.skipped];
@@ -5606,6 +5743,11 @@ function skipIntegration() {
 }
 
 function closeIntegrateCard() {
+    // Clear any running animation timer
+    if (integrateAnimationState.timer) {
+        clearInterval(integrateAnimationState.timer);
+        integrateAnimationState.timer = null;
+    }
     showView('integrate');
 }
 
@@ -5644,6 +5786,12 @@ function renderIntegrateHistory(tab = 'completed') {
 // PROCESS TOOL
 // ============================================
 
+// Process animation state
+let processAnimationState = {
+    timer: null,
+    remaining: 10
+};
+
 function updateProcessUI() {
     const total = EMOTIONS_DATA.length;
     const completed = shadowState.process.completed.length;
@@ -5675,20 +5823,73 @@ function showProcessCard(emotion) {
     
     document.getElementById('processCardNumber').textContent = `${currentNum} of ${total}`;
     document.getElementById('emotionName').textContent = emotion.name;
-    document.getElementById('emotionDescription').textContent = emotion.description || '';
+    document.getElementById('emotionDescription').innerHTML = emotion.description || '';
+    
+    // Reset screens
+    document.getElementById('processAnimationScreen').classList.add('hidden');
+    document.getElementById('processCompleteScreen').classList.add('hidden');
+    document.getElementById('processNav').style.display = 'flex';
+    document.querySelector('.process-reader-content').style.display = 'flex';
     
     showView('processCard');
 }
 
-function completeProcess() {
+function startProcessAnimation() {
     const emotion = shadowState.process.currentEmotion;
     if (!emotion) return;
     
+    // Hide main content and nav, show animation
+    document.getElementById('processNav').style.display = 'none';
+    document.querySelector('.process-reader-content').style.display = 'none';
+    
+    // Setup animation screen
+    document.getElementById('animEmotionName').textContent = emotion.name;
+    document.getElementById('processAnimationScreen').classList.remove('hidden');
+    
+    // Start 10-second countdown
+    processAnimationState.remaining = 10;
+    document.getElementById('processAnimationTimer').textContent = '10';
+    document.getElementById('processAnimationBar').style.width = '0%';
+    
+    processAnimationState.timer = setInterval(() => {
+        processAnimationState.remaining--;
+        document.getElementById('processAnimationTimer').textContent = processAnimationState.remaining;
+        const progress = ((10 - processAnimationState.remaining) / 10) * 100;
+        document.getElementById('processAnimationBar').style.width = `${progress}%`;
+        
+        if (processAnimationState.remaining <= 0) {
+            clearInterval(processAnimationState.timer);
+            finishProcessAnimation();
+        }
+    }, 1000);
+}
+
+function finishProcessAnimation() {
+    const emotion = shadowState.process.currentEmotion;
+    if (!emotion) return;
+    
+    // Record completion
     shadowState.process.completed.push(emotion.id);
     saveShadowState();
+    syncShadowToBackend();
     
-    showToast('Emotional state processed ◉', 'success');
+    // Hide animation, show complete screen
+    document.getElementById('processAnimationScreen').classList.add('hidden');
+    document.getElementById('processCompleteScreen').classList.remove('hidden');
     
+    // Update complete screen
+    document.getElementById('completeEmotionName').textContent = emotion.name;
+    
+    updateProcessUI();
+    updateShadowToolCards();
+    
+    // Play sound and vibrate
+    playCompletionSound();
+    vibrate([100, 50, 100]);
+}
+
+function continueProcess() {
+    // Check if more to do
     const handled = [...shadowState.process.completed, ...shadowState.process.skipped];
     const hasMore = EMOTIONS_DATA.some(e => !handled.includes(e.id));
     
@@ -5696,11 +5897,13 @@ function completeProcess() {
         startNextProcess();
     } else {
         showToast('All emotional states processed!', 'success');
-        closeProcessCard();
+        finishProcess();
     }
-    
-    updateProcessUI();
-    updateShadowToolCards();
+}
+
+function finishProcess() {
+    // Go back to shadow page
+    showView('shadow');
 }
 
 function skipProcess() {
@@ -5709,6 +5912,7 @@ function skipProcess() {
     
     shadowState.process.skipped.push(emotion.id);
     saveShadowState();
+    syncShadowToBackend();
     
     const handled = [...shadowState.process.completed, ...shadowState.process.skipped];
     const hasMore = EMOTIONS_DATA.some(e => !handled.includes(e.id));
@@ -5725,6 +5929,11 @@ function skipProcess() {
 }
 
 function closeProcessCard() {
+    // Clear any running animation timer
+    if (processAnimationState.timer) {
+        clearInterval(processAnimationState.timer);
+        processAnimationState.timer = null;
+    }
     showView('process');
 }
 
@@ -5835,6 +6044,7 @@ function startDeepClean() {
     shadowState.deepClean.isPaused = false;
     
     saveShadowState();
+    syncShadowToBackend();
     updateDeepCleanUI();
     updateShadowToolCards();
     
@@ -5850,6 +6060,7 @@ function toggleDeepCleanPause() {
     }
     
     saveShadowState();
+    syncShadowToBackend();
     updateDeepCleanUI();
     
     showToast(shadowState.deepClean.isPaused ? 'Deep Clean paused' : 'Deep Clean resumed', 'info');
@@ -5863,6 +6074,7 @@ function stopDeepClean() {
         shadowState.deepClean.isPaused = false;
         
         saveShadowState();
+        syncShadowToBackend();
         updateDeepCleanUI();
         updateShadowToolCards();
         
@@ -5929,15 +6141,23 @@ async function loadAttunmentsFromBackend() {
     try {
         // Load all available attunements
         const attResult = await apiCall('getAttunements');
-        if (attResult?.attunements) {
+        
+        if (attResult?.attunements && attResult.attunements.length > 0) {
+            // Backend has data - use it
             attunementState.attunements = attResult.attunements;
+        } else if (attunementState.attunements.length > 0) {
+            // Backend is empty but we have local data - upload it to backend
+            console.log('Uploading local attunements to backend...');
+            for (const att of attunementState.attunements) {
+                await apiCall('saveAttunement', att).catch(e => console.warn('Error uploading attunement:', e));
+            }
         }
         
         // Load user's received attunements
         if (state.currentUser) {
             const userId = state.currentUser.user_id;
             const userResult = await apiCall('getUserAttunements', { userId: userId });
-            if (userResult?.userAttunements) {
+            if (userResult?.userAttunements && userResult.userAttunements.length > 0) {
                 attunementState.userAttunements[userId] = userResult.userAttunements;
             }
         }

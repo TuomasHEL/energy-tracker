@@ -619,25 +619,68 @@
             </section>
 
             <!-- Integrate Card View -->
-            <section id="viewIntegrateCard" class="view shadow-card-view">
-                <button class="session-exit-btn" onclick="closeIntegrateCard()">✕</button>
-
-                <div class="shadow-card-header">
-                    <span class="shadow-card-number" id="integrateCardNumber">1 of 100</span>
-                </div>
-
-                <div class="shadow-card-content">
+            <section id="viewIntegrateCard" class="view integrate-reader-view">
+                <button class="integrate-reader-exit" onclick="closeIntegrateCard()">✕</button>
+                
+                <div class="integrate-reader-content">
+                    <!-- Progress indicator -->
+                    <div class="integrate-reader-badge" id="integrateCardNumber">1 of 404</div>
+                    
+                    <!-- Polarity display (always visible) -->
                     <div class="polarity-display">
                         <span class="polarity-left" id="polarityLeft">absolute</span>
                         <span class="polarity-separator">—</span>
                         <span class="polarity-right" id="polarityRight">relative</span>
                     </div>
-                    <p class="polarity-description" id="polarityDescription"></p>
+                    
+                    <!-- Description text (scrollable if long) -->
+                    <div class="integrate-reader-text" id="polarityDescription"></div>
+                    
+                    <!-- Progress dots for multi-page descriptions -->
+                    <div class="integrate-reader-dots" id="integrateDots"></div>
                 </div>
-
-                <div class="shadow-card-actions">
-                    <button class="btn secondary" onclick="skipIntegration()">Skip</button>
-                    <button class="btn primary" onclick="completeIntegration()">Integrate</button>
+                
+                <!-- Navigation (fixed at bottom) -->
+                <div class="integrate-reader-nav" id="integrateNav">
+                    <button class="integrate-nav-btn skip" onclick="skipIntegration()">Skip</button>
+                    <button class="integrate-nav-btn primary" onclick="startIntegrationAnimation()">Integrate</button>
+                </div>
+                
+                <!-- Integration Animation Screen -->
+                <div class="integrate-animation-screen hidden" id="integrateAnimationScreen">
+                    <div class="integrate-animation-polarity">
+                        <span class="polarity-left" id="animPolarityLeft">absolute</span>
+                        <span class="polarity-separator">—</span>
+                        <span class="polarity-right" id="animPolarityRight">relative</span>
+                    </div>
+                    
+                    <div class="integrate-animation-orb">
+                        <div class="integrate-orb-inner">☯</div>
+                    </div>
+                    
+                    <div class="integrate-animation-timer" id="integrateAnimationTimer">10</div>
+                    <p class="integrate-animation-text">Integrating...</p>
+                    
+                    <div class="integrate-animation-progress">
+                        <div class="integrate-animation-bar" id="integrateAnimationBar"></div>
+                    </div>
+                </div>
+                
+                <!-- Integration Complete Screen -->
+                <div class="integrate-complete-screen hidden" id="integrateCompleteScreen">
+                    <div class="integrate-complete-icon">✓</div>
+                    <h2 class="integrate-complete-title">Polarity Integrated</h2>
+                    <div class="integrate-complete-polarity">
+                        <span id="completePolarityLeft">absolute</span>
+                        <span>—</span>
+                        <span id="completePolarityRight">relative</span>
+                    </div>
+                    <p class="integrate-complete-message">Take a moment to feel the integration.</p>
+                    
+                    <div class="integrate-complete-actions">
+                        <button class="btn secondary large" onclick="finishIntegration()">I feel done for now</button>
+                        <button class="btn primary large" onclick="continueIntegration()">Continue to next</button>
+                    </div>
                 </div>
             </section>
 
@@ -683,23 +726,62 @@
             </section>
 
             <!-- Process Card View -->
-            <section id="viewProcessCard" class="view shadow-card-view">
-                <button class="session-exit-btn" onclick="closeProcessCard()">✕</button>
-
-                <div class="shadow-card-header">
-                    <span class="shadow-card-number" id="processCardNumber">1 of 100</span>
-                </div>
-
-                <div class="shadow-card-content">
+            <section id="viewProcessCard" class="view process-reader-view">
+                <button class="process-reader-exit" onclick="closeProcessCard()">✕</button>
+                
+                <div class="process-reader-content">
+                    <!-- Progress indicator -->
+                    <div class="process-reader-badge" id="processCardNumber">1 of 700</div>
+                    
+                    <!-- Emotion display (always visible) -->
                     <div class="emotion-display">
                         <span class="emotion-name" id="emotionName">abandoned</span>
                     </div>
-                    <p class="emotion-description" id="emotionDescription"></p>
+                    
+                    <!-- Description text (scrollable if long) -->
+                    <div class="process-reader-text" id="emotionDescription"></div>
+                    
+                    <!-- Progress dots for multi-page descriptions -->
+                    <div class="process-reader-dots" id="processDots"></div>
                 </div>
-
-                <div class="shadow-card-actions">
-                    <button class="btn secondary" onclick="skipProcess()">Skip</button>
-                    <button class="btn primary" onclick="completeProcess()">Process</button>
+                
+                <!-- Navigation (fixed at bottom) -->
+                <div class="process-reader-nav" id="processNav">
+                    <button class="process-nav-btn skip" onclick="skipProcess()">Skip</button>
+                    <button class="process-nav-btn primary" onclick="startProcessAnimation()">Process</button>
+                </div>
+                
+                <!-- Process Animation Screen -->
+                <div class="process-animation-screen hidden" id="processAnimationScreen">
+                    <div class="process-animation-emotion">
+                        <span class="emotion-name" id="animEmotionName">abandoned</span>
+                    </div>
+                    
+                    <div class="process-animation-orb">
+                        <div class="process-orb-inner">◉</div>
+                    </div>
+                    
+                    <div class="process-animation-timer" id="processAnimationTimer">10</div>
+                    <p class="process-animation-text">Processing...</p>
+                    
+                    <div class="process-animation-progress">
+                        <div class="process-animation-bar" id="processAnimationBar"></div>
+                    </div>
+                </div>
+                
+                <!-- Process Complete Screen -->
+                <div class="process-complete-screen hidden" id="processCompleteScreen">
+                    <div class="process-complete-icon">✓</div>
+                    <h2 class="process-complete-title">Emotional State Processed</h2>
+                    <div class="process-complete-emotion">
+                        <span id="completeEmotionName">abandoned</span>
+                    </div>
+                    <p class="process-complete-message">Take a moment to feel the release.</p>
+                    
+                    <div class="process-complete-actions">
+                        <button class="btn secondary large" onclick="finishProcess()">I feel done for now</button>
+                        <button class="btn primary large" onclick="continueProcess()">Continue to next</button>
+                    </div>
                 </div>
             </section>
 
@@ -1411,7 +1493,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Clear Ground v5.0</p>
+                    <p class="version">Clear Ground v5.1</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>

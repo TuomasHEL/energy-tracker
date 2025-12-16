@@ -1,5 +1,5 @@
 // Clear Ground - Google Apps Script Backend
-// Version 3.2 - Added Attunements support
+// Version 3.3 - Added Attunements and Shadow progress support
 
 // ============================================
 // CONFIGURATION
@@ -76,6 +76,12 @@ function createSheet(name) {
     case 'UserAttunements':
       sheet.appendRow([
         'record_id', 'user_id', 'attunement_id', 'attuned_at', 'level'
+      ]);
+      break;
+    case 'ShadowProgress':
+      sheet.appendRow([
+        'user_id', 'integrate_completed', 'integrate_skipped',
+        'process_completed', 'process_skipped', 'deep_clean_data', 'updated_at'
       ]);
       break;
   }
@@ -214,6 +220,14 @@ function handleRequest(e) {
         break;
       case 'saveUserAttunement':
         result = saveUserAttunement(params);
+        break;
+        
+      // Shadow progress operations
+      case 'getShadowProgress':
+        result = getShadowProgress(params.userId);
+        break;
+      case 'saveShadowProgress':
+        result = saveShadowProgress(params);
         break;
         
       // Config operations
@@ -1146,4 +1160,78 @@ function saveUserAttunement(params) {
   ]);
   
   return { success: true, record_id: recordId };
+}
+
+// ============================================
+// SHADOW PROGRESS FUNCTIONS
+// ============================================
+
+function getShadowProgress(userId) {
+  const sheet = getSheet('ShadowProgress');
+  const data = sheet.getDataRange().getValues();
+  
+  if (data.length <= 1) {
+    return { shadowProgress: null };
+  }
+  
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (row[0] === userId) {
+      let deepClean = {};
+      try {
+        deepClean = JSON.parse(row[5] || '{}');
+      } catch (e) {
+        deepClean = {};
+      }
+      
+      return {
+        shadowProgress: {
+          integrateCompleted: JSON.parse(row[1] || '[]'),
+          integrateSkipped: JSON.parse(row[2] || '[]'),
+          processCompleted: JSON.parse(row[3] || '[]'),
+          processSkipped: JSON.parse(row[4] || '[]'),
+          deepClean: deepClean
+        }
+      };
+    }
+  }
+  
+  return { shadowProgress: null };
+}
+
+function saveShadowProgress(params) {
+  const sheet = getSheet('ShadowProgress');
+  const data = sheet.getDataRange().getValues();
+  const now = new Date().toISOString();
+  
+  // Check for existing record
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === params.userId) {
+      const rowIndex = i + 1;
+      const rowData = [
+        params.userId,
+        JSON.stringify(params.integrateCompleted || []),
+        JSON.stringify(params.integrateSkipped || []),
+        JSON.stringify(params.processCompleted || []),
+        JSON.stringify(params.processSkipped || []),
+        JSON.stringify(params.deepClean || {}),
+        now
+      ];
+      sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+      return { success: true };
+    }
+  }
+  
+  // New record
+  sheet.appendRow([
+    params.userId,
+    JSON.stringify(params.integrateCompleted || []),
+    JSON.stringify(params.integrateSkipped || []),
+    JSON.stringify(params.processCompleted || []),
+    JSON.stringify(params.processSkipped || []),
+    JSON.stringify(params.deepClean || {}),
+    now
+  ]);
+  
+  return { success: true };
 }
