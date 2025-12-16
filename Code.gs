@@ -1235,3 +1235,61 @@ function saveShadowProgress(params) {
   
   return { success: true };
 }
+
+// ============================================
+// LIBERATION PROGRESS
+// ============================================
+
+function getLiberationProgress(userId) {
+  const sheet = getSheet('LiberationProgress');
+  const data = sheet.getDataRange().getValues();
+  
+  // Skip header row
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === userId) {
+      return {
+        liberationProgress: {
+          totalRounds: data[i][1] || 0,
+          currentStreak: data[i][2] || 0,
+          lastCompletedDate: data[i][3] || null,
+          updatedAt: data[i][4]
+        }
+      };
+    }
+  }
+  
+  return { liberationProgress: null };
+}
+
+function saveLiberationProgress(params) {
+  const sheet = getSheet('LiberationProgress');
+  const data = sheet.getDataRange().getValues();
+  const now = new Date().toISOString();
+  
+  // Check for existing record
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === params.userId) {
+      const rowIndex = i + 1;
+      const rowData = [
+        params.userId,
+        params.totalRounds || 0,
+        params.currentStreak || 0,
+        params.lastCompletedDate || '',
+        now
+      ];
+      sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+      return { success: true };
+    }
+  }
+  
+  // New record
+  sheet.appendRow([
+    params.userId,
+    params.totalRounds || 0,
+    params.currentStreak || 0,
+    params.lastCompletedDate || '',
+    now
+  ]);
+  
+  return { success: true };
+}

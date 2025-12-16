@@ -581,6 +581,20 @@
                         <div class="shadow-tool-arrow">→</div>
                     </div>
 
+                    <!-- Liberation Tool Card -->
+                    <div class="shadow-tool-card liberation" onclick="showView('liberation')">
+                        <div class="shadow-tool-icon">❤</div>
+                        <div class="shadow-tool-content">
+                            <h3>Liberation & Happiness</h3>
+                            <p>Guided healing and energy restoration process</p>
+                            <div class="shadow-tool-stats">
+                                <span class="liberation-stat" id="liberationRoundsText">0 rounds</span>
+                                <span class="liberation-streak" id="liberationStreakText">🔥 0 day streak</span>
+                            </div>
+                        </div>
+                        <div class="shadow-tool-arrow">→</div>
+                    </div>
+
                     <!-- Deep Clean Tool Card -->
                     <div class="shadow-tool-card" onclick="showView('deepClean')">
                         <div class="shadow-tool-icon">✧</div>
@@ -854,6 +868,136 @@
                         </p>
                         <p class="deep-clean-date" id="deepCleanCompletedDate">Completed on: -</p>
                     </div>
+                </div>
+            </section>
+
+            <!-- Liberation Main View -->
+            <section id="viewLiberation" class="view">
+                <div class="view-header">
+                    <button class="back-btn" onclick="showView('shadow')">←</button>
+                    <h2>Liberation & Happiness</h2>
+                </div>
+
+                <div class="liberation-stats-row">
+                    <div class="liberation-stat-card">
+                        <span class="liberation-stat-value" id="liberationTotalRounds">0</span>
+                        <span class="liberation-stat-label">Total Rounds</span>
+                    </div>
+                    <div class="liberation-stat-card streak">
+                        <span class="liberation-stat-value" id="liberationCurrentStreak">0</span>
+                        <span class="liberation-stat-label">Day Streak 🔥</span>
+                    </div>
+                </div>
+
+                <div class="liberation-intro">
+                    <p>A guided healing process that works through 8 stages to repair subtle bodies, return vitality, and activate wellbeing.</p>
+                </div>
+
+                <div class="liberation-instructions">
+                    <h3>Before You Begin</h3>
+                    <ul>
+                        <li>Sit upright</li>
+                        <li>Breathe naturally</li>
+                        <li>After each line: pause and feel/notice what changes (sensations, breath, energy, emotion, spaciousness)</li>
+                        <li>If something is clearly moving, stay longer before continuing</li>
+                    </ul>
+                </div>
+
+                <div class="liberation-energy-toggle">
+                    <div class="liberation-toggle-content">
+                        <div class="liberation-toggle-info">
+                            <span class="liberation-toggle-label">Enable Healing Energy</span>
+                            <span class="liberation-toggle-description">Run Onelove transmission during the process</span>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="liberationEnergyToggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="liberation-start-prompt">
+                    <div class="liberation-prompt-icon" onclick="startLiberationProcess()">
+                        <span class="liberation-symbol">❤</span>
+                    </div>
+                    <p class="liberation-prompt-text">Tap to begin the process</p>
+                </div>
+            </section>
+
+            <!-- Liberation Process View -->
+            <section id="viewLiberationProcess" class="view liberation-process-view">
+                <button class="liberation-exit-btn" onclick="confirmExitLiberation()">✕</button>
+
+                <div class="liberation-process-content">
+                    <!-- Energy indicator -->
+                    <div class="liberation-energy-indicator" id="liberationEnergyIndicator">
+                        <span class="liberation-energy-dot"></span>
+                        <span>Onelove healing active</span>
+                    </div>
+
+                    <!-- Stage indicator -->
+                    <div class="liberation-stage-badge" id="liberationStageBadge">Stage 1 of 8</div>
+                    <h3 class="liberation-stage-title" id="liberationStageTitle">Session Intention</h3>
+
+                    <!-- Step text -->
+                    <div class="liberation-step-text" id="liberationStepText">
+                        "My intention is trauma and emotional healing, gently and safely, in a way my system can integrate."
+                    </div>
+
+                    <!-- Feel notice reminder -->
+                    <p class="liberation-feel-notice">Feel/notice what changes: sensations, breath, energy, emotion, spaciousness</p>
+
+                    <!-- Timer display -->
+                    <div class="liberation-timer-display">
+                        <div class="liberation-timer-circle">
+                            <svg viewBox="0 0 100 100">
+                                <circle class="liberation-timer-bg" cx="50" cy="50" r="45"></circle>
+                                <circle class="liberation-timer-progress" id="liberationTimerCircle" cx="50" cy="50" r="45"></circle>
+                            </svg>
+                            <div class="liberation-timer-text" id="liberationTimerText">30</div>
+                        </div>
+                    </div>
+
+                    <!-- Progress dots -->
+                    <div class="liberation-step-dots" id="liberationStepDots"></div>
+                </div>
+
+                <div class="liberation-process-nav">
+                    <button class="btn primary large" id="liberationProceedBtn" onclick="proceedLiberationStep()" disabled>
+                        <span id="liberationProceedText">Please wait...</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Liberation Complete View -->
+            <section id="viewLiberationComplete" class="view liberation-complete-view">
+                <div class="liberation-complete-content">
+                    <div class="liberation-complete-icon">✓</div>
+                    <h2 class="liberation-complete-title">Well Done</h2>
+                    <p class="liberation-complete-subtitle">You have completed the Liberation & Happiness process</p>
+
+                    <div class="liberation-closing-card">
+                        <h3>Stage 9: Close & Integration</h3>
+                        <p class="liberation-closing-instruction">
+                            "I let everything settle. I don't need to figure anything out right now."
+                        </p>
+                        <p class="liberation-closing-optional">
+                            Optional: lie down 5–10 minutes to integrate.
+                        </p>
+                    </div>
+
+                    <div class="liberation-complete-stats">
+                        <div class="liberation-complete-stat">
+                            <span class="stat-value" id="liberationCompleteRounds">1</span>
+                            <span class="stat-label">Total Rounds</span>
+                        </div>
+                        <div class="liberation-complete-stat">
+                            <span class="stat-value" id="liberationCompleteStreak">1</span>
+                            <span class="stat-label">Day Streak 🔥</span>
+                        </div>
+                    </div>
+
+                    <button class="btn primary large" onclick="closeLiberationComplete()">Done</button>
                 </div>
             </section>
 
@@ -1493,7 +1637,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Clear Ground v5.2</p>
+                    <p class="version">Clear Ground v5.3.1</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>

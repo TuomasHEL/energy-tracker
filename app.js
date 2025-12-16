@@ -1434,6 +1434,15 @@ function showView(viewName) {
                 updateDeepCleanProgress();
                 updateDeepCleanUI();
                 break;
+            case 'liberation':
+                updateLiberationUI();
+                break;
+            case 'liberationProcess':
+                // Handled by startLiberationProcess
+                break;
+            case 'liberationComplete':
+                // Handled by completeLiberationProcess
+                break;
         }
     } catch (error) {
         console.error('Error in showView:', error);
@@ -6285,8 +6294,12 @@ async function initShadow() {
     loadShadowStateFromCache();
     updateShadowUI();
     
+    // Initialize liberation tool
+    initLiberation();
+    
     // Then sync from backend (non-blocking)
     loadShadowFromBackend().catch(e => console.warn('Shadow backend load error:', e));
+    loadLiberationFromBackend().catch(e => console.warn('Liberation backend load error:', e));
 }
 
 // Load shadow state from localStorage cache
@@ -6920,6 +6933,484 @@ function stopDeepClean() {
         updateShadowToolCards();
         
         showToast('Deep Clean stopped', 'info');
+    }
+}
+
+// ============================================
+// LIBERATION & HAPPINESS PROCESS
+// ============================================
+
+// Liberation process data
+const LIBERATION_STAGES = [
+    {
+        number: 1,
+        title: "Session Intention",
+        steps: [
+            { text: "My intention is trauma and emotional healing, gently and safely, in a way my system can integrate.", duration: 10 },
+            { text: "I'm not forcing anything. I'm allowing what's ready to unwind, at the pace my system can handle.", duration: 10 },
+            { text: "If anything feels overwhelming, I'll slow down, feel my body, and return to what feels stabilizing.", duration: 10 }
+        ]
+    },
+    {
+        number: 2,
+        title: "Causal Body Repair",
+        steps: [
+            { text: "For the liberation and happiness of all beings, may the broken parts, bits, and pieces of my causal body return to their original natural places.", duration: 30 },
+            { text: "For the liberation and happiness of all beings, may the broken parts of the causal body's nadi channels return back to their natural places.", duration: 30 },
+            { text: "For the liberation and happiness of all beings, may the fragments of my broken nadi channels return back to their natural places, supporting trauma healing and wholeness.", duration: 30 }
+        ]
+    },
+    {
+        number: 3,
+        title: "Astral Meridian Repair",
+        steps: [
+            { text: "For the liberation and happiness of all beings, may the broken parts of my meridian channels return to their original places.", duration: 30 },
+            { text: "For the liberation and happiness of all beings, may the broken fragments of the meridian channels of my astral body return back to their natural places.", duration: 30 },
+            { text: "For the liberation and happiness of all beings, may the broken parts of my meridians return back to their original places.", duration: 30 },
+            { text: "For the liberation and happiness of all beings, may my astral body and my causal body become completely whole again.", duration: 30 }
+        ]
+    },
+    {
+        number: 4,
+        title: "Vitality Return",
+        steps: [
+            { text: "For the liberation and happiness of all beings, may the vital energy that has left my body through holes in the subtle bodies return to nourish my mind, my heart, and my body.", duration: 30 },
+            { text: "For the liberation and happiness of all beings, may my vitality return to me.", duration: 30 },
+            { text: "For the liberation and happiness of all beings, may my vital energy return to my subtle bodies and circulate smoothly, harmoniously, and beautifully.", duration: 30 }
+        ]
+    },
+    {
+        number: 5,
+        title: "Reintegration of Dissociated Parts",
+        steps: [
+            { text: "For the liberation and happiness of all beings, may the larger sections of the channel system in my astral body return back to where and how they should be.", duration: 30 },
+            { text: "For the liberation and happiness of all beings, may the dissociated parts of my psyche and soul body return back to their natural places and be integrated back into the whole.", duration: 30 },
+            { text: "For the liberation and happiness of all beings, may the larger dissociated sections of the soul body's meridian system return back to their natural original places.", duration: 30 }
+        ]
+    },
+    {
+        number: 6,
+        title: "Emotional Unwinding and Inner Refuge",
+        steps: [
+            { text: "I invite and allow emotions to start releasing.", duration: 30 },
+            { text: "I allow painful memories to surface gently, only as much as I can integrate.", duration: 30 },
+            { text: "I take refuge in what is steady in me: simple presence and embodied safety.", duration: 30 },
+            { text: "I'm here. I'm safe enough right now. I can feel this without fighting it.", duration: 30 }
+        ]
+    },
+    {
+        number: 7,
+        title: "Kindness and Wellbeing Activation",
+        steps: [
+            { text: "For the liberation and happiness of all beings, may I feel love.", duration: 30 },
+            { text: "For the liberation and happiness of all beings, may I be kind to myself.", duration: 30 },
+            { text: "For the liberation and happiness of all beings, may I be happy.", duration: 30 },
+            { text: "For the liberation and happiness of all beings, may the people around me be loved and happy. May all beings be loved and happy.", duration: 30 }
+        ]
+    },
+    {
+        number: 8,
+        title: "May I Change This to Love",
+        steps: [
+            { text: "May I change this to love", duration: 30 },
+            { text: "May I change this to love", duration: 30 },
+            { text: "May I change this to love", duration: 30 }
+        ]
+    }
+];
+
+// Liberation state
+let liberationState = {
+    totalRounds: 0,
+    currentStreak: 0,
+    lastCompletedDate: null,
+    currentStage: 0,
+    currentStep: 0,
+    timer: null,
+    timeRemaining: 0,
+    isTimerComplete: false,
+    healingEnergyEnabled: false,
+    sessionStartTime: null
+};
+
+// Initialize liberation
+function initLiberation() {
+    loadLiberationState();
+    updateLiberationUI();
+}
+
+// Load liberation state from localStorage
+function loadLiberationState() {
+    const saved = localStorage.getItem('liberationState');
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            liberationState.totalRounds = parsed.totalRounds || 0;
+            liberationState.currentStreak = parsed.currentStreak || 0;
+            liberationState.lastCompletedDate = parsed.lastCompletedDate || null;
+        } catch (e) {
+            console.error('Error loading liberation state:', e);
+        }
+    }
+    
+    // Check and update streak
+    updateLiberationStreak();
+}
+
+// Save liberation state
+function saveLiberationState() {
+    localStorage.setItem('liberationState', JSON.stringify({
+        totalRounds: liberationState.totalRounds,
+        currentStreak: liberationState.currentStreak,
+        lastCompletedDate: liberationState.lastCompletedDate
+    }));
+}
+
+// Update streak based on last completion date
+function updateLiberationStreak() {
+    if (!liberationState.lastCompletedDate) return;
+    
+    const lastDate = new Date(liberationState.lastCompletedDate);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    // Reset dates to start of day for comparison
+    lastDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    yesterday.setHours(0, 0, 0, 0);
+    
+    // If last completion was before yesterday, reset streak
+    if (lastDate < yesterday) {
+        liberationState.currentStreak = 0;
+        saveLiberationState();
+    }
+}
+
+// Update Liberation UI
+function updateLiberationUI() {
+    // Main view stats
+    const totalRoundsEl = document.getElementById('liberationTotalRounds');
+    const currentStreakEl = document.getElementById('liberationCurrentStreak');
+    
+    if (totalRoundsEl) totalRoundsEl.textContent = liberationState.totalRounds;
+    if (currentStreakEl) currentStreakEl.textContent = liberationState.currentStreak;
+    
+    // Shadow card stats
+    const roundsText = document.getElementById('liberationRoundsText');
+    const streakText = document.getElementById('liberationStreakText');
+    
+    if (roundsText) roundsText.textContent = `${liberationState.totalRounds} round${liberationState.totalRounds !== 1 ? 's' : ''}`;
+    if (streakText) streakText.textContent = `🔥 ${liberationState.currentStreak} day streak`;
+}
+
+// Start the liberation process
+function startLiberationProcess() {
+    liberationState.currentStage = 0;
+    liberationState.currentStep = 0;
+    liberationState.isTimerComplete = false;
+    
+    // Check if healing energy is enabled
+    const energyToggle = document.getElementById('liberationEnergyToggle');
+    liberationState.healingEnergyEnabled = energyToggle ? energyToggle.checked : false;
+    liberationState.sessionStartTime = new Date();
+    
+    // Show/hide energy indicator
+    const energyIndicator = document.getElementById('liberationEnergyIndicator');
+    if (energyIndicator) {
+        energyIndicator.classList.toggle('active', liberationState.healingEnergyEnabled);
+    }
+    
+    showView('liberationProcess');
+    renderLiberationStep();
+}
+
+// Render current step
+function renderLiberationStep() {
+    const stage = LIBERATION_STAGES[liberationState.currentStage];
+    const step = stage.steps[liberationState.currentStep];
+    
+    // Update stage info
+    document.getElementById('liberationStageBadge').textContent = `Stage ${stage.number} of 8`;
+    document.getElementById('liberationStageTitle').textContent = stage.title;
+    
+    // Update step text
+    document.getElementById('liberationStepText').textContent = `"${step.text}"`;
+    
+    // Render progress dots
+    renderLiberationDots();
+    
+    // Start timer
+    startLiberationTimer(step.duration);
+}
+
+// Render progress dots for all steps across all stages
+function renderLiberationDots() {
+    const dotsContainer = document.getElementById('liberationStepDots');
+    if (!dotsContainer) return;
+    
+    let totalSteps = 0;
+    let currentGlobalStep = 0;
+    
+    // Calculate total steps and current global position
+    LIBERATION_STAGES.forEach((stage, stageIndex) => {
+        stage.steps.forEach((_, stepIndex) => {
+            if (stageIndex < liberationState.currentStage || 
+                (stageIndex === liberationState.currentStage && stepIndex < liberationState.currentStep)) {
+                currentGlobalStep++;
+            }
+            totalSteps++;
+        });
+    });
+    
+    // Render dots
+    let html = '';
+    let globalIndex = 0;
+    LIBERATION_STAGES.forEach((stage, stageIndex) => {
+        stage.steps.forEach((_, stepIndex) => {
+            let dotClass = 'liberation-step-dot';
+            if (globalIndex < currentGlobalStep) {
+                dotClass += ' completed';
+            } else if (stageIndex === liberationState.currentStage && stepIndex === liberationState.currentStep) {
+                dotClass += ' active';
+            }
+            html += `<div class="${dotClass}"></div>`;
+            globalIndex++;
+        });
+    });
+    
+    dotsContainer.innerHTML = html;
+}
+
+// Start timer for current step
+function startLiberationTimer(duration) {
+    liberationState.timeRemaining = duration;
+    liberationState.isTimerComplete = false;
+    
+    const timerText = document.getElementById('liberationTimerText');
+    const timerCircle = document.getElementById('liberationTimerCircle');
+    const proceedBtn = document.getElementById('liberationProceedBtn');
+    const proceedText = document.getElementById('liberationProceedText');
+    
+    // Reset UI
+    timerText.textContent = duration;
+    timerCircle.style.strokeDashoffset = '0';
+    proceedBtn.disabled = true;
+    proceedText.textContent = 'Please wait...';
+    
+    const circumference = 283; // 2 * PI * 45 (radius)
+    
+    // Clear any existing timer
+    if (liberationState.timer) {
+        clearInterval(liberationState.timer);
+    }
+    
+    liberationState.timer = setInterval(() => {
+        liberationState.timeRemaining--;
+        timerText.textContent = liberationState.timeRemaining;
+        
+        // Update circle progress
+        const progress = (duration - liberationState.timeRemaining) / duration;
+        timerCircle.style.strokeDashoffset = circumference * (1 - progress);
+        
+        if (liberationState.timeRemaining <= 0) {
+            clearInterval(liberationState.timer);
+            liberationState.timer = null;
+            liberationState.isTimerComplete = true;
+            
+            // Enable proceed button
+            proceedBtn.disabled = false;
+            
+            // Check if this is the last step
+            const isLastStage = liberationState.currentStage === LIBERATION_STAGES.length - 1;
+            const isLastStep = liberationState.currentStep === LIBERATION_STAGES[liberationState.currentStage].steps.length - 1;
+            
+            if (isLastStage && isLastStep) {
+                proceedText.textContent = 'Complete';
+            } else {
+                proceedText.textContent = 'Proceed →';
+            }
+            
+            // Play subtle sound
+            playCompletionSound();
+            vibrate([50]);
+        }
+    }, 1000);
+}
+
+// Proceed to next step
+function proceedLiberationStep() {
+    if (!liberationState.isTimerComplete) return;
+    
+    const currentStage = LIBERATION_STAGES[liberationState.currentStage];
+    const isLastStepInStage = liberationState.currentStep === currentStage.steps.length - 1;
+    const isLastStage = liberationState.currentStage === LIBERATION_STAGES.length - 1;
+    
+    if (isLastStepInStage) {
+        if (isLastStage) {
+            // Process complete
+            completeLiberationProcess();
+        } else {
+            // Move to next stage
+            liberationState.currentStage++;
+            liberationState.currentStep = 0;
+            renderLiberationStep();
+        }
+    } else {
+        // Move to next step in current stage
+        liberationState.currentStep++;
+        renderLiberationStep();
+    }
+}
+
+// Complete the liberation process
+function completeLiberationProcess() {
+    // Update stats
+    liberationState.totalRounds++;
+    
+    // Update streak
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (liberationState.lastCompletedDate) {
+        const lastDate = new Date(liberationState.lastCompletedDate);
+        lastDate.setHours(0, 0, 0, 0);
+        
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        if (lastDate.getTime() === yesterday.getTime()) {
+            // Consecutive day
+            liberationState.currentStreak++;
+        } else if (lastDate.getTime() < yesterday.getTime()) {
+            // Streak broken, start new
+            liberationState.currentStreak = 1;
+        }
+        // If same day, keep streak as is
+    } else {
+        // First time
+        liberationState.currentStreak = 1;
+    }
+    
+    liberationState.lastCompletedDate = today.toISOString();
+    
+    saveLiberationState();
+    syncLiberationToBackend();
+    updateLiberationUI();
+    
+    // Save healing energy session if enabled
+    if (liberationState.healingEnergyEnabled && state.currentUser && liberationState.sessionStartTime) {
+        const endTime = new Date();
+        const durationMinutes = Math.round((endTime - liberationState.sessionStartTime) / 60000);
+        
+        apiCall('saveSession', {
+            userId: state.currentUser.user_id,
+            markerId: '',
+            startTime: liberationState.sessionStartTime.toISOString(),
+            endTime: endTime.toISOString(),
+            durationMinutes: durationMinutes,
+            energyType: 'Onelove',
+            intensity: 'medium',
+            notes: 'Liberation & Happiness Process'
+        }).catch(e => console.warn('Error saving liberation energy session:', e));
+        
+        // Add to local sessions for immediate UI update
+        if (state.sessions) {
+            state.sessions.unshift({
+                start_time: liberationState.sessionStartTime.toISOString(),
+                end_time: endTime.toISOString(),
+                duration_minutes: durationMinutes,
+                energy_type: 'Onelove',
+                intensity: 'medium',
+                notes: 'Liberation & Happiness Process'
+            });
+        }
+    }
+    
+    // Reset energy state
+    liberationState.healingEnergyEnabled = false;
+    liberationState.sessionStartTime = null;
+    
+    // Update complete screen stats
+    document.getElementById('liberationCompleteRounds').textContent = liberationState.totalRounds;
+    document.getElementById('liberationCompleteStreak').textContent = liberationState.currentStreak;
+    
+    // Show complete view
+    showView('liberationComplete');
+    
+    // Play completion sound
+    playCompletionSound();
+    vibrate([100, 50, 100, 50, 100]);
+}
+
+// Confirm exit from liberation process
+function confirmExitLiberation() {
+    if (confirm('Are you sure you want to exit? Your progress in this session will be lost.')) {
+        exitLiberationProcess();
+    }
+}
+
+// Exit liberation process
+function exitLiberationProcess() {
+    // Clear timer
+    if (liberationState.timer) {
+        clearInterval(liberationState.timer);
+        liberationState.timer = null;
+    }
+    
+    // Clear energy state (no session saved since incomplete)
+    liberationState.healingEnergyEnabled = false;
+    liberationState.sessionStartTime = null;
+    
+    showView('liberation');
+}
+
+// Close liberation complete screen
+function closeLiberationComplete() {
+    showView('shadow');
+}
+
+// Sync liberation state to backend
+async function syncLiberationToBackend() {
+    if (!state.currentUser) return;
+    
+    try {
+        await apiCall('saveLiberationProgress', {
+            userId: state.currentUser.user_id,
+            totalRounds: liberationState.totalRounds,
+            currentStreak: liberationState.currentStreak,
+            lastCompletedDate: liberationState.lastCompletedDate
+        });
+    } catch (e) {
+        console.warn('Error syncing liberation to backend:', e);
+    }
+}
+
+// Load liberation state from backend
+async function loadLiberationFromBackend() {
+    if (!state.currentUser) return;
+    
+    try {
+        const result = await apiCall('getLiberationProgress', { userId: state.currentUser.user_id });
+        
+        if (result?.liberationProgress) {
+            const progress = result.liberationProgress;
+            
+            if (progress.totalRounds > liberationState.totalRounds) {
+                liberationState.totalRounds = progress.totalRounds;
+            }
+            if (progress.currentStreak > liberationState.currentStreak) {
+                liberationState.currentStreak = progress.currentStreak;
+            }
+            if (progress.lastCompletedDate) {
+                liberationState.lastCompletedDate = progress.lastCompletedDate;
+            }
+            
+            saveLiberationState();
+            updateLiberationUI();
+        }
+    } catch (e) {
+        console.error('Error loading liberation from backend:', e);
     }
 }
 

@@ -6121,3 +6121,504 @@ input:checked + .toggle-slider:before {
 .btn.danger:hover {
     background: rgba(239, 68, 68, 0.3);
 }
+
+/* ============================================
+   LIBERATION & HAPPINESS TOOL
+   ============================================ */
+
+/* Liberation card in Shadow grid */
+.shadow-tool-card.liberation {
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.1), rgba(139, 92, 246, 0.1));
+}
+
+.shadow-tool-card.liberation .shadow-tool-icon {
+    color: #EC4899;
+}
+
+.shadow-tool-stats {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    margin-top: var(--space-sm);
+}
+
+.liberation-stat {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.liberation-streak {
+    font-size: 0.85rem;
+    color: #F59E0B;
+}
+
+/* Liberation Main View */
+.liberation-stats-row {
+    display: flex;
+    gap: var(--space-md);
+    padding: var(--space-md);
+}
+
+.liberation-stat-card {
+    flex: 1;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    text-align: center;
+}
+
+.liberation-stat-card.streak {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.05));
+    border-color: rgba(245, 158, 11, 0.3);
+}
+
+.liberation-stat-value {
+    display: block;
+    font-size: 2rem;
+    font-weight: 600;
+    color: #EC4899;
+    margin-bottom: var(--space-xs);
+}
+
+.liberation-stat-card.streak .liberation-stat-value {
+    color: #F59E0B;
+}
+
+.liberation-stat-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.liberation-intro {
+    padding: 0 var(--space-md);
+    margin-bottom: var(--space-lg);
+}
+
+.liberation-intro p {
+    color: var(--text-secondary);
+    line-height: 1.6;
+    text-align: center;
+}
+
+.liberation-instructions {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--space-lg);
+    margin: 0 var(--space-md) var(--space-xl);
+}
+
+.liberation-instructions h3 {
+    font-size: 1rem;
+    color: var(--text-primary);
+    margin-bottom: var(--space-md);
+}
+
+.liberation-instructions ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.liberation-instructions li {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    padding: var(--space-xs) 0;
+    padding-left: var(--space-lg);
+    position: relative;
+}
+
+.liberation-instructions li::before {
+    content: "•";
+    color: #EC4899;
+    position: absolute;
+    left: 0;
+}
+
+.liberation-start-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--space-xl);
+}
+
+.liberation-prompt-icon {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.3), rgba(139, 92, 246, 0.2));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 40px rgba(236, 72, 153, 0.2);
+    animation: liberation-pulse-soft 3s ease-in-out infinite;
+}
+
+.liberation-prompt-icon:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 60px rgba(236, 72, 153, 0.3);
+}
+
+@keyframes liberation-pulse-soft {
+    0%, 100% {
+        box-shadow: 0 0 40px rgba(236, 72, 153, 0.2);
+    }
+    50% {
+        box-shadow: 0 0 60px rgba(236, 72, 153, 0.3);
+    }
+}
+
+.liberation-symbol {
+    font-size: 3.5rem;
+    color: #EC4899;
+}
+
+.liberation-prompt-text {
+    margin-top: var(--space-lg);
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+/* Liberation Process View */
+.liberation-process-view {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-primary);
+    z-index: 1000;
+    display: none;
+    flex-direction: column;
+    padding: 0;
+}
+
+.liberation-process-view.active {
+    display: flex;
+}
+
+.liberation-exit-btn {
+    position: absolute;
+    top: var(--space-lg);
+    right: var(--space-lg);
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.5rem;
+    cursor: pointer;
+    z-index: 10;
+    padding: var(--space-sm);
+}
+
+.liberation-process-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-xl);
+    padding-bottom: 120px;
+    text-align: center;
+}
+
+.liberation-stage-badge {
+    display: inline-block;
+    padding: var(--space-xs) var(--space-md);
+    background: rgba(236, 72, 153, 0.2);
+    color: #EC4899;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--space-sm);
+}
+
+.liberation-stage-title {
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    margin-bottom: var(--space-xl);
+    font-weight: 500;
+}
+
+.liberation-step-text {
+    font-size: 1.2rem;
+    line-height: 1.6;
+    color: var(--text-primary);
+    max-width: 500px;
+    margin-bottom: var(--space-xl);
+    font-style: italic;
+    padding: var(--space-md);
+    background: rgba(236, 72, 153, 0.05);
+    border-radius: var(--radius-md);
+    border-left: 3px solid #EC4899;
+}
+
+.liberation-feel-notice {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: var(--space-xl);
+    max-width: 400px;
+}
+
+.liberation-timer-display {
+    margin-bottom: var(--space-lg);
+}
+
+.liberation-timer-circle {
+    width: 120px;
+    height: 120px;
+    position: relative;
+}
+
+.liberation-timer-circle svg {
+    transform: rotate(-90deg);
+    width: 100%;
+    height: 100%;
+}
+
+.liberation-timer-bg {
+    fill: none;
+    stroke: var(--border-color);
+    stroke-width: 4;
+}
+
+.liberation-timer-progress {
+    fill: none;
+    stroke: #EC4899;
+    stroke-width: 4;
+    stroke-linecap: round;
+    stroke-dasharray: 283;
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 0.1s linear;
+}
+
+.liberation-timer-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2rem;
+    font-weight: 600;
+    color: #EC4899;
+}
+
+.liberation-step-dots {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    flex-wrap: wrap;
+    max-width: 300px;
+}
+
+.liberation-step-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border-color);
+    transition: all 0.3s ease;
+}
+
+.liberation-step-dot.active {
+    background: #EC4899;
+    transform: scale(1.2);
+}
+
+.liberation-step-dot.completed {
+    background: #10B981;
+}
+
+.liberation-process-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: var(--space-lg);
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: center;
+}
+
+.liberation-process-nav .btn {
+    min-width: 200px;
+}
+
+.liberation-process-nav .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Liberation Complete View */
+.liberation-complete-view {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-primary);
+    z-index: 1000;
+    display: none;
+    flex-direction: column;
+}
+
+.liberation-complete-view.active {
+    display: flex;
+}
+
+.liberation-complete-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-xl);
+    text-align: center;
+}
+
+.liberation-complete-icon {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(16, 185, 129, 0.1));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    color: #10B981;
+    margin-bottom: var(--space-lg);
+}
+
+.liberation-complete-title {
+    font-size: 1.8rem;
+    color: var(--text-primary);
+    margin-bottom: var(--space-sm);
+}
+
+.liberation-complete-subtitle {
+    color: var(--text-secondary);
+    margin-bottom: var(--space-xl);
+}
+
+.liberation-closing-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    margin-bottom: var(--space-xl);
+    max-width: 400px;
+    width: 100%;
+}
+
+.liberation-closing-card h3 {
+    font-size: 1rem;
+    color: #EC4899;
+    margin-bottom: var(--space-md);
+}
+
+.liberation-closing-instruction {
+    font-style: italic;
+    color: var(--text-primary);
+    line-height: 1.6;
+    margin-bottom: var(--space-md);
+}
+
+.liberation-closing-optional {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.liberation-complete-stats {
+    display: flex;
+    gap: var(--space-xl);
+    margin-bottom: var(--space-xl);
+}
+
+.liberation-complete-stat {
+    text-align: center;
+}
+
+.liberation-complete-stat .stat-value {
+    display: block;
+    font-size: 2rem;
+    font-weight: 600;
+    color: #EC4899;
+    margin-bottom: var(--space-xs);
+}
+
+.liberation-complete-stat .stat-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* Liberation Energy Toggle */
+.liberation-energy-toggle {
+    margin: 0 var(--space-md) var(--space-xl);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--space-md) var(--space-lg);
+}
+
+.liberation-toggle-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+}
+
+.liberation-toggle-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.liberation-toggle-label {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.liberation-toggle-description {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* Energy indicator in process view */
+.liberation-energy-indicator {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-md);
+    background: rgba(236, 72, 153, 0.15);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--space-md);
+    font-size: 0.8rem;
+    color: #EC4899;
+}
+
+.liberation-energy-indicator.active {
+    display: flex;
+}
+
+.liberation-energy-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #EC4899;
+    animation: energy-pulse 2s ease-in-out infinite;
+}
+
+@keyframes energy-pulse {
+    0%, 100% {
+        opacity: 0.5;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.2);
+    }
+}
