@@ -1,5 +1,5 @@
 // Clear Ground - Google Apps Script Backend
-// Version 3.1 - Added Signal rating, category order & index
+// Version 3.2 - Added Attunements support
 
 // ============================================
 // CONFIGURATION
@@ -64,6 +64,18 @@ function createSheet(name) {
       sheet.appendRow([
         'record_id', 'user_id', 'lesson_id', 'category', 'status',
         'is_favorite', 'rating', 'shown_at', 'completed_at'
+      ]);
+      break;
+    case 'Attunements':
+      sheet.appendRow([
+        'attunement_id', 'name', 'description', 'usage_instructions',
+        'duration', 'series_id', 'series_name', 'level',
+        'visible', 'created_at', 'updated_at'
+      ]);
+      break;
+    case 'UserAttunements':
+      sheet.appendRow([
+        'record_id', 'user_id', 'attunement_id', 'attuned_at', 'level'
       ]);
       break;
   }
@@ -185,6 +197,23 @@ function handleRequest(e) {
         break;
       case 'saveSignalHistory':
         result = saveSignalHistory(params);
+        break;
+        
+      // Attunement operations
+      case 'getAttunements':
+        result = getAttunements();
+        break;
+      case 'saveAttunement':
+        result = saveAttunement(params);
+        break;
+      case 'deleteAttunement':
+        result = deleteAttunement(params.attunementId);
+        break;
+      case 'getUserAttunements':
+        result = getUserAttunements(params.userId);
+        break;
+      case 'saveUserAttunement':
+        result = saveUserAttunement(params);
         break;
         
       // Config operations
@@ -977,6 +1006,143 @@ function saveSignalHistory(params) {
     params.rating || '',
     params.shownAt || new Date().toISOString(),
     params.completedAt || ''
+  ]);
+  
+  return { success: true, record_id: recordId };
+}
+
+// ============================================
+// ATTUNEMENT FUNCTIONS
+// ============================================
+
+function getAttunements() {
+  const sheet = getSheet('Attunements');
+  const data = sheet.getDataRange().getValues();
+  
+  if (data.length <= 1) {
+    return { attunements: [] };
+  }
+  
+  const headers = data[0];
+  const attunements = [];
+  
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    attunements.push({
+      id: row[0],
+      name: row[1],
+      description: row[2],
+      usageInstructions: row[3],
+      duration: row[4],
+      seriesId: row[5],
+      seriesName: row[6],
+      level: row[7],
+      visible: row[8] === true || row[8] === 'TRUE' || row[8] === 'true',
+      createdAt: row[9],
+      updatedAt: row[10]
+    });
+  }
+  
+  return { attunements: attunements };
+}
+
+function saveAttunement(params) {
+  const sheet = getSheet('Attunements');
+  const data = sheet.getDataRange().getValues();
+  const now = new Date().toISOString();
+  
+  // Check if updating existing attunement
+  if (params.id) {
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === params.id) {
+        const rowIndex = i + 1;
+        const rowData = [
+          params.id,
+          params.name,
+          params.description || '',
+          params.usageInstructions || '',
+          params.duration || 30,
+          params.seriesId || '',
+          params.seriesName || '',
+          params.level || 1,
+          params.visible !== false,
+          data[i][9], // Keep original createdAt
+          now
+        ];
+        sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+        return { success: true, attunement_id: params.id };
+      }
+    }
+  }
+  
+  // New attunement
+  const attunementId = params.id || 'att-' + Date.now();
+  sheet.appendRow([
+    attunementId,
+    params.name,
+    params.description || '',
+    params.usageInstructions || '',
+    params.duration || 30,
+    params.seriesId || '',
+    params.seriesName || '',
+    params.level || 1,
+    params.visible !== false,
+    now,
+    now
+  ]);
+  
+  return { success: true, attunement_id: attunementId };
+}
+
+function deleteAttunement(attunementId) {
+  const sheet = getSheet('Attunements');
+  const data = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === attunementId) {
+      sheet.deleteRow(i + 1);
+      return { success: true };
+    }
+  }
+  
+  return { error: 'Attunement not found' };
+}
+
+function getUserAttunements(userId) {
+  const sheet = getSheet('UserAttunements');
+  const data = sheet.getDataRange().getValues();
+  
+  if (data.length <= 1) {
+    return { userAttunements: [] };
+  }
+  
+  const userAttunements = [];
+  
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (row[1] === userId) {
+      userAttunements.push({
+        recordId: row[0],
+        attunementId: row[2],
+        attunedAt: row[3],
+        level: row[4]
+      });
+    }
+  }
+  
+  return { userAttunements: userAttunements };
+}
+
+function saveUserAttunement(params) {
+  const sheet = getSheet('UserAttunements');
+  const recordId = 'UA_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  
+  sheet.appendRow([
+    recordId,
+    params.userId,
+    params.attunementId,
+    params.attunedAt || new Date().toISOString(),
+    params.level || 1
   ]);
   
   return { success: true, record_id: recordId };

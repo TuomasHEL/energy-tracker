@@ -129,6 +129,18 @@
                     </div>
                     <div class="attunement-home-arrow">→</div>
                 </div>
+
+                <!-- Shadow Card -->
+                <div class="shadow-home-card" onclick="showView('shadow')">
+                    <div class="shadow-home-icon">◐</div>
+                    <div class="shadow-home-content">
+                        <div class="shadow-home-title">Shadow</div>
+                        <div class="shadow-home-stats">
+                            <span id="shadowOverallProgress">Integration & processing tools</span>
+                        </div>
+                    </div>
+                    <div class="shadow-home-arrow">→</div>
+                </div>
             </section>
 
             <!-- Signal View -->
@@ -524,6 +536,241 @@
                     <h3>Existing Attunements</h3>
                     <div class="admin-attunements-list" id="adminAttunementsList">
                         <!-- Admin list of attunements will be shown here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Shadow Main View -->
+            <section id="viewShadow" class="view">
+                <div class="view-header">
+                    <h2>Shadow</h2>
+                </div>
+
+                <p class="shadow-intro">Tools for integrating polarities and processing emotional states from the subconscious</p>
+
+                <div class="shadow-tools-grid">
+                    <!-- Integrate Tool Card -->
+                    <div class="shadow-tool-card" onclick="showView('integrate')">
+                        <div class="shadow-tool-icon">☯</div>
+                        <div class="shadow-tool-content">
+                            <h3>Integrate</h3>
+                            <p>Work through polarities to achieve inner balance</p>
+                            <div class="shadow-tool-progress">
+                                <div class="shadow-progress-bar">
+                                    <div class="shadow-progress-fill" id="integrateProgressBar" style="width: 0%"></div>
+                                </div>
+                                <span class="shadow-progress-text" id="integrateProgressText">0% complete</span>
+                            </div>
+                        </div>
+                        <div class="shadow-tool-arrow">→</div>
+                    </div>
+
+                    <!-- Process Tool Card -->
+                    <div class="shadow-tool-card" onclick="showView('process')">
+                        <div class="shadow-tool-icon">◉</div>
+                        <div class="shadow-tool-content">
+                            <h3>Process</h3>
+                            <p>Release emotional states and charges</p>
+                            <div class="shadow-tool-progress">
+                                <div class="shadow-progress-bar">
+                                    <div class="shadow-progress-fill" id="processProgressBar" style="width: 0%"></div>
+                                </div>
+                                <span class="shadow-progress-text" id="processProgressText">0% complete</span>
+                            </div>
+                        </div>
+                        <div class="shadow-tool-arrow">→</div>
+                    </div>
+
+                    <!-- Deep Clean Tool Card -->
+                    <div class="shadow-tool-card" onclick="showView('deepClean')">
+                        <div class="shadow-tool-icon">✧</div>
+                        <div class="shadow-tool-content">
+                            <h3>Deep Clean</h3>
+                            <p>30-day subconscious cleansing process</p>
+                            <div class="shadow-tool-status" id="deepCleanStatus">Not started</div>
+                        </div>
+                        <div class="shadow-tool-arrow">→</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Integrate Main View -->
+            <section id="viewIntegrate" class="view">
+                <div class="view-header">
+                    <button class="back-btn" onclick="showView('shadow')">←</button>
+                    <h2>Integrate</h2>
+                    <button class="btn small secondary" onclick="showView('integrateHistory')">History</button>
+                </div>
+
+                <div class="integrate-stats-bar">
+                    <span class="integrate-progress">
+                        <span id="integrateCompletedCount">0</span> / <span id="integrateTotalCount">0</span> integrated
+                    </span>
+                    <span class="integrate-percentage" id="integratePercentage">0%</span>
+                </div>
+
+                <!-- Integrate Prompt -->
+                <div id="integratePrompt" class="integrate-prompt">
+                    <div class="integrate-prompt-icon" onclick="startNextIntegration()">
+                        <span class="integrate-symbol">☯</span>
+                    </div>
+                    <p class="integrate-prompt-text">Tap to integrate next polarity</p>
+                </div>
+            </section>
+
+            <!-- Integrate Card View -->
+            <section id="viewIntegrateCard" class="view shadow-card-view">
+                <button class="session-exit-btn" onclick="closeIntegrateCard()">✕</button>
+
+                <div class="shadow-card-header">
+                    <span class="shadow-card-number" id="integrateCardNumber">1 of 100</span>
+                </div>
+
+                <div class="shadow-card-content">
+                    <div class="polarity-display">
+                        <span class="polarity-left" id="polarityLeft">absolute</span>
+                        <span class="polarity-separator">—</span>
+                        <span class="polarity-right" id="polarityRight">relative</span>
+                    </div>
+                    <p class="polarity-description" id="polarityDescription"></p>
+                </div>
+
+                <div class="shadow-card-actions">
+                    <button class="btn secondary" onclick="skipIntegration()">Skip</button>
+                    <button class="btn primary" onclick="completeIntegration()">Integrate</button>
+                </div>
+            </section>
+
+            <!-- Integrate History View -->
+            <section id="viewIntegrateHistory" class="view">
+                <div class="view-header">
+                    <button class="back-btn" onclick="showView('integrate')">←</button>
+                    <h2>Integration History</h2>
+                </div>
+
+                <div class="history-tabs">
+                    <button class="tab-btn active" onclick="showIntegrateTab('completed')">Completed</button>
+                    <button class="tab-btn" onclick="showIntegrateTab('skipped')">Skipped</button>
+                </div>
+
+                <div id="integrateHistoryList" class="shadow-history-list">
+                    <!-- History items will be dynamically inserted here -->
+                </div>
+            </section>
+
+            <!-- Process Main View -->
+            <section id="viewProcess" class="view">
+                <div class="view-header">
+                    <button class="back-btn" onclick="showView('shadow')">←</button>
+                    <h2>Process</h2>
+                    <button class="btn small secondary" onclick="showView('processHistory')">History</button>
+                </div>
+
+                <div class="process-stats-bar">
+                    <span class="process-progress">
+                        <span id="processCompletedCount">0</span> / <span id="processTotalCount">0</span> processed
+                    </span>
+                    <span class="process-percentage" id="processPercentage">0%</span>
+                </div>
+
+                <!-- Process Prompt -->
+                <div id="processPrompt" class="process-prompt">
+                    <div class="process-prompt-icon" onclick="startNextProcess()">
+                        <span class="process-symbol">◉</span>
+                    </div>
+                    <p class="process-prompt-text">Tap to process next emotional state</p>
+                </div>
+            </section>
+
+            <!-- Process Card View -->
+            <section id="viewProcessCard" class="view shadow-card-view">
+                <button class="session-exit-btn" onclick="closeProcessCard()">✕</button>
+
+                <div class="shadow-card-header">
+                    <span class="shadow-card-number" id="processCardNumber">1 of 100</span>
+                </div>
+
+                <div class="shadow-card-content">
+                    <div class="emotion-display">
+                        <span class="emotion-name" id="emotionName">abandoned</span>
+                    </div>
+                    <p class="emotion-description" id="emotionDescription"></p>
+                </div>
+
+                <div class="shadow-card-actions">
+                    <button class="btn secondary" onclick="skipProcess()">Skip</button>
+                    <button class="btn primary" onclick="completeProcess()">Process</button>
+                </div>
+            </section>
+
+            <!-- Process History View -->
+            <section id="viewProcessHistory" class="view">
+                <div class="view-header">
+                    <button class="back-btn" onclick="showView('process')">←</button>
+                    <h2>Process History</h2>
+                </div>
+
+                <div class="history-tabs">
+                    <button class="tab-btn active" onclick="showProcessTab('completed')">Completed</button>
+                    <button class="tab-btn" onclick="showProcessTab('skipped')">Skipped</button>
+                </div>
+
+                <div id="processHistoryList" class="shadow-history-list">
+                    <!-- History items will be dynamically inserted here -->
+                </div>
+            </section>
+
+            <!-- Deep Clean View -->
+            <section id="viewDeepClean" class="view">
+                <div class="view-header">
+                    <button class="back-btn" onclick="showView('shadow')">←</button>
+                    <h2>Deep Clean</h2>
+                </div>
+
+                <div class="deep-clean-content">
+                    <!-- Not Started State -->
+                    <div id="deepCleanNotStarted" class="deep-clean-state">
+                        <div class="deep-clean-icon">✧</div>
+                        <h3>30-Day Deep Cleansing</h3>
+                        <p class="deep-clean-description">
+                            This process works while you sleep, clearing deep subconscious patterns over 30 days.
+                            Once started, it runs automatically in the background.
+                        </p>
+                        <button class="btn primary large" onclick="startDeepClean()">Begin Deep Clean</button>
+                    </div>
+
+                    <!-- In Progress State -->
+                    <div id="deepCleanInProgress" class="deep-clean-state hidden">
+                        <div class="deep-clean-orb">
+                            <div class="deep-clean-orb-inner">✧</div>
+                        </div>
+                        <h3>Deep Clean in Progress</h3>
+                        <div class="deep-clean-progress">
+                            <div class="deep-clean-days">
+                                <span class="deep-clean-current" id="deepCleanCurrentDay">0</span>
+                                <span class="deep-clean-separator">/</span>
+                                <span class="deep-clean-total">30</span>
+                            </div>
+                            <span class="deep-clean-label">days complete</span>
+                        </div>
+                        <div class="deep-clean-progress-bar">
+                            <div class="deep-clean-progress-fill" id="deepCleanProgressFill" style="width: 0%"></div>
+                        </div>
+                        <p class="deep-clean-status" id="deepCleanStatusText">Working while you sleep...</p>
+                        <div class="deep-clean-actions">
+                            <button class="btn secondary" id="deepCleanPauseBtn" onclick="toggleDeepCleanPause()">Pause</button>
+                            <button class="btn danger" onclick="stopDeepClean()">Stop</button>
+                        </div>
+                    </div>
+
+                    <!-- Completed State -->
+                    <div id="deepCleanCompleted" class="deep-clean-state hidden">
+                        <div class="deep-clean-complete-icon">✓</div>
+                        <h3>Deep Clean Complete</h3>
+                        <p class="deep-clean-description">
+                            Congratulations! You have completed the 30-day deep cleansing process.
+                        </p>
+                        <p class="deep-clean-date" id="deepCleanCompletedDate">Completed on: -</p>
                     </div>
                 </div>
             </section>
@@ -1164,7 +1411,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Clear Ground v4.8.1</p>
+                    <p class="version">Clear Ground v5.0</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>

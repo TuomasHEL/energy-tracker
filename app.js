@@ -292,6 +292,9 @@ async function init() {
         // Initialize attunements
         initAttunements();
         
+        // Initialize shadow tools
+        initShadow();
+        
         console.log('App init completed successfully');
         
     } catch (error) {
@@ -911,6 +914,7 @@ function setupVisibilityHandler() {
         if (document.hidden) {
             saveTimerState();
             savePlaylistState();
+            saveRunningAttunementState();
         } else {
             // Page became visible - catch up on any elapsed time
             
@@ -931,13 +935,36 @@ function setupVisibilityHandler() {
             if (state.playlistRunner.isRunning && !state.playlistRunner.isPaused) {
                 catchUpPlaylist();
             }
+            
+            // Handle attunement - catch up if needed
+            if (attunementState.isRunning) {
+                catchUpAttunement();
+            }
         }
     });
     
     window.addEventListener('beforeunload', () => {
         saveTimerState();
         savePlaylistState();
+        saveRunningAttunementState();
     });
+}
+
+// Catch up attunement when returning from background
+function catchUpAttunement() {
+    if (!attunementState.isRunning || !attunementState.endTime) return;
+    
+    const now = new Date();
+    const remaining = Math.round((attunementState.endTime - now) / 1000);
+    
+    if (remaining <= 0) {
+        // Attunement completed while in background
+        completeAttunement();
+    } else {
+        // Update remaining time
+        attunementState.remaining = remaining;
+        updateAttunementTimer();
+    }
 }
 
 // Catch up playlist when returning from background
@@ -1387,6 +1414,25 @@ function showView(viewName) {
                 break;
             case 'attunementSettings':
                 renderAdminAttunements();
+                break;
+            case 'shadow':
+                updateShadowUI();
+                break;
+            case 'integrate':
+                updateIntegrateUI();
+                break;
+            case 'integrateHistory':
+                renderIntegrateHistory('completed');
+                break;
+            case 'process':
+                updateProcessUI();
+                break;
+            case 'processHistory':
+                renderProcessHistory('completed');
+                break;
+            case 'deepClean':
+                updateDeepCleanProgress();
+                updateDeepCleanUI();
                 break;
         }
     } catch (error) {
@@ -4862,6 +4908,969 @@ function animate() {
 }
 
 // ============================================
+// SHADOW FEATURE
+// ============================================
+
+// Polarities data for Integrate tool
+const POLARITIES_DATA = [
+    { id: 1, left: "ability (to do something)", right: "disability", description: "" },
+    { id: 2, left: "abnormal", right: "normal", description: "" },
+    { id: 3, left: "indifference", right: "sympathy", description: "" },
+    { id: 4, left: "absolute", right: "relative", description: "" },
+    { id: 5, left: "abstract", right: "concrete", description: "" },
+    { id: 6, left: "acceptable", right: "unacceptable", description: "" },
+    { id: 7, left: "acceptance", right: "rejection", description: "" },
+    { id: 8, left: "acceptance of someone else's points of view", right: "unacceptance of someone else's points of view", description: "" },
+    { id: 9, left: "accessibility", right: "inaccessibility", description: "" },
+    { id: 10, left: "active", right: "passive", description: "" },
+    { id: 11, left: "activity", right: "passivity", description: "" },
+    { id: 12, left: "adequate", right: "inadequate", description: "" },
+    { id: 13, left: "advancement", right: "retreat", description: "" },
+    { id: 14, left: "all", right: "nothing", description: "" },
+    { id: 15, left: "altruism", right: "egoism", description: "" },
+    { id: 16, left: "always", right: "never", description: "" },
+    { id: 17, left: "analysis", right: "synthesis", description: "" },
+    { id: 18, left: "anxiety", right: "peace", description: "" },
+    { id: 19, left: "anxiety", right: "tranquility", description: "" },
+    { id: 20, left: "appearance", right: "disappearance", description: "" },
+    { id: 21, left: "approaching to a goal", right: "moving away from a goal", description: "" },
+    { id: 22, left: "arrival", right: "departure", description: "" },
+    { id: 23, left: "attack", right: "counter-attack", description: "" },
+    { id: 24, left: "attraction", right: "repulsion", description: "" },
+    { id: 25, left: "attraction to people", right: "rejection of people", description: "" },
+    { id: 26, left: "balance", right: "compulsion", description: "" },
+    { id: 27, left: "beauty", right: "ugliness", description: "" },
+    { id: 28, left: "beginning", right: "end", description: "" },
+    { id: 29, left: "belief", right: "disbelief", description: "" },
+    { id: 30, left: "benevolence", right: "hostility", description: "" },
+    { id: 31, left: "better", right: "worse", description: "" },
+    { id: 32, left: "big", right: "small", description: "" },
+    { id: 33, left: "body", right: "mind", description: "" },
+    { id: 34, left: "body", right: "spirit", description: "" },
+    { id: 35, left: "boredom", right: "interest", description: "" },
+    { id: 36, left: "change", right: "stagnation", description: "" },
+    { id: 37, left: "chaos", right: "order", description: "" },
+    { id: 38, left: "charisma", right: "dullness", description: "" },
+    { id: 39, left: "cheerful", right: "tired", description: "" },
+    { id: 40, left: "cheerfulness", right: "gloominess", description: "" },
+    { id: 41, left: "clean", right: "dirty", description: "" },
+    { id: 42, left: "communication", right: "silence", description: "" },
+    { id: 43, left: "conclusion", right: "beginning", description: "" },
+    { id: 44, left: "condensation", right: "dissolution", description: "" },
+    { id: 45, left: "confidence", right: "doubt", description: "" },
+    { id: 46, left: "confidence about the abundance of the universe", right: "fear that you will receive nothing", description: "" },
+    { id: 47, left: "confirmation", right: "denial", description: "" },
+    { id: 48, left: "consciousness", right: "body", description: "" },
+    { id: 49, left: "consciousness", right: "instincts", description: "" },
+    { id: 50, left: "consciousness", right: "materiality", description: "" },
+    { id: 51, left: "consciousness", right: "unconsciousness", description: "" },
+    { id: 52, left: "contempt", right: "respect", description: "" },
+    { id: 53, left: "control", right: "freedom", description: "" },
+    { id: 54, left: "correct", right: "incorrect", description: "" },
+    { id: 55, left: "creation", right: "destruction", description: "" },
+    { id: 56, left: "danger", right: "safety", description: "" },
+    { id: 57, left: "darkness", right: "light", description: "" },
+    { id: 58, left: "day", right: "night", description: "" },
+    { id: 59, left: "decent", right: "indecent", description: "" },
+    { id: 60, left: "dependence", right: "independence", description: "" },
+    { id: 61, left: "depth", right: "surface", description: "" },
+    { id: 62, left: "difference", right: "similarity", description: "" },
+    { id: 63, left: "difference", right: "agreement", description: "" },
+    { id: 64, left: "dissatisfaction", right: "satisfaction", description: "" },
+    { id: 65, left: "distrust of people", right: "trust of people", description: "" },
+    { id: 66, left: "divine", right: "ordinary", description: "" },
+    { id: 67, left: "dominance", right: "submission", description: "" },
+    { id: 68, left: "dork", right: "charmer", description: "" },
+    { id: 69, left: "dream", right: "reality", description: "" },
+    { id: 70, left: "dynamics", right: "statics", description: "" },
+    { id: 71, left: "earthly", right: "divine", description: "" },
+    { id: 72, left: "effort", right: "apathy", description: "" },
+    { id: 73, left: "effort", right: "rest", description: "" },
+    { id: 74, left: "emotions", right: "lack of emotions", description: "" },
+    { id: 75, left: "emotions", right: "mind", description: "" },
+    { id: 76, left: "emotions", right: "reason", description: "" },
+    { id: 77, left: "emotions", right: "void", description: "" },
+    { id: 78, left: "energetic", right: "inactive", description: "" },
+    { id: 79, left: "enlightened master", right: "moron", description: "" },
+    { id: 80, left: "enlightenment", right: "ignorance", description: "" },
+    { id: 81, left: "entering experience", right: "avoiding experience", description: "" },
+    { id: 82, left: "enthusiasm", right: "apathy", description: "" },
+    { id: 83, left: "eternity", right: "moment", description: "" },
+    { id: 84, left: "everybody", right: "nobody", description: "" },
+    { id: 85, left: "everything depends on me", right: "nothing depends on me", description: "" },
+    { id: 86, left: "existence", right: "creation", description: "" },
+    { id: 87, left: "existence", right: "non-existence", description: "" },
+    { id: 88, left: "expansion", right: "compression", description: "" },
+    { id: 89, left: "extrovert", right: "introvert", description: "" },
+    { id: 90, left: "faith", right: "knowledge", description: "" },
+    { id: 91, left: "far", right: "near", description: "" },
+    { id: 92, left: "fear", right: "courage", description: "" },
+    { id: 93, left: "fear", right: "peace", description: "" },
+    { id: 94, left: "fire", right: "water", description: "" },
+    { id: 95, left: "folding", right: "unfolding", description: "" },
+    { id: 96, left: "forever", right: "temporarily", description: "" },
+    { id: 97, left: "form", right: "formlessness", description: "" },
+    { id: 98, left: "formation", right: "disappearance", description: "" },
+    { id: 99, left: "forward", right: "backward", description: "" },
+    { id: 100, left: "fragrant", right: "malodorous", description: "" },
+    { id: 101, left: "freedom", right: "depression", description: "" },
+    { id: 102, left: "freedom", right: "fate/karma", description: "" },
+    { id: 103, left: "freedom", right: "responsibility", description: "" },
+    { id: 104, left: "freedom", right: "slavery", description: "" },
+    { id: 105, left: "freedom", right: "submission", description: "" },
+    { id: 106, left: "freedom", right: "lack of freedom", description: "" },
+    { id: 107, left: "fresh", right: "sluggish", description: "" },
+    { id: 108, left: "front", right: "back", description: "" },
+    { id: 109, left: "full", right: "empty", description: "" },
+    { id: 110, left: "fullness", right: "emptiness", description: "" },
+    { id: 111, left: "fundamentality", right: "shakiness", description: "" },
+    { id: 112, left: "future", right: "past", description: "" },
+    { id: 113, left: "generous", right: "mean", description: "" },
+    { id: 114, left: "genius", right: "madness", description: "" },
+    { id: 115, left: "gently sloping", right: "steep", description: "" },
+    { id: 116, left: "god", right: "devil", description: "" },
+    { id: 117, left: "good", right: "bad", description: "" },
+    { id: 118, left: "good", right: "evil", description: "" },
+    { id: 119, left: "gratitude", right: "ingratitude", description: "" },
+    { id: 120, left: "greatness", right: "smallness", description: "" },
+    { id: 121, left: "happiness", right: "grief", description: "" },
+    { id: 122, left: "happiness", right: "sadness", description: "" },
+    { id: 123, left: "hardness", right: "fragility", description: "" },
+    { id: 124, left: "heavy", right: "light", description: "" },
+    { id: 125, left: "hell", right: "heaven", description: "" },
+    { id: 126, left: "here", right: "now", description: "" },
+    { id: 127, left: "here", right: "there", description: "" },
+    { id: 128, left: "high", right: "low", description: "" },
+    { id: 129, left: "honest man", right: "swindler", description: "" },
+    { id: 130, left: "hopelessness", right: "hope", description: "" },
+    { id: 131, left: "horizontal", right: "vertical", description: "" },
+    { id: 132, left: "hot", right: "cold", description: "" },
+    { id: 133, left: "hunger", right: "satiety", description: "" },
+    { id: 134, left: "I am bad", right: "I am good", description: "" },
+    { id: 135, left: "I am not good at anything", right: "I am good at everything", description: "" },
+    { id: 136, left: "I am the source", right: "I am not the source", description: "" },
+    { id: 137, left: "I am unique", right: "I am like everybody else", description: "" },
+    { id: 138, left: "I exist", right: "I don't exist", description: "" },
+    { id: 139, left: "I must", right: "I want", description: "" },
+    { id: 140, left: "I must be right", right: "I am not right", description: "" },
+    { id: 141, left: "I want to be aware", right: "I don't want to be aware", description: "" },
+    { id: 142, left: "I want to communicate with people", right: "I don't want to communicate with people", description: "" },
+    { id: 143, left: "I-don't-care-ness", right: "enthusiasm", description: "" },
+    { id: 144, left: "ignorant people", right: "wise people", description: "" },
+    { id: 145, left: "illusion", right: "reality", description: "" },
+    { id: 146, left: "indifference", right: "involvement", description: "" },
+    { id: 147, left: "infinitely small", right: "infinitely large", description: "" },
+    { id: 148, left: "initiative", right: "inactive", description: "" },
+    { id: 149, left: "inner world", right: "outer world", description: "" },
+    { id: 150, left: "inside", right: "outside", description: "" },
+    { id: 151, left: "intellect", right: "emotion", description: "" },
+    { id: 152, left: "intellect", right: "instincts", description: "" },
+    { id: 153, left: "interest", right: "boredom", description: "" },
+    { id: 154, left: "interest", right: "indifference", description: "" },
+    { id: 155, left: "intuition", right: "consciousness", description: "" },
+    { id: 156, left: "irritation", right: "acceptance", description: "" },
+    { id: 157, left: "joy", right: "sorrow", description: "" },
+    { id: 158, left: "joyous", right: "angry", description: "" },
+    { id: 159, left: "knowledge", right: "action", description: "" },
+    { id: 160, left: "knowledge", right: "ignorance", description: "" },
+    { id: 161, left: "lack of self-confidence", right: "self-confidence", description: "" },
+    { id: 162, left: "laziness", right: "willingness to act", description: "" },
+    { id: 163, left: "lechery", right: "chastity", description: "" },
+    { id: 164, left: "left", right: "right", description: "" },
+    { id: 165, left: "left hemisphere", right: "right hemisphere", description: "" },
+    { id: 166, left: "life", right: "death", description: "" },
+    { id: 167, left: "light", right: "darkness", description: "" },
+    { id: 168, left: "lightness", right: "heaviness", description: "" },
+    { id: 169, left: "limited consciousness", right: "unlimited consciousness", description: "" },
+    { id: 170, left: "limitedness", right: "limitlessness", description: "" },
+    { id: 171, left: "literacy", right: "illiteracy", description: "" },
+    { id: 172, left: "localization", right: "non-localization", description: "" },
+    { id: 173, left: "logic", right: "creativity", description: "" },
+    { id: 174, left: "logic", right: "emotions", description: "" },
+    { id: 175, left: "logical thinking", right: "creative thinking", description: "" },
+    { id: 176, left: "long", right: "short", description: "" },
+    { id: 177, left: "love", right: "aggressiveness", description: "" },
+    { id: 178, left: "love", right: "fear", description: "" },
+    { id: 179, left: "love", right: "freedom", description: "" },
+    { id: 180, left: "love", right: "hatred", description: "" },
+    { id: 181, left: "love", right: "loneliness", description: "" },
+    { id: 182, left: "love", right: "pain", description: "" },
+    { id: 183, left: "love", right: "power", description: "" },
+    { id: 184, left: "love", right: "refusal", description: "" },
+    { id: 185, left: "love of people", right: "hatred of people", description: "" },
+    { id: 186, left: "luck", right: "misfortune", description: "" },
+    { id: 187, left: "lucky", right: "unlucky", description: "" },
+    { id: 188, left: "male", right: "female", description: "" },
+    { id: 189, left: "man", right: "woman", description: "" },
+    { id: 190, left: "material", right: "emptiness", description: "" },
+    { id: 191, left: "material", right: "immaterial", description: "" },
+    { id: 192, left: "material", right: "spiritual", description: "" },
+    { id: 193, left: "material world", right: "spiritual world", description: "" },
+    { id: 194, left: "material world", right: "subtle world", description: "" },
+    { id: 195, left: "matter", right: "energy", description: "" },
+    { id: 196, left: "matter", right: "void", description: "" },
+    { id: 197, left: "me", right: "abundance of the universe", description: "" },
+    { id: 198, left: "me", right: "Buddha", description: "" },
+    { id: 199, left: "me", right: "complete enlightenment", description: "" },
+    { id: 200, left: "me", right: "eternity", description: "" },
+    { id: 201, left: "me", right: "everyone", description: "" },
+    { id: 202, left: "me", right: "extraterrestrial intelligence", description: "" },
+    { id: 203, left: "me", right: "galaxy", description: "" },
+    { id: 204, left: "me", right: "intuition", description: "" },
+    { id: 205, left: "me", right: "life", description: "" },
+    { id: 206, left: "me", right: "movement", description: "" },
+    { id: 207, left: "me", right: "nothing", description: "" },
+    { id: 208, left: "me", right: "others", description: "" },
+    { id: 209, left: "me", right: "people", description: "" },
+    { id: 210, left: "me", right: "someone else", description: "" },
+    { id: 211, left: "me", right: "subtle worlds", description: "" },
+    { id: 212, left: "me", right: "the whole world", description: "" },
+    { id: 213, left: "me", right: "unity", description: "" },
+    { id: 214, left: "me", right: "universe", description: "" },
+    { id: 215, left: "me", right: "void", description: "" },
+    { id: 216, left: "me", right: "world", description: "" },
+    { id: 217, left: "merciful", right: "merciless", description: "" },
+    { id: 218, left: "minus", right: "plus", description: "" },
+    { id: 219, left: "misfortune", right: "good fortune", description: "" },
+    { id: 220, left: "monotony", right: "diversity", description: "" },
+    { id: 221, left: "motion", right: "immobility", description: "" },
+    { id: 222, left: "motion", right: "rest", description: "" },
+    { id: 223, left: "motion", right: "stopping", description: "" },
+    { id: 224, left: "moving", right: "staying", description: "" },
+    { id: 225, left: "multitude", right: "uniqueness", description: "" },
+    { id: 226, left: "must do", right: "don't want to do", description: "" },
+    { id: 227, left: "must", right: "must not", description: "" },
+    { id: 228, left: "my", right: "somebody else's", description: "" },
+    { id: 229, left: "my father", right: "my mother", description: "" },
+    { id: 230, left: "my wishes", right: "somebody else's wishes", description: "" },
+    { id: 231, left: "mysticism", right: "narrow-mindedness", description: "" },
+    { id: 232, left: "nature", right: "civilization", description: "" },
+    { id: 233, left: "near", right: "remote", description: "" },
+    { id: 234, left: "negative", right: "positive", description: "" },
+    { id: 235, left: "negative emotions", right: "positive emotions", description: "" },
+    { id: 236, left: "noble", right: "ignoble", description: "" },
+    { id: 237, left: "nobleness", right: "baseness", description: "" },
+    { id: 238, left: "noise/sounds", right: "silence", description: "" },
+    { id: 239, left: "now", right: "later", description: "" },
+    { id: 240, left: "observer", right: "observed", description: "" },
+    { id: 241, left: "old", right: "young", description: "" },
+    { id: 242, left: "optimism", right: "pessimism", description: "" },
+    { id: 243, left: "others are right", right: "I am right", description: "" },
+    { id: 244, left: "panic", right: "tranquillity", description: "" },
+    { id: 245, left: "part", right: "whole", description: "" },
+    { id: 246, left: "passion", right: "spirituality", description: "" },
+    { id: 247, left: "past", right: "future", description: "" },
+    { id: 248, left: "path", right: "goal", description: "" },
+    { id: 249, left: "peace", right: "aggression", description: "" },
+    { id: 250, left: "peace", right: "disorders", description: "" },
+    { id: 251, left: "peace", right: "fear", description: "" },
+    { id: 252, left: "peace", right: "power", description: "" },
+    { id: 253, left: "people", right: "animals", description: "" },
+    { id: 254, left: "perfection", right: "imperfection", description: "" },
+    { id: 255, left: "permanence", right: "transience", description: "" },
+    { id: 256, left: "permanent", right: "temporary", description: "" },
+    { id: 257, left: "permission", right: "prohibition", description: "" },
+    { id: 258, left: "point", right: "space", description: "" },
+    { id: 259, left: "point", right: "three-dimensional object", description: "" },
+    { id: 260, left: "poor", right: "wealthy", description: "" },
+    { id: 261, left: "positive", right: "negative", description: "" },
+    { id: 262, left: "positive element", right: "negative element", description: "" },
+    { id: 263, left: "positive polarity", right: "negative polarity", description: "" },
+    { id: 264, left: "possible", right: "impossible", description: "" },
+    { id: 265, left: "poverty", right: "wealth", description: "" },
+    { id: 266, left: "power", right: "helplessness", description: "" },
+    { id: 267, left: "power", right: "impotence", description: "" },
+    { id: 268, left: "power of the night", right: "power of the day", description: "" },
+    { id: 269, left: "presence of thoughts", right: "absence of thoughts", description: "" },
+    { id: 270, left: "present", right: "future", description: "" },
+    { id: 271, left: "present", right: "past", description: "" },
+    { id: 272, left: "present moment", right: "eternity", description: "" },
+    { id: 273, left: "progress", right: "degradation", description: "" },
+    { id: 274, left: "proof", right: "disproof", description: "" },
+    { id: 275, left: "prudent", right: "imprudent", description: "" },
+    { id: 276, left: "quickly", right: "slowly", description: "" },
+    { id: 277, left: "reason", right: "consequence", description: "" },
+    { id: 278, left: "reasonable", right: "hasty", description: "" },
+    { id: 279, left: "relationship", right: "loneliness", description: "" },
+    { id: 280, left: "relaxation", right: "stress", description: "" },
+    { id: 281, left: "resoluteness to do something", right: "postponement", description: "" },
+    { id: 282, left: "responsibility", right: "irresponsibility", description: "" },
+    { id: 283, left: "right", right: "wrong", description: "" },
+    { id: 284, left: "saint", right: "sinner", description: "" },
+    { id: 285, left: "salted", right: "unsalted", description: "" },
+    { id: 286, left: "sane", right: "insane", description: "" },
+    { id: 287, left: "satisfaction", right: "displeasure", description: "" },
+    { id: 288, left: "scream", right: "silence", description: "" },
+    { id: 289, left: "security", right: "insecurity", description: "" },
+    { id: 290, left: "sensible", right: "thoughtless", description: "" },
+    { id: 291, left: "sentimentalism", right: "heartlessness", description: "" },
+    { id: 292, left: "separateness", right: "integrity", description: "" },
+    { id: 293, left: "seriousness", right: "light-mindedness", description: "" },
+    { id: 294, left: "severity", right: "mildness", description: "" },
+    { id: 295, left: "shame of failure", right: "delight of victory", description: "" },
+    { id: 296, left: "shining", right: "dim", description: "" },
+    { id: 297, left: "short life", right: "eternity", description: "" },
+    { id: 298, left: "should save one's face", right: "shouldn't save one's face", description: "" },
+    { id: 299, left: "silently", right: "loudly", description: "" },
+    { id: 300, left: "silly", right: "enlightened", description: "" },
+    { id: 301, left: "sky", right: "earth", description: "" },
+    { id: 302, left: "small", right: "big", description: "" },
+    { id: 303, left: "something", right: "nothing", description: "" },
+    { id: 304, left: "something has to be done", right: "nothing has to be done", description: "" },
+    { id: 305, left: "sorrow", right: "joy", description: "" },
+    { id: 306, left: "stability", right: "changes", description: "" },
+    { id: 307, left: "stability", right: "shock", description: "" },
+    { id: 308, left: "standing", right: "lying", description: "" },
+    { id: 309, left: "straight", right: "curved", description: "" },
+    { id: 310, left: "strength", right: "weakness", description: "" },
+    { id: 311, left: "structured", right: "unstructured", description: "" },
+    { id: 312, left: "subject", right: "object", description: "" },
+    { id: 313, left: "subtle humor", right: "vulgar humor", description: "" },
+    { id: 314, left: "success", right: "defeat", description: "" },
+    { id: 315, left: "success", right: "disappointment", description: "" },
+    { id: 316, left: "successful", right: "unsuccessful", description: "" },
+    { id: 317, left: "sun", right: "moon", description: "" },
+    { id: 318, left: "sweet", right: "not sweet", description: "" },
+    { id: 319, left: "symmetric", right: "asymmetric", description: "" },
+    { id: 320, left: "sympathy", right: "antipathy", description: "" },
+    { id: 321, left: "talent", right: "lack of talent", description: "" },
+    { id: 322, left: "teacher", right: "pupil", description: "" },
+    { id: 323, left: "teaching", right: "knowledge", description: "" },
+    { id: 324, left: "the one who knows", right: "the thing which is known", description: "" },
+    { id: 325, left: "the world is bad", right: "the world is good", description: "" },
+    { id: 326, left: "the world is dangerous", right: "the world is safe", description: "" },
+    { id: 327, left: "the world is unfair", right: "the world is fair", description: "" },
+    { id: 328, left: "theory", right: "practice", description: "" },
+    { id: 329, left: "this world", right: "other world", description: "" },
+    { id: 330, left: "thrifty", right: "thriftless", description: "" },
+    { id: 331, left: "to agree", right: "to disagree", description: "" },
+    { id: 332, left: "to be", right: "not to be", description: "" },
+    { id: 333, left: "to be always conscious of oneself", right: "to be never conscious of oneself", description: "" },
+    { id: 334, left: "to be aware of the essence", right: "to see the surface", description: "" },
+    { id: 335, left: "to be flexible", right: "to be fixated on", description: "" },
+    { id: 336, left: "to be united with one's roots", right: "to be separated with them", description: "" },
+    { id: 337, left: "to begin", right: "to stop", description: "" },
+    { id: 338, left: "to believe everything will be OK", right: "to disbelieve everything will be OK", description: "" },
+    { id: 339, left: "to bless", right: "to curse", description: "" },
+    { id: 340, left: "to forget", right: "to remember", description: "" },
+    { id: 341, left: "to give", right: "to get", description: "" },
+    { id: 342, left: "to have a higher purpose", right: "to live without a purpose", description: "" },
+    { id: 343, left: "to have a possibility to choose", right: "to have no choice", description: "" },
+    { id: 344, left: "to have results", right: "to have no results", description: "" },
+    { id: 345, left: "to have time", right: "to have no time", description: "" },
+    { id: 346, left: "to know", right: "not to know", description: "" },
+    { id: 347, left: "to know everything", right: "to know nothing", description: "" },
+    { id: 348, left: "to know one's predestination", right: "to not know one's predestination", description: "" },
+    { id: 349, left: "to give a gift", right: "to take a gift", description: "" },
+    { id: 350, left: "to possess everything", right: "to possess nothing", description: "" },
+    { id: 351, left: "to remember", right: "to forget", description: "" },
+    { id: 352, left: "to see", right: "to understand", description: "" },
+    { id: 353, left: "to stay", right: "to leave", description: "" },
+    { id: 354, left: "to survive", right: "to die", description: "" },
+    { id: 355, left: "to survive", right: "to give up", description: "" },
+    { id: 356, left: "to take", right: "to give", description: "" },
+    { id: 357, left: "to take responsibility", right: "to reject responsibility", description: "" },
+    { id: 358, left: "to throw", right: "to pick up", description: "" },
+    { id: 359, left: "to turn pale", right: "to turn red", description: "" },
+    { id: 360, left: "to win", right: "to lose", description: "" },
+    { id: 361, left: "to withstand", right: "to give up", description: "" },
+    { id: 362, left: "tolerance", right: "intolerance", description: "" },
+    { id: 363, left: "top", right: "bottom", description: "" },
+    { id: 364, left: "topical", right: "non-topical", description: "" },
+    { id: 365, left: "tragedy", right: "comedy", description: "" },
+    { id: 366, left: "true memory", right: "illusive memory", description: "" },
+    { id: 367, left: "truth", right: "hallucinations", description: "" },
+    { id: 368, left: "truth", right: "lie", description: "" },
+    { id: 369, left: "uncertainty", right: "certainty", description: "" },
+    { id: 370, left: "uncertainty about the future", right: "certainty about the future", description: "" },
+    { id: 371, left: "understanding", right: "misunderstanding", description: "" },
+    { id: 372, left: "unity", right: "duality", description: "" },
+    { id: 373, left: "unity", right: "separation", description: "" },
+    { id: 374, left: "unity with others", right: "isolation", description: "" },
+    { id: 375, left: "unpleasant", right: "pleasant", description: "" },
+    { id: 376, left: "unwillingness to change", right: "willingness to change", description: "" },
+    { id: 377, left: "unwillingness to live", right: "enjoyment of life", description: "" },
+    { id: 378, left: "unwillingness to live", right: "lust for life", description: "" },
+    { id: 379, left: "up", right: "down", description: "" },
+    { id: 380, left: "usual people", right: "enlightened people", description: "" },
+    { id: 381, left: "victory", right: "defeat", description: "" },
+    { id: 382, left: "victory", right: "loss", description: "" },
+    { id: 383, left: "virtual world", right: "real world", description: "" },
+    { id: 384, left: "visibility", right: "invisibility", description: "" },
+    { id: 385, left: "void", right: "the whole world", description: "" },
+    { id: 386, left: "vulnerability", right: "invulnerability", description: "" },
+    { id: 387, left: "war", right: "peace", description: "" },
+    { id: 388, left: "wealth", right: "poverty", description: "" },
+    { id: 389, left: "weekdays", right: "holiday", description: "" },
+    { id: 390, left: "white", right: "black", description: "" },
+    { id: 391, left: "wish to be approved", right: "wish to approve", description: "" },
+    { id: 392, left: "wish to be lonely", right: "wish to be with everyone", description: "" },
+    { id: 393, left: "wish to be loved", right: "wish to love", description: "" },
+    { id: 394, left: "wish to be with people", right: "unwillingness to be with people", description: "" },
+    { id: 395, left: "wish to control", right: "wish to release control", description: "" },
+    { id: 396, left: "wish to control the others", right: "wish to be controlled by the others", description: "" },
+    { id: 397, left: "wish to debate", right: "unwillingness to debate", description: "" },
+    { id: 398, left: "wish to have love", right: "wish to give love", description: "" },
+    { id: 399, left: "wish to live", right: "wish to die", description: "" },
+    { id: 400, left: "wish to move", right: "fear to move", description: "" },
+    { id: 401, left: "wish to move", right: "unwillingness to move", description: "" },
+    { id: 402, left: "wish to win approval", right: "wish to express approval", description: "" },
+    { id: 403, left: "wish to work", right: "unwillingness to work", description: "" },
+    { id: 404, left: "wise man", right: "stupid jerk", description: "" }
+];
+
+// Emotional states data for Process tool
+const EMOTIONS_DATA = [
+    "abandoned", "abrupt", "abused", "accused", "aching", "achy", "adrift", "afflicted", "afraid", "aggravated",
+    "aggressive", "agitated", "agonized", "agony", "agoraphobic", "alarmed", "alienated", "alone", "aloof", "ambivalent",
+    "anguished", "animosity", "annoyed", "antagonistic", "anxious", "apathetic", "appalled", "apprehensive", "argumentative", "arrogant",
+    "ashamed", "at fault", "attached", "attacked", "attacking", "authoritative", "avoiding", "awful", "awkward", "bad",
+    "baffled", "banished", "barren", "bashful", "beaten down", "befuddled", "belittled", "belligerent", "bereft", "betrayed",
+    "bewildered", "bitter", "blaming", "bleak", "blindsided", "blocked", "blue", "blushing", "boastful", "bored",
+    "bossy", "broken-hearted", "brutal", "bugged", "bulldozed", "bullied", "bummed out", "burdened", "burned up", "captive",
+    "careless", "cast off", "censured", "chaotic", "chastened", "cheap", "cheapened", "cheated", "cheerless", "clingy",
+    "closed", "clumsy", "cold", "combative", "comparing", "complaining", "compromised", "compulsive", "conceited", "condemned",
+    "condemning", "condescending", "confined", "conflicted", "confounded", "confused", "contemptible", "contentious", "contracted", "contradictory",
+    "contrary", "controlled", "controlling", "covetous", "cowardly", "crabby", "cranky", "craving", "crazy", "crippled",
+    "critical", "criticized", "cruel", "crushed", "crying", "cursed", "cut off", "cynical", "debased", "deceitful",
+    "deceived", "defamed", "defeated", "defensive", "defiant", "deficient", "defiled", "deflated", "degenerate", "degraded",
+    "dejected", "demanding", "demeaned", "demoralized", "dependent", "depraved", "depreciated", "depressed", "deprived", "derided",
+    "desecrated", "deserted", "desolate", "despair", "despairing", "desperate", "despicable", "despondent", "destitute", "destroyed",
+    "devalued", "devastated", "difficult", "diminished", "dirty", "disappointed", "discarded", "disconcerted", "disconnected", "disconsolate",
+    "discontented", "discouraged", "discredited", "disdainful", "disgraced", "disgusted", "disheartened", "dishonest", "disillusioned", "dismal",
+    "dismayed", "disorganized", "disoriented", "disparaged", "disparaging", "disrespectful", "disrupted", "dissatisfied", "distant", "distorted",
+    "distracted", "distraught", "distressed", "distrustful", "disturbed", "dominated", "doomed", "doubtful", "down", "downcast",
+    "downhearted", "drained", "drawn", "dread", "dreadful", "dreary", "dull", "embarrassed", "embroiled", "empty",
+    "enraged", "envious", "estranged", "exasperated", "excluded", "exhausted", "exploited", "exposed", "failure", "faithless",
+    "fake", "fatigued", "faultfinding", "fearful", "feeble", "fidgety", "filthy", "finished", "flighty", "flustered",
+    "foggy", "forgetful", "forgotten", "forlorn", "forsaken", "fragile", "fragmented", "frantic", "frenzied", "fretful",
+    "friendless", "frightened", "frigid", "frowning", "frustrated", "fuming", "furious", "glaring", "gloomy", "glum",
+    "grieved", "grim", "groaning", "grouchy", "grumpy", "guarded", "guilty", "gullible", "haggard", "harassed",
+    "hard", "hardened", "harsh", "hasty", "hateful", "hatred", "haughty", "haunted", "heartbroken", "heartless",
+    "helpless", "hesitant", "hindered", "hitting", "hopeless", "horrible", "horrified", "hostile", "hot-headed", "humiliated",
+    "hungry", "hurried", "hurt", "hurtful", "hypocritical", "hysterical", "ignorant", "immature", "immobile", "immobilized",
+    "impaired", "impatient", "impotent", "impoverished", "imprisoned", "impulsive", "in a bind", "in hell", "inadequate", "incapable",
+    "incapacitated", "incensed", "incompetent", "inconsiderate", "inconsistent", "indecisive", "indignant", "ineffective", "inefficient", "inept",
+    "inferior", "inflexible", "infuriated", "inhibited", "injured", "insecure", "insensitive", "insignificant", "insincere", "insulted",
+    "insulting", "intimidated", "intolerant", "invaded", "irate", "irresponsible", "irritable", "irritated", "isolated", "jealous",
+    "jittery", "joyless", "judgmental", "jumpy", "lacking", "left out", "let down", "lifeless", "limited", "listless",
+    "livid", "lonely", "lonesome", "longing", "lost", "loud", "lousy", "low", "mad", "malicious",
+    "maligned", "manipulated", "manipulative", "masochistic", "materialistic", "mean", "mean-spirited", "melancholy", "menaced", "mentally deficient",
+    "miffed", "minimized", "miserable", "miserly", "misgiving", "mistreated", "misunderstood", "misused", "mixed up", "moaning",
+    "mocked", "moody", "morose", "mortified", "mournful", "muddled", "naive", "narrow", "nauseated", "negative",
+    "neglected", "neglectful", "nervous", "no energy", "obnoxious", "obsessed", "obsessive", "obstinate", "obstructed", "off",
+    "off-kilter", "offended", "offensive", "on edge", "opposed", "oppositional", "oppressed", "out of sorts", "outcast", "outraged",
+    "overbearing", "overlooked", "oversensitive", "overwhelmed", "overworked", "overwrought", "pained", "panicked", "panicky", "paralyzed",
+    "paranoid", "pathetic", "peculiar", "perfectionistic", "perplexed", "persecuted", "perturbed", "pessimistic", "petrified", "phobic",
+    "phony", "pitiful", "poisonous", "powerless", "prejudiced", "preoccupied", "pressured", "provoked", "punished", "punishing",
+    "puny", "pushed", "pushy", "put down", "puzzled", "quarrelsome", "ranting", "rattled", "reactive", "rebellious",
+    "recoiling", "regretful", "rejected", "remorseful", "remote", "reprimanding", "reproved", "repulsed", "repulsive", "resentful",
+    "reserved", "resistant", "responsible", "restless", "restrained", "restricted", "retaliating", "revengeful", "ridiculed", "rigid",
+    "risky", "robotic", "rotten", "rude", "ruined", "rushed", "ruthless", "sad", "sadistic", "sarcastic",
+    "scared", "scattered", "scoffed at", "scolding", "scorned", "scornful", "screaming", "secretive", "seething", "self-absorbed",
+    "self-castigating", "self-conscious", "self-critical", "self-denigrating", "self-deprecating", "self-hating", "serious", "shaky", "shallow", "shameful",
+    "sharp", "shocked", "short-tempered", "shot down", "shrill", "shunned", "shut down", "shy", "sick", "sinful",
+    "slammed", "slandered", "slighted", "slouching", "slow", "sluggish", "slumped", "small", "smothered", "smug",
+    "sorrowful", "sour", "spiteful", "squirming", "stagnant", "stern", "stiff", "stifled", "stilted", "stingy",
+    "stonewalling", "stony", "stressed", "stubborn", "stuck", "stumped", "stupid", "suffering", "suicidal", "sulky",
+    "sullen", "superficial", "superior", "suspicious", "swearing", "tactless", "taut", "tearful", "temperamental", "tense",
+    "terrible", "terrified", "territorial", "thoughtless", "threatened", "thwarted", "ticked off", "tight", "timid", "tired",
+    "tormented", "tortured", "touchy", "trapped", "trembling", "troubled", "turned off", "twitching", "unable", "unappreciated",
+    "unbending", "uncaring", "uncertain", "uncomfortable", "undecided", "undesirable", "undisciplined", "uneasy", "unfair", "unforgivable",
+    "unforgiving", "unfriendly", "unhappy", "unimportant", "uninterested", "unmindful", "unorganized", "unpleasant", "unprotected", "unreasonable",
+    "unresponsive", "unsettled", "unsure", "unthankful", "unwanted", "unwelcoming", "unwise", "unworthy", "upset", "uptight",
+    "used", "useless", "vengeful", "venomous", "vexed", "vicious", "victimized", "vindictive", "violated", "violent",
+    "vulnerable", "wanton", "wary", "washed up", "wasted", "weak", "weary", "weepy", "withdrawn", "woozy",
+    "worried", "worthless", "wounded", "wrong", "wronged", "yearning", "yelling",
+    "able", "absolved", "absorbed", "abundant", "acceptable", "accepted", "accepting", "accommodating", "accomplished", "accountable",
+    "achieving", "active", "adaptable", "adequate", "admirable", "admired", "adored", "adversarial", "affluent", "agreeable",
+    "alert", "altruistic", "ambitious", "amused", "analytical", "appreciated", "appreciative", "approved", "approving", "assertive",
+    "assured", "at ease", "attractive", "attached", "attentive", "authentic", "awake", "aware", "awesome", "balanced",
+    "beautiful", "believing", "blessed", "blissful", "bonded", "brave", "bright", "brilliant", "calm", "capable",
+    "captivated", "cared for", "carefree", "careful", "caring", "cautious", "centered", "certain", "cheerful", "cherished",
+    "clean", "clear", "collected", "comfortable", "comforted", "committed", "compassionate", "complete", "composed", "comprehending",
+    "confident", "congruent", "connected", "conscious", "constant", "content", "cooperative", "courageous", "creative", "credible",
+    "curious", "daring", "decisive", "defended", "delighted", "dependable", "desirable", "dignified", "discerning", "disciplined",
+    "distinguished", "dutiful", "dynamic", "eager", "easy going", "eccentric", "ecstatic", "edified", "efficient", "elated",
+    "elegant", "elevated", "emancipated", "empathic", "empowered", "encouraged", "energetic", "energized", "enthusiastic", "euphoric",
+    "exceptional", "excited", "exhilarated", "experienced", "expressive", "extroverted", "exuberant", "fair", "faithful", "fantastic",
+    "favored", "firm", "flexible", "flowing", "focused", "forceful", "forgiven", "fortified", "fortunate", "free",
+    "friendly", "fulfilled", "gentle", "genuine", "gifted", "glad", "glowing", "good", "graceful", "gracious",
+    "grateful", "gratified", "grounded", "growing", "guarded", "happy", "harmonious", "healed", "helpful", "heroic",
+    "hesitant", "high", "honest", "honourable", "honoured", "hopeful", "humble", "humorous", "idealistic", "important",
+    "in control", "in service", "included", "independent", "individualistic", "infatuated", "influential", "innocent", "inspired", "intelligent",
+    "interested", "introspective", "invigorated", "invincible", "invited", "invulnerable", "jovial", "joyful", "jubilant", "judicious",
+    "kind", "learning", "liberated", "light", "light-hearted", "likable", "lively", "loose", "loved", "loving",
+    "loyal", "lucky", "magnetic", "marvellous", "masterful", "mature", "mediating", "meek", "merciful", "methodical",
+    "mindful", "modest", "motivated", "neat", "noble", "observant", "open", "open hearted", "organized", "pacified",
+    "pampered", "pardoned", "passionate", "patient", "peaceful", "perfect", "persevering", "pleasant", "pleased", "popular",
+    "positive", "powerful", "practical", "praised", "precious", "prepared", "present", "productive", "proficient", "progressive",
+    "prosperous", "protected", "proud", "prudent", "punctual", "purified", "purposeful", "qualified", "quick", "quiet",
+    "radiant", "rational", "reasonable", "reassured", "receptive", "recognized", "redeemed", "regenerated", "rejoicing", "relaxed",
+    "reliable", "relieved", "remembered", "replenished", "resolute", "respected", "respectful", "responsible", "responsive", "restored",
+    "revitalized", "rewarded", "rooted", "satisfied", "secure", "self accepting", "self reliant", "selfless", "sensational", "sensible",
+    "sensitive", "serene", "serenity", "settled", "sharing", "simple", "skillful", "smooth", "soothed", "spirited",
+    "splendid", "stable", "steadfast", "strengthened", "stimulated", "strong", "successful", "supported", "sustained", "tactful",
+    "teachable", "temperate", "tenacious", "tender", "thankful", "thoughtful", "thrilled", "tolerant", "tranquil", "triumphant",
+    "trusting", "unconcerned", "understanding", "understood", "undisturbed", "unhurried", "unique", "united", "unselfish", "upheld",
+    "valiant", "valuable", "valued", "virile", "visionary", "vital", "warm", "wealthy", "well-meaning", "willing",
+    "wise", "wonderful", "worthwhile", "worthy", "yielding", "zealous"
+].map((name, index) => ({ id: index + 1, name: name, description: "" }));
+
+// Shadow state
+let shadowState = {
+    integrate: {
+        completed: [],    // Array of polarity IDs
+        skipped: [],      // Array of polarity IDs  
+        currentIndex: 0   // Next polarity to show
+    },
+    process: {
+        completed: [],    // Array of emotion IDs
+        skipped: [],      // Array of emotion IDs
+        currentIndex: 0   // Next emotion to show
+    },
+    deepClean: {
+        status: 'not_started',  // 'not_started', 'in_progress', 'paused', 'completed'
+        startDate: null,
+        currentDay: 0,
+        isPaused: false,
+        completedDate: null
+    }
+};
+
+// Initialize shadow feature
+function initShadow() {
+    loadShadowState();
+    updateShadowUI();
+}
+
+// Load shadow state from localStorage
+function loadShadowState() {
+    const saved = localStorage.getItem('shadowState');
+    if (saved) {
+        try {
+            shadowState = { ...shadowState, ...JSON.parse(saved) };
+        } catch (e) {
+            console.error('Error loading shadow state:', e);
+        }
+    }
+    
+    // Check and update Deep Clean progress
+    updateDeepCleanProgress();
+}
+
+// Save shadow state
+function saveShadowState() {
+    localStorage.setItem('shadowState', JSON.stringify(shadowState));
+}
+
+// Update all Shadow UI elements
+function updateShadowUI() {
+    updateIntegrateUI();
+    updateProcessUI();
+    updateDeepCleanUI();
+    updateShadowToolCards();
+}
+
+// Update Shadow tool cards on main shadow view
+function updateShadowToolCards() {
+    // Integrate progress
+    const integrateTotal = POLARITIES_DATA.length;
+    const integrateCompleted = shadowState.integrate.completed.length;
+    const integratePercent = Math.round((integrateCompleted / integrateTotal) * 100);
+    
+    const integrateBar = document.getElementById('integrateProgressBar');
+    const integrateText = document.getElementById('integrateProgressText');
+    if (integrateBar) integrateBar.style.width = `${integratePercent}%`;
+    if (integrateText) integrateText.textContent = `${integratePercent}% complete`;
+    
+    // Process progress
+    const processTotal = EMOTIONS_DATA.length;
+    const processCompleted = shadowState.process.completed.length;
+    const processPercent = Math.round((processCompleted / processTotal) * 100);
+    
+    const processBar = document.getElementById('processProgressBar');
+    const processText = document.getElementById('processProgressText');
+    if (processBar) processBar.style.width = `${processPercent}%`;
+    if (processText) processText.textContent = `${processPercent}% complete`;
+    
+    // Deep Clean status
+    const deepCleanStatus = document.getElementById('deepCleanStatus');
+    if (deepCleanStatus) {
+        switch (shadowState.deepClean.status) {
+            case 'not_started':
+                deepCleanStatus.textContent = 'Not started';
+                break;
+            case 'in_progress':
+                deepCleanStatus.textContent = `Day ${shadowState.deepClean.currentDay}/30`;
+                break;
+            case 'paused':
+                deepCleanStatus.textContent = `Paused - Day ${shadowState.deepClean.currentDay}/30`;
+                break;
+            case 'completed':
+                deepCleanStatus.textContent = 'Completed ✓';
+                deepCleanStatus.style.color = '#10B981';
+                break;
+        }
+    }
+}
+
+// ============================================
+// INTEGRATE TOOL
+// ============================================
+
+function updateIntegrateUI() {
+    const total = POLARITIES_DATA.length;
+    const completed = shadowState.integrate.completed.length;
+    const percent = Math.round((completed / total) * 100);
+    
+    document.getElementById('integrateCompletedCount').textContent = completed;
+    document.getElementById('integrateTotalCount').textContent = total;
+    document.getElementById('integratePercentage').textContent = `${percent}%`;
+}
+
+function startNextIntegration() {
+    // Find next polarity that hasn't been completed or skipped
+    const handled = [...shadowState.integrate.completed, ...shadowState.integrate.skipped];
+    const next = POLARITIES_DATA.find(p => !handled.includes(p.id));
+    
+    if (!next) {
+        showToast('All polarities have been processed!', 'success');
+        return;
+    }
+    
+    // Show the card
+    showIntegrateCard(next);
+}
+
+function showIntegrateCard(polarity) {
+    shadowState.integrate.currentPolarity = polarity;
+    
+    const handled = [...shadowState.integrate.completed, ...shadowState.integrate.skipped];
+    const currentNum = handled.length + 1;
+    const total = POLARITIES_DATA.length;
+    
+    document.getElementById('integrateCardNumber').textContent = `${currentNum} of ${total}`;
+    document.getElementById('polarityLeft').textContent = polarity.left;
+    document.getElementById('polarityRight').textContent = polarity.right;
+    document.getElementById('polarityDescription').textContent = polarity.description || '';
+    
+    showView('integrateCard');
+}
+
+function completeIntegration() {
+    const polarity = shadowState.integrate.currentPolarity;
+    if (!polarity) return;
+    
+    shadowState.integrate.completed.push(polarity.id);
+    saveShadowState();
+    
+    showToast('Polarity integrated ☯', 'success');
+    
+    // Check if more to do
+    const handled = [...shadowState.integrate.completed, ...shadowState.integrate.skipped];
+    const hasMore = POLARITIES_DATA.some(p => !handled.includes(p.id));
+    
+    if (hasMore) {
+        // Show next one
+        startNextIntegration();
+    } else {
+        showToast('All polarities integrated!', 'success');
+        closeIntegrateCard();
+    }
+    
+    updateIntegrateUI();
+    updateShadowToolCards();
+}
+
+function skipIntegration() {
+    const polarity = shadowState.integrate.currentPolarity;
+    if (!polarity) return;
+    
+    shadowState.integrate.skipped.push(polarity.id);
+    saveShadowState();
+    
+    // Check if more to do
+    const handled = [...shadowState.integrate.completed, ...shadowState.integrate.skipped];
+    const hasMore = POLARITIES_DATA.some(p => !handled.includes(p.id));
+    
+    if (hasMore) {
+        startNextIntegration();
+    } else {
+        showToast('All polarities have been processed', 'info');
+        closeIntegrateCard();
+    }
+    
+    updateIntegrateUI();
+    updateShadowToolCards();
+}
+
+function closeIntegrateCard() {
+    showView('integrate');
+}
+
+function showIntegrateTab(tab) {
+    // Update tab buttons
+    document.querySelectorAll('#viewIntegrateHistory .tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent.toLowerCase() === tab);
+    });
+    
+    renderIntegrateHistory(tab);
+}
+
+function renderIntegrateHistory(tab = 'completed') {
+    const container = document.getElementById('integrateHistoryList');
+    if (!container) return;
+    
+    const ids = tab === 'completed' ? shadowState.integrate.completed : shadowState.integrate.skipped;
+    
+    if (ids.length === 0) {
+        container.innerHTML = `<p class="empty-state">No ${tab} polarities yet</p>`;
+        return;
+    }
+    
+    container.innerHTML = ids.map(id => {
+        const polarity = POLARITIES_DATA.find(p => p.id === id);
+        if (!polarity) return '';
+        return `
+            <div class="shadow-history-item ${tab}">
+                <span class="shadow-history-text">${polarity.left} — ${polarity.right}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+// ============================================
+// PROCESS TOOL
+// ============================================
+
+function updateProcessUI() {
+    const total = EMOTIONS_DATA.length;
+    const completed = shadowState.process.completed.length;
+    const percent = Math.round((completed / total) * 100);
+    
+    document.getElementById('processCompletedCount').textContent = completed;
+    document.getElementById('processTotalCount').textContent = total;
+    document.getElementById('processPercentage').textContent = `${percent}%`;
+}
+
+function startNextProcess() {
+    const handled = [...shadowState.process.completed, ...shadowState.process.skipped];
+    const next = EMOTIONS_DATA.find(e => !handled.includes(e.id));
+    
+    if (!next) {
+        showToast('All emotional states have been processed!', 'success');
+        return;
+    }
+    
+    showProcessCard(next);
+}
+
+function showProcessCard(emotion) {
+    shadowState.process.currentEmotion = emotion;
+    
+    const handled = [...shadowState.process.completed, ...shadowState.process.skipped];
+    const currentNum = handled.length + 1;
+    const total = EMOTIONS_DATA.length;
+    
+    document.getElementById('processCardNumber').textContent = `${currentNum} of ${total}`;
+    document.getElementById('emotionName').textContent = emotion.name;
+    document.getElementById('emotionDescription').textContent = emotion.description || '';
+    
+    showView('processCard');
+}
+
+function completeProcess() {
+    const emotion = shadowState.process.currentEmotion;
+    if (!emotion) return;
+    
+    shadowState.process.completed.push(emotion.id);
+    saveShadowState();
+    
+    showToast('Emotional state processed ◉', 'success');
+    
+    const handled = [...shadowState.process.completed, ...shadowState.process.skipped];
+    const hasMore = EMOTIONS_DATA.some(e => !handled.includes(e.id));
+    
+    if (hasMore) {
+        startNextProcess();
+    } else {
+        showToast('All emotional states processed!', 'success');
+        closeProcessCard();
+    }
+    
+    updateProcessUI();
+    updateShadowToolCards();
+}
+
+function skipProcess() {
+    const emotion = shadowState.process.currentEmotion;
+    if (!emotion) return;
+    
+    shadowState.process.skipped.push(emotion.id);
+    saveShadowState();
+    
+    const handled = [...shadowState.process.completed, ...shadowState.process.skipped];
+    const hasMore = EMOTIONS_DATA.some(e => !handled.includes(e.id));
+    
+    if (hasMore) {
+        startNextProcess();
+    } else {
+        showToast('All emotional states have been processed', 'info');
+        closeProcessCard();
+    }
+    
+    updateProcessUI();
+    updateShadowToolCards();
+}
+
+function closeProcessCard() {
+    showView('process');
+}
+
+function showProcessTab(tab) {
+    document.querySelectorAll('#viewProcessHistory .tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent.toLowerCase() === tab);
+    });
+    
+    renderProcessHistory(tab);
+}
+
+function renderProcessHistory(tab = 'completed') {
+    const container = document.getElementById('processHistoryList');
+    if (!container) return;
+    
+    const ids = tab === 'completed' ? shadowState.process.completed : shadowState.process.skipped;
+    
+    if (ids.length === 0) {
+        container.innerHTML = `<p class="empty-state">No ${tab} emotional states yet</p>`;
+        return;
+    }
+    
+    container.innerHTML = ids.map(id => {
+        const emotion = EMOTIONS_DATA.find(e => e.id === id);
+        if (!emotion) return '';
+        return `
+            <div class="shadow-history-item ${tab}">
+                <span class="shadow-history-text">${emotion.name}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+// ============================================
+// DEEP CLEAN TOOL
+// ============================================
+
+function updateDeepCleanProgress() {
+    if (shadowState.deepClean.status !== 'in_progress') return;
+    if (shadowState.deepClean.isPaused) return;
+    
+    const startDate = new Date(shadowState.deepClean.startDate);
+    const now = new Date();
+    const daysDiff = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
+    
+    shadowState.deepClean.currentDay = Math.min(daysDiff + 1, 30);
+    
+    if (shadowState.deepClean.currentDay >= 30) {
+        shadowState.deepClean.status = 'completed';
+        shadowState.deepClean.completedDate = now.toISOString();
+    }
+    
+    saveShadowState();
+}
+
+function updateDeepCleanUI() {
+    const notStarted = document.getElementById('deepCleanNotStarted');
+    const inProgress = document.getElementById('deepCleanInProgress');
+    const completed = document.getElementById('deepCleanCompleted');
+    
+    if (!notStarted || !inProgress || !completed) return;
+    
+    // Hide all states
+    notStarted.classList.add('hidden');
+    inProgress.classList.add('hidden');
+    completed.classList.add('hidden');
+    
+    switch (shadowState.deepClean.status) {
+        case 'not_started':
+            notStarted.classList.remove('hidden');
+            break;
+            
+        case 'in_progress':
+        case 'paused':
+            inProgress.classList.remove('hidden');
+            document.getElementById('deepCleanCurrentDay').textContent = shadowState.deepClean.currentDay;
+            document.getElementById('deepCleanProgressFill').style.width = `${(shadowState.deepClean.currentDay / 30) * 100}%`;
+            
+            const pauseBtn = document.getElementById('deepCleanPauseBtn');
+            if (shadowState.deepClean.isPaused) {
+                pauseBtn.textContent = 'Resume';
+                document.getElementById('deepCleanStatusText').textContent = 'Paused';
+            } else {
+                pauseBtn.textContent = 'Pause';
+                document.getElementById('deepCleanStatusText').textContent = 'Working while you sleep...';
+            }
+            break;
+            
+        case 'completed':
+            completed.classList.remove('hidden');
+            if (shadowState.deepClean.completedDate) {
+                const date = new Date(shadowState.deepClean.completedDate).toLocaleDateString();
+                document.getElementById('deepCleanCompletedDate').textContent = `Completed on: ${date}`;
+            }
+            break;
+    }
+}
+
+function startDeepClean() {
+    if (shadowState.deepClean.status === 'completed') {
+        showToast('Deep Clean has already been completed', 'info');
+        return;
+    }
+    
+    shadowState.deepClean.status = 'in_progress';
+    shadowState.deepClean.startDate = new Date().toISOString();
+    shadowState.deepClean.currentDay = 1;
+    shadowState.deepClean.isPaused = false;
+    
+    saveShadowState();
+    updateDeepCleanUI();
+    updateShadowToolCards();
+    
+    showToast('Deep Clean started! This will work while you sleep.', 'success');
+}
+
+function toggleDeepCleanPause() {
+    shadowState.deepClean.isPaused = !shadowState.deepClean.isPaused;
+    
+    if (!shadowState.deepClean.isPaused) {
+        // Resuming - adjust start date to account for paused time
+        // For simplicity, we'll just continue from where we left off
+    }
+    
+    saveShadowState();
+    updateDeepCleanUI();
+    
+    showToast(shadowState.deepClean.isPaused ? 'Deep Clean paused' : 'Deep Clean resumed', 'info');
+}
+
+function stopDeepClean() {
+    if (confirm('Are you sure you want to stop the Deep Clean? You will need to start over.')) {
+        shadowState.deepClean.status = 'not_started';
+        shadowState.deepClean.startDate = null;
+        shadowState.deepClean.currentDay = 0;
+        shadowState.deepClean.isPaused = false;
+        
+        saveShadowState();
+        updateDeepCleanUI();
+        updateShadowToolCards();
+        
+        showToast('Deep Clean stopped', 'info');
+    }
+}
+
+// ============================================
 // ATTUNEMENTS FEATURE
 // ============================================
 
@@ -4875,18 +5884,26 @@ let attunementState = {
     isRunning: false,
     timer: null,
     endTime: null,
+    startTime: null,
     duration: 0,
     remaining: 0
 };
 
 // Initialize attunements
-function initAttunements() {
-    loadAttunementState();
+async function initAttunements() {
+    // Load from localStorage first (for instant UI)
+    loadAttunementStateFromCache();
     updateAttunementHomeCard();
+    
+    // Restore running attunement if any
+    restoreAttunementState();
+    
+    // Then sync from backend (non-blocking)
+    loadAttunmentsFromBackend().catch(e => console.warn('Attunements backend load error:', e));
 }
 
-// Load attunement state from localStorage
-function loadAttunementState() {
+// Load attunement state from localStorage cache
+function loadAttunementStateFromCache() {
     const saved = localStorage.getItem('attunementState');
     if (saved) {
         try {
@@ -4907,12 +5924,143 @@ function loadAttunementState() {
     }
 }
 
-// Save attunement state to localStorage
-function saveAttunementState() {
+// Load attunements from backend
+async function loadAttunmentsFromBackend() {
+    try {
+        // Load all available attunements
+        const attResult = await apiCall('getAttunements');
+        if (attResult?.attunements) {
+            attunementState.attunements = attResult.attunements;
+        }
+        
+        // Load user's received attunements
+        if (state.currentUser) {
+            const userId = state.currentUser.user_id;
+            const userResult = await apiCall('getUserAttunements', { userId: userId });
+            if (userResult?.userAttunements) {
+                attunementState.userAttunements[userId] = userResult.userAttunements;
+            }
+        }
+        
+        // Update cache
+        saveAttunementStateToCache();
+        updateAttunementHomeCard();
+        
+        console.log('Attunements loaded from backend:', attunementState.attunements.length);
+    } catch (e) {
+        console.error('Error loading attunements from backend:', e);
+    }
+}
+
+// Save attunement state to localStorage cache
+function saveAttunementStateToCache() {
     localStorage.setItem('attunementState', JSON.stringify({
         attunements: attunementState.attunements,
         userAttunements: attunementState.userAttunements
     }));
+}
+
+// Save running attunement state (for background persistence)
+function saveRunningAttunementState() {
+    if (attunementState.isRunning && attunementState.currentAttunement) {
+        localStorage.setItem('runningAttunement', JSON.stringify({
+            attunementId: attunementState.currentAttunement.id,
+            startTime: attunementState.startTime,
+            endTime: attunementState.endTime?.toISOString(),
+            duration: attunementState.duration
+        }));
+    } else {
+        localStorage.removeItem('runningAttunement');
+    }
+}
+
+// Restore running attunement state
+function restoreAttunementState() {
+    const saved = localStorage.getItem('runningAttunement');
+    if (!saved) return;
+    
+    try {
+        const data = JSON.parse(saved);
+        const endTime = new Date(data.endTime);
+        const now = new Date();
+        
+        // Check if attunement already completed while away
+        if (now >= endTime) {
+            // Complete the attunement
+            const att = attunementState.attunements.find(a => a.id === data.attunementId);
+            if (att) {
+                attunementState.currentAttunement = att;
+                recordAttunementCompletion();
+                showToast('Attunement completed while away!', 'success');
+            }
+            localStorage.removeItem('runningAttunement');
+            return;
+        }
+        
+        // Resume the running attunement
+        const att = attunementState.attunements.find(a => a.id === data.attunementId);
+        if (att) {
+            attunementState.currentAttunement = att;
+            attunementState.duration = data.duration;
+            attunementState.startTime = data.startTime;
+            attunementState.endTime = endTime;
+            attunementState.remaining = Math.round((endTime - now) / 1000);
+            attunementState.isRunning = true;
+            
+            // Setup process view
+            document.getElementById('attunementProcessName').textContent = att.name;
+            const seriesEl = document.getElementById('attunementProcessSeries');
+            if (att.seriesName) {
+                seriesEl.textContent = `${att.seriesName} Level ${att.level || 1}`;
+                seriesEl.style.display = 'block';
+            } else {
+                seriesEl.style.display = 'none';
+            }
+            
+            updateAttunementTimer();
+            
+            // Start timer interval
+            attunementState.timer = setInterval(attunementTick, 1000);
+            
+            showView('attunementProcess');
+            showToast(`Attunement resumed: ${Math.ceil(attunementState.remaining / 60)}m left`, 'info');
+        }
+    } catch (e) {
+        console.error('Error restoring attunement state:', e);
+        localStorage.removeItem('runningAttunement');
+    }
+}
+
+// Record attunement completion to backend and local state
+async function recordAttunementCompletion() {
+    const att = attunementState.currentAttunement;
+    const userId = state.currentUser?.user_id;
+    
+    if (userId && att) {
+        // Record locally
+        if (!attunementState.userAttunements[userId]) {
+            attunementState.userAttunements[userId] = [];
+        }
+        
+        const record = {
+            attunementId: att.id,
+            attunedAt: new Date().toISOString(),
+            level: att.level || 1
+        };
+        
+        attunementState.userAttunements[userId].push(record);
+        saveAttunementStateToCache();
+        
+        // Sync to backend (non-blocking)
+        apiCall('saveUserAttunement', {
+            userId: userId,
+            attunementId: att.id,
+            attunedAt: record.attunedAt,
+            level: record.level
+        }).catch(e => console.warn('Error syncing user attunement:', e));
+    }
+    
+    localStorage.removeItem('runningAttunement');
 }
 
 // Update home card
@@ -5210,8 +6358,12 @@ async function startAttunement() {
     // Set timer
     attunementState.duration = att.duration * 60; // Convert to seconds
     attunementState.remaining = attunementState.duration;
+    attunementState.startTime = new Date().toISOString();
     attunementState.endTime = new Date(Date.now() + attunementState.duration * 1000);
     attunementState.isRunning = true;
+    
+    // Save running state for background persistence
+    saveRunningAttunementState();
     
     updateAttunementTimer();
     
@@ -5230,6 +6382,11 @@ function attunementTick() {
     attunementState.remaining = Math.max(0, Math.round((attunementState.endTime - now) / 1000));
     
     updateAttunementTimer();
+    
+    // Save state periodically (every 30 seconds)
+    if (attunementState.remaining % 30 === 0) {
+        saveRunningAttunementState();
+    }
     
     if (attunementState.remaining <= 0) {
         completeAttunement();
@@ -5256,6 +6413,7 @@ function cancelAttunement() {
         clearInterval(attunementState.timer);
         attunementState.isRunning = false;
         attunementState.timer = null;
+        localStorage.removeItem('runningAttunement');
         showView('attunements');
         showToast('Attunement cancelled', 'info');
     }
@@ -5268,22 +6426,9 @@ function completeAttunement() {
     attunementState.timer = null;
     
     const att = attunementState.currentAttunement;
-    const userId = state.currentUser?.user_id;
     
-    if (userId && att) {
-        // Record attunement
-        if (!attunementState.userAttunements[userId]) {
-            attunementState.userAttunements[userId] = [];
-        }
-        
-        attunementState.userAttunements[userId].push({
-            attunementId: att.id,
-            attunedAt: new Date().toISOString(),
-            level: att.level || 1
-        });
-        
-        saveAttunementState();
-    }
+    // Record to local state and backend
+    recordAttunementCompletion();
     
     // Play completion sound
     playCompletionSound();
@@ -5446,7 +6591,7 @@ function onSeriesSelectChange() {
 }
 
 // Add new attunement
-function addAttunement() {
+async function addAttunement() {
     const name = document.getElementById('newAttunementName').value.trim();
     const duration = parseInt(document.getElementById('newAttunementDuration').value) || 30;
     const description = document.getElementById('newAttunementDescription').value.trim();
@@ -5492,8 +6637,12 @@ function addAttunement() {
         createdAt: new Date().toISOString()
     };
     
+    // Add to local state
     attunementState.attunements.push(newAttunement);
-    saveAttunementState();
+    saveAttunementStateToCache();
+    
+    // Sync to backend
+    apiCall('saveAttunement', newAttunement).catch(e => console.warn('Error syncing attunement:', e));
     
     // Clear form
     document.getElementById('newAttunementName').value = '';
@@ -5514,7 +6663,11 @@ function toggleAttunementVisibility(attId) {
     const att = attunementState.attunements.find(a => a.id === attId);
     if (att) {
         att.visible = att.visible === false ? true : false;
-        saveAttunementState();
+        saveAttunementStateToCache();
+        
+        // Sync to backend
+        apiCall('saveAttunement', att).catch(e => console.warn('Error syncing attunement visibility:', e));
+        
         renderAdminAttunements();
         updateAttunementHomeCard();
     }
@@ -5527,7 +6680,11 @@ function deleteAttunement(attId) {
     
     if (confirm(`Delete "${att.name}"? This cannot be undone.`)) {
         attunementState.attunements = attunementState.attunements.filter(a => a.id !== attId);
-        saveAttunementState();
+        saveAttunementStateToCache();
+        
+        // Sync to backend
+        apiCall('deleteAttunement', { attunementId: attId }).catch(e => console.warn('Error deleting attunement:', e));
+        
         renderAdminAttunements();
         updateAttunementHomeCard();
         showToast(`Deleted "${att.name}"`, 'success');
