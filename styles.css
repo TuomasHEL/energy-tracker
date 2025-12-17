@@ -6622,3 +6622,188 @@ input:checked + .toggle-slider:before {
         transform: scale(1.2);
     }
 }
+
+/* ============================================
+   SHADOW TOOLS GAMIFICATION
+   ============================================ */
+
+/* Complete screen stats */
+.complete-stats {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    margin: var(--space-lg) 0;
+    width: 100%;
+    max-width: 300px;
+}
+
+.complete-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-xs) 0;
+}
+
+.complete-stat-row:not(:last-child) {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.complete-stat-row.level {
+    margin-top: var(--space-sm);
+    padding-top: var(--space-sm);
+    border-bottom: none;
+}
+
+.complete-stat-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.complete-stat-value {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.complete-stat-value.target-met {
+    color: #10B981;
+}
+
+.complete-stat-row.level .complete-stat-value {
+    color: #8B5CF6;
+    font-weight: 600;
+}
+
+/* Shadow Settings View */
+.shadow-settings-content {
+    padding: var(--space-md);
+}
+
+.shadow-settings-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--space-lg);
+    margin-bottom: var(--space-md);
+}
+
+.shadow-settings-section h3 {
+    font-size: 1rem;
+    color: var(--text-primary);
+    margin-bottom: var(--space-xs);
+}
+
+.shadow-settings-description {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-md);
+}
+
+.shadow-settings-control {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-md);
+}
+
+.shadow-target-display {
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 60px;
+    text-align: center;
+}
+
+.shadow-settings-level {
+    margin-top: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--border-color);
+    text-align: center;
+}
+
+.shadow-settings-level .level-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+}
+
+.shadow-settings-level .level-badge {
+    background: linear-gradient(135deg, #8B5CF6, #A78BFA);
+    color: white;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.shadow-settings-level .level-name {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.shadow-settings-level .level-progress {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: var(--space-xs);
+}
+
+.shadow-settings-info {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--space-lg);
+}
+
+.shadow-settings-info h4 {
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    margin-bottom: var(--space-md);
+}
+
+.shadow-levels-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.shadow-level-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.shadow-level-item .level-badge {
+    background: linear-gradient(135deg, #8B5CF6, #A78BFA);
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Shadow tool card level badge */
+.shadow-tool-level {
+    margin-top: var(--space-sm);
+    font-size: 0.8rem;
+    color: #8B5CF6;
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.tool-level-badge {
+    background: linear-gradient(135deg, #8B5CF6, #A78BFA);
+    color: white;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    font-size: 0.7rem;
+    font-weight: 600;
+}

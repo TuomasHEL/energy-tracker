@@ -540,6 +540,72 @@
                 </div>
             </section>
 
+            <!-- Shadow Settings View -->
+            <section id="viewShadowSettings" class="view">
+                <div class="view-header">
+                    <button class="back-btn" onclick="showView('settings')">←</button>
+                    <h2>Shadow Tools Settings</h2>
+                </div>
+
+                <div class="shadow-settings-content">
+                    <div class="shadow-settings-section">
+                        <h3>☯ Integrate - Daily Target</h3>
+                        <p class="shadow-settings-description">How many polarities to integrate daily (max 50/day)</p>
+                        <div class="shadow-settings-control">
+                            <button class="btn small secondary" onclick="adjustIntegrateTarget(-5)">-5</button>
+                            <span class="shadow-target-display" id="integrateTargetDisplay">15</span>
+                            <button class="btn small secondary" onclick="adjustIntegrateTarget(5)">+5</button>
+                        </div>
+                        <div class="shadow-settings-level" id="integrateLevelDisplay">
+                            <!-- Level display populated by JS -->
+                        </div>
+                    </div>
+
+                    <div class="shadow-settings-section">
+                        <h3>◉ Process - Daily Target</h3>
+                        <p class="shadow-settings-description">How many emotions to process daily (max 50/day)</p>
+                        <div class="shadow-settings-control">
+                            <button class="btn small secondary" onclick="adjustProcessTarget(-5)">-5</button>
+                            <span class="shadow-target-display" id="processTargetDisplay">15</span>
+                            <button class="btn small secondary" onclick="adjustProcessTarget(5)">+5</button>
+                        </div>
+                        <div class="shadow-settings-level" id="processLevelDisplay">
+                            <!-- Level display populated by JS -->
+                        </div>
+                    </div>
+
+                    <div class="shadow-settings-info">
+                        <h4>About Levels</h4>
+                        <div class="shadow-levels-list">
+                            <div class="shadow-level-item">
+                                <span class="level-badge">1</span>
+                                <span>First item completed</span>
+                            </div>
+                            <div class="shadow-level-item">
+                                <span class="level-badge">2</span>
+                                <span>10% complete</span>
+                            </div>
+                            <div class="shadow-level-item">
+                                <span class="level-badge">3</span>
+                                <span>25% complete</span>
+                            </div>
+                            <div class="shadow-level-item">
+                                <span class="level-badge">4</span>
+                                <span>50% complete</span>
+                            </div>
+                            <div class="shadow-level-item">
+                                <span class="level-badge">5</span>
+                                <span>75% complete</span>
+                            </div>
+                            <div class="shadow-level-item">
+                                <span class="level-badge">6</span>
+                                <span>100% - Mastery!</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- Shadow Main View -->
             <section id="viewShadow" class="view">
                 <div class="view-header">
@@ -561,6 +627,7 @@
                                 </div>
                                 <span class="shadow-progress-text" id="integrateProgressText">0% complete</span>
                             </div>
+                            <div class="shadow-tool-level" id="integrateLevelBadge"></div>
                         </div>
                         <div class="shadow-tool-arrow">→</div>
                     </div>
@@ -577,6 +644,7 @@
                                 </div>
                                 <span class="shadow-progress-text" id="processProgressText">0% complete</span>
                             </div>
+                            <div class="shadow-tool-level" id="processLevelBadge"></div>
                         </div>
                         <div class="shadow-tool-arrow">→</div>
                     </div>
@@ -689,11 +757,14 @@
                         <span>—</span>
                         <span id="completePolarityRight">relative</span>
                     </div>
-                    <p class="integrate-complete-message">Take a moment to feel the integration.</p>
+                    
+                    <div class="complete-stats" id="integrateCompleteStats">
+                        <!-- Stats populated by JS -->
+                    </div>
                     
                     <div class="integrate-complete-actions">
                         <button class="btn secondary large" onclick="finishIntegration()">I feel done for now</button>
-                        <button class="btn primary large" onclick="continueIntegration()">Continue to next</button>
+                        <button class="btn primary large" id="integrateContinueBtn" onclick="continueIntegration()">Continue to next</button>
                     </div>
                 </div>
             </section>
@@ -790,11 +861,14 @@
                     <div class="process-complete-emotion">
                         <span id="completeEmotionName">abandoned</span>
                     </div>
-                    <p class="process-complete-message">Take a moment to feel the release.</p>
+                    
+                    <div class="complete-stats" id="processCompleteStats">
+                        <!-- Stats populated by JS -->
+                    </div>
                     
                     <div class="process-complete-actions">
                         <button class="btn secondary large" onclick="finishProcess()">I feel done for now</button>
-                        <button class="btn primary large" onclick="continueProcess()">Continue to next</button>
+                        <button class="btn primary large" id="processContinueBtn" onclick="continueProcess()">Continue to next</button>
                     </div>
                 </div>
             </section>
@@ -1594,6 +1668,16 @@
                     <div class="profile-card-arrow">→</div>
                 </div>
 
+                <!-- Shadow Tools Settings Card -->
+                <div class="profile-card" onclick="showView('shadowSettings')">
+                    <div class="profile-card-icon">☯</div>
+                    <div class="profile-card-content">
+                        <div class="profile-card-title">Shadow Tools</div>
+                        <div class="profile-card-subtitle">Daily targets for Integrate & Process</div>
+                    </div>
+                    <div class="profile-card-arrow">→</div>
+                </div>
+
                 <div class="settings-section">
                     <h3>Notifications</h3>
                     <div class="settings-row">
@@ -1637,7 +1721,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Clear Ground v5.3.1</p>
+                    <p class="version">Clear Ground v5.4</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>

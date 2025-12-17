@@ -1415,6 +1415,9 @@ function showView(viewName) {
             case 'attunementSettings':
                 renderAdminAttunements();
                 break;
+            case 'shadowSettings':
+                renderShadowSettings();
+                break;
             case 'shadow':
                 updateShadowUI();
                 break;
@@ -6285,13 +6288,51 @@ let shadowState = {
         currentDay: 0,
         isPaused: false,
         completedDate: null
+    },
+    daily: {
+        date: null,           // Current date string (YYYY-MM-DD)
+        integrateCount: 0,    // Today's integrate completions
+        processCount: 0       // Today's process completions
+    },
+    settings: {
+        integrateTarget: 15,  // Daily target (10-50)
+        processTarget: 15     // Daily target (10-50)
     }
 };
 
+// Level definitions for gamification
+const INTEGRATE_LEVELS = [
+    { level: 1, name: "Seeker", threshold: 1, description: "You've taken the first step toward integration" },
+    { level: 2, name: "Explorer", threshold: 0.10, description: "10% of polarities explored" },
+    { level: 3, name: "Harmonizer", threshold: 0.25, description: "25% - Finding balance in opposites" },
+    { level: 4, name: "Integrator", threshold: 0.50, description: "50% - The middle path emerges" },
+    { level: 5, name: "Unifier", threshold: 0.75, description: "75% - Duality dissolves into wholeness" },
+    { level: 6, name: "Complete", threshold: 1.00, description: "100% - All polarities integrated" }
+];
+
+const PROCESS_LEVELS = [
+    { level: 1, name: "Awakener", threshold: 1, description: "You've begun feeling what's there" },
+    { level: 2, name: "Feeler", threshold: 0.10, description: "10% of emotions witnessed" },
+    { level: 3, name: "Processor", threshold: 0.25, description: "25% - Emotions flow through you" },
+    { level: 4, name: "Alchemist", threshold: 0.50, description: "50% - Transforming shadow to gold" },
+    { level: 5, name: "Liberator", threshold: 0.75, description: "75% - Freedom from emotional weight" },
+    { level: 6, name: "Embodied", threshold: 1.00, description: "100% - Full emotional mastery" }
+];
+
+// Daily limit
+const DAILY_LIMIT = 50;
+
 // Initialize shadow feature
 async function initShadow() {
+    // Load settings first
+    loadShadowSettings();
+    
     // Load from localStorage first (for instant UI)
     loadShadowStateFromCache();
+    
+    // Check daily reset
+    checkDailyReset();
+    
     updateShadowUI();
     
     // Initialize liberation tool
@@ -6370,6 +6411,175 @@ async function loadShadowFromBackend() {
     }
 }
 
+// Get current level for integrate tool
+function getIntegrateLevel() {
+    const completed = shadowState.integrate.completed.length;
+    const total = POLARITIES_DATA.length;
+    const percentage = total > 0 ? completed / total : 0;
+    
+    // Check from highest to lowest
+    for (let i = INTEGRATE_LEVELS.length - 1; i >= 0; i--) {
+        const level = INTEGRATE_LEVELS[i];
+        // First level uses absolute count, others use percentage
+        if (i === 0) {
+            if (completed >= level.threshold) return level;
+        } else {
+            if (percentage >= level.threshold) return level;
+        }
+    }
+    return null; // Not started
+}
+
+// Get current level for process tool
+function getProcessLevel() {
+    const completed = shadowState.process.completed.length;
+    const total = EMOTIONS_DATA.length;
+    const percentage = total > 0 ? completed / total : 0;
+    
+    // Check from highest to lowest
+    for (let i = PROCESS_LEVELS.length - 1; i >= 0; i--) {
+        const level = PROCESS_LEVELS[i];
+        // First level uses absolute count, others use percentage
+        if (i === 0) {
+            if (completed >= level.threshold) return level;
+        } else {
+            if (percentage >= level.threshold) return level;
+        }
+    }
+    return null; // Not started
+}
+
+// Check and reset daily counts if new day
+function checkDailyReset() {
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (shadowState.daily.date !== today) {
+        shadowState.daily.date = today;
+        shadowState.daily.integrateCount = 0;
+        shadowState.daily.processCount = 0;
+        saveShadowState();
+    }
+}
+
+// Check if daily limit reached for integrate
+function isIntegrateLimitReached() {
+    checkDailyReset();
+    return shadowState.daily.integrateCount >= DAILY_LIMIT;
+}
+
+// Check if daily limit reached for process
+function isProcessLimitReached() {
+    checkDailyReset();
+    return shadowState.daily.processCount >= DAILY_LIMIT;
+}
+
+// Increment daily integrate count
+function incrementDailyIntegrate() {
+    checkDailyReset();
+    shadowState.daily.integrateCount++;
+    saveShadowState();
+}
+
+// Increment daily process count
+function incrementDailyProcess() {
+    checkDailyReset();
+    shadowState.daily.processCount++;
+    saveShadowState();
+}
+
+// Load shadow settings from localStorage
+function loadShadowSettings() {
+    const saved = localStorage.getItem('shadowSettings');
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            shadowState.settings = { ...shadowState.settings, ...parsed };
+        } catch (e) {
+            console.error('Error loading shadow settings:', e);
+        }
+    }
+}
+
+// Save shadow settings to localStorage
+function saveShadowSettings() {
+    localStorage.setItem('shadowSettings', JSON.stringify(shadowState.settings));
+}
+
+// Render shadow settings view
+function renderShadowSettings() {
+    // Update target displays
+    document.getElementById('integrateTargetDisplay').textContent = shadowState.settings.integrateTarget;
+    document.getElementById('processTargetDisplay').textContent = shadowState.settings.processTarget;
+    
+    // Update level displays
+    updateShadowSettingsLevels();
+}
+
+// Update level displays in settings
+function updateShadowSettingsLevels() {
+    const integrateLevel = getIntegrateLevel();
+    const processLevel = getProcessLevel();
+    
+    const integrateLevelEl = document.getElementById('integrateLevelDisplay');
+    const processLevelEl = document.getElementById('processLevelDisplay');
+    
+    const integrateCompleted = shadowState.integrate.completed.length;
+    const integrateTotal = POLARITIES_DATA.length;
+    const integratePercent = Math.round((integrateCompleted / integrateTotal) * 100);
+    
+    const processCompleted = shadowState.process.completed.length;
+    const processTotal = EMOTIONS_DATA.length;
+    const processPercent = Math.round((processCompleted / processTotal) * 100);
+    
+    if (integrateLevelEl) {
+        if (integrateLevel) {
+            integrateLevelEl.innerHTML = `
+                <div class="level-info">
+                    <span class="level-badge">Lv ${integrateLevel.level}</span>
+                    <span class="level-name">${integrateLevel.name}</span>
+                </div>
+                <div class="level-progress">${integrateCompleted}/${integrateTotal} (${integratePercent}%)</div>
+            `;
+        } else {
+            integrateLevelEl.innerHTML = `
+                <div class="level-progress">Not started yet (${integrateCompleted}/${integrateTotal})</div>
+            `;
+        }
+    }
+    
+    if (processLevelEl) {
+        if (processLevel) {
+            processLevelEl.innerHTML = `
+                <div class="level-info">
+                    <span class="level-badge">Lv ${processLevel.level}</span>
+                    <span class="level-name">${processLevel.name}</span>
+                </div>
+                <div class="level-progress">${processCompleted}/${processTotal} (${processPercent}%)</div>
+            `;
+        } else {
+            processLevelEl.innerHTML = `
+                <div class="level-progress">Not started yet (${processCompleted}/${processTotal})</div>
+            `;
+        }
+    }
+}
+
+// Adjust integrate daily target
+function adjustIntegrateTarget(delta) {
+    const newTarget = Math.max(10, Math.min(50, shadowState.settings.integrateTarget + delta));
+    shadowState.settings.integrateTarget = newTarget;
+    saveShadowSettings();
+    document.getElementById('integrateTargetDisplay').textContent = newTarget;
+}
+
+// Adjust process daily target
+function adjustProcessTarget(delta) {
+    const newTarget = Math.max(10, Math.min(50, shadowState.settings.processTarget + delta));
+    shadowState.settings.processTarget = newTarget;
+    saveShadowSettings();
+    document.getElementById('processTargetDisplay').textContent = newTarget;
+}
+
 // Save shadow state to localStorage
 function saveShadowState() {
     localStorage.setItem('shadowState', JSON.stringify(shadowState));
@@ -6413,6 +6623,17 @@ function updateShadowToolCards() {
     if (integrateBar) integrateBar.style.width = `${integratePercent}%`;
     if (integrateText) integrateText.textContent = `${integratePercent}% complete`;
     
+    // Integrate level badge
+    const integrateLevelBadge = document.getElementById('integrateLevelBadge');
+    const integrateLevel = getIntegrateLevel();
+    if (integrateLevelBadge) {
+        if (integrateLevel) {
+            integrateLevelBadge.innerHTML = `<span class="tool-level-badge">Lv ${integrateLevel.level}</span> ${integrateLevel.name}`;
+        } else {
+            integrateLevelBadge.innerHTML = '';
+        }
+    }
+    
     // Process progress
     const processTotal = EMOTIONS_DATA.length;
     const processCompleted = shadowState.process.completed.length;
@@ -6422,6 +6643,17 @@ function updateShadowToolCards() {
     const processText = document.getElementById('processProgressText');
     if (processBar) processBar.style.width = `${processPercent}%`;
     if (processText) processText.textContent = `${processPercent}% complete`;
+    
+    // Process level badge
+    const processLevelBadge = document.getElementById('processLevelBadge');
+    const processLevel = getProcessLevel();
+    if (processLevelBadge) {
+        if (processLevel) {
+            processLevelBadge.innerHTML = `<span class="tool-level-badge">Lv ${processLevel.level}</span> ${processLevel.name}`;
+        } else {
+            processLevelBadge.innerHTML = '';
+        }
+    }
     
     // Deep Clean status
     const deepCleanStatus = document.getElementById('deepCleanStatus');
@@ -6536,6 +6768,7 @@ function finishIntegrationAnimation() {
     
     // Record completion
     shadowState.integrate.completed.push(polarity.id);
+    incrementDailyIntegrate();
     saveShadowState();
     syncShadowToBackend();
     
@@ -6547,6 +6780,9 @@ function finishIntegrationAnimation() {
     document.getElementById('completePolarityLeft').textContent = polarity.left;
     document.getElementById('completePolarityRight').textContent = polarity.right;
     
+    // Update progress stats on complete screen
+    updateIntegrateCompleteStats();
+    
     updateIntegrateUI();
     updateShadowToolCards();
     
@@ -6555,7 +6791,59 @@ function finishIntegrationAnimation() {
     vibrate([100, 50, 100]);
 }
 
+function updateIntegrateCompleteStats() {
+    const completed = shadowState.integrate.completed.length;
+    const total = POLARITIES_DATA.length;
+    const percentage = Math.round((completed / total) * 100);
+    const todayCount = shadowState.daily.integrateCount;
+    const todayTarget = shadowState.settings.integrateTarget;
+    const level = getIntegrateLevel();
+    
+    // Update stats display
+    const statsEl = document.getElementById('integrateCompleteStats');
+    if (statsEl) {
+        const atLimit = todayCount >= DAILY_LIMIT;
+        const targetMet = todayCount >= todayTarget;
+        
+        statsEl.innerHTML = `
+            <div class="complete-stat-row">
+                <span class="complete-stat-label">All-time progress</span>
+                <span class="complete-stat-value">${completed} / ${total} (${percentage}%)</span>
+            </div>
+            <div class="complete-stat-row">
+                <span class="complete-stat-label">Today</span>
+                <span class="complete-stat-value ${targetMet ? 'target-met' : ''}">${todayCount} / ${todayTarget} target${atLimit ? ' (daily limit reached)' : ''}</span>
+            </div>
+            ${level ? `
+            <div class="complete-stat-row level">
+                <span class="complete-stat-label">Level ${level.level}</span>
+                <span class="complete-stat-value">${level.name}</span>
+            </div>
+            ` : ''}
+        `;
+    }
+    
+    // Update continue button text
+    const continueBtn = document.getElementById('integrateContinueBtn');
+    if (continueBtn) {
+        if (todayCount >= DAILY_LIMIT) {
+            continueBtn.disabled = true;
+            continueBtn.textContent = 'Daily limit reached';
+        } else {
+            continueBtn.disabled = false;
+            continueBtn.textContent = 'Continue to next';
+        }
+    }
+}
+
 function continueIntegration() {
+    // Check daily limit
+    if (isIntegrateLimitReached()) {
+        showToast('Daily limit reached (50). Come back tomorrow!', 'info');
+        finishIntegration();
+        return;
+    }
+    
     // Check if more to do
     const handled = [...shadowState.integrate.completed, ...shadowState.integrate.skipped];
     const hasMore = POLARITIES_DATA.some(p => !handled.includes(p.id));
@@ -6724,6 +7012,7 @@ function finishProcessAnimation() {
     
     // Record completion
     shadowState.process.completed.push(emotion.id);
+    incrementDailyProcess();
     saveShadowState();
     syncShadowToBackend();
     
@@ -6734,6 +7023,9 @@ function finishProcessAnimation() {
     // Update complete screen
     document.getElementById('completeEmotionName').textContent = emotion.name;
     
+    // Update progress stats on complete screen
+    updateProcessCompleteStats();
+    
     updateProcessUI();
     updateShadowToolCards();
     
@@ -6742,7 +7034,59 @@ function finishProcessAnimation() {
     vibrate([100, 50, 100]);
 }
 
+function updateProcessCompleteStats() {
+    const completed = shadowState.process.completed.length;
+    const total = EMOTIONS_DATA.length;
+    const percentage = Math.round((completed / total) * 100);
+    const todayCount = shadowState.daily.processCount;
+    const todayTarget = shadowState.settings.processTarget;
+    const level = getProcessLevel();
+    
+    // Update stats display
+    const statsEl = document.getElementById('processCompleteStats');
+    if (statsEl) {
+        const atLimit = todayCount >= DAILY_LIMIT;
+        const targetMet = todayCount >= todayTarget;
+        
+        statsEl.innerHTML = `
+            <div class="complete-stat-row">
+                <span class="complete-stat-label">All-time progress</span>
+                <span class="complete-stat-value">${completed} / ${total} (${percentage}%)</span>
+            </div>
+            <div class="complete-stat-row">
+                <span class="complete-stat-label">Today</span>
+                <span class="complete-stat-value ${targetMet ? 'target-met' : ''}">${todayCount} / ${todayTarget} target${atLimit ? ' (daily limit reached)' : ''}</span>
+            </div>
+            ${level ? `
+            <div class="complete-stat-row level">
+                <span class="complete-stat-label">Level ${level.level}</span>
+                <span class="complete-stat-value">${level.name}</span>
+            </div>
+            ` : ''}
+        `;
+    }
+    
+    // Update continue button text
+    const continueBtn = document.getElementById('processContinueBtn');
+    if (continueBtn) {
+        if (todayCount >= DAILY_LIMIT) {
+            continueBtn.disabled = true;
+            continueBtn.textContent = 'Daily limit reached';
+        } else {
+            continueBtn.disabled = false;
+            continueBtn.textContent = 'Continue to next';
+        }
+    }
+}
+
 function continueProcess() {
+    // Check daily limit
+    if (isProcessLimitReached()) {
+        showToast('Daily limit reached (50). Come back tomorrow!', 'info');
+        finishProcess();
+        return;
+    }
+    
     // Check if more to do
     const handled = [...shadowState.process.completed, ...shadowState.process.skipped];
     const hasMore = EMOTIONS_DATA.some(e => !handled.includes(e.id));
