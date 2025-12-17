@@ -1721,7 +1721,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Clear Ground v5.4</p>
+                    <p class="version">Clear Ground v5.4.1</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>
@@ -2015,6 +2015,44 @@
                             <span class="order-label">Order:</span>
                             <button class="order-btn active" data-order="sequential" data-cat="thought-leaders" onclick="setSignalOrder('thought-leaders', 'sequential')">1→2→3</button>
                             <button class="order-btn" data-order="random" data-cat="thought-leaders" onclick="setSignalOrder('thought-leaders', 'random')">Random</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Nondual Understanding -->
+                    <div class="signal-category-setting">
+                        <div class="signal-category-header">
+                            <label class="toggle">
+                                <input type="checkbox" id="signalCat-nondual-understanding" checked onchange="saveSignalSettings()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="signal-category-name">Nondual Understanding</span>
+                            <span class="signal-category-ratio" id="ratio-nondual-understanding">20%</span>
+                        </div>
+                        <input type="range" id="signalRatio-nondual-understanding" min="0" max="100" value="20" 
+                               oninput="updateCategoryRatios()" onchange="saveSignalSettings()">
+                        <div class="signal-order-toggle">
+                            <span class="order-label">Order:</span>
+                            <button class="order-btn active" data-order="sequential" data-cat="nondual-understanding" onclick="setSignalOrder('nondual-understanding', 'sequential')">1→2→3</button>
+                            <button class="order-btn" data-order="random" data-cat="nondual-understanding" onclick="setSignalOrder('nondual-understanding', 'random')">Random</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Tantric Yoga -->
+                    <div class="signal-category-setting">
+                        <div class="signal-category-header">
+                            <label class="toggle">
+                                <input type="checkbox" id="signalCat-tantric-yoga" checked onchange="saveSignalSettings()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="signal-category-name">Tantric Yoga</span>
+                            <span class="signal-category-ratio" id="ratio-tantric-yoga">20%</span>
+                        </div>
+                        <input type="range" id="signalRatio-tantric-yoga" min="0" max="100" value="20" 
+                               oninput="updateCategoryRatios()" onchange="saveSignalSettings()">
+                        <div class="signal-order-toggle">
+                            <span class="order-label">Order:</span>
+                            <button class="order-btn active" data-order="sequential" data-cat="tantric-yoga" onclick="setSignalOrder('tantric-yoga', 'sequential')">1→2→3</button>
+                            <button class="order-btn" data-order="random" data-cat="tantric-yoga" onclick="setSignalOrder('tantric-yoga', 'random')">Random</button>
                         </div>
                     </div>
                 </div>

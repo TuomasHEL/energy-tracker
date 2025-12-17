@@ -9042,13 +9042,15 @@ function updateHabitStats() {
 const SIGNAL_CONFIG = {
     // Base URL for raw GitHub content (user should update this)
     baseUrl: 'https://raw.githubusercontent.com/tuomashel/energy-tracker/main/signals',
-    categories: ['foundations', 'presence', 'collective-wisdom', 'creation', 'thought-leaders'],
+    categories: ['foundations', 'presence', 'collective-wisdom', 'creation', 'thought-leaders', 'nondual-understanding', 'tantric-yoga'],
     categoryLabels: {
         'foundations': 'Foundations',
         'presence': 'Presence',
         'collective-wisdom': 'Collective Wisdom',
         'creation': 'Creation',
-        'thought-leaders': 'Life, Business & Beyond'
+        'thought-leaders': 'Life, Business & Beyond',
+        'nondual-understanding': 'Nondual Understanding',
+        'tantric-yoga': 'Tantric Yoga'
     },
     cacheKey: 'signalLessonsCache',
     versionKey: 'signalLessonsVersion',
@@ -9062,7 +9064,9 @@ let SIGNAL_DATA = {
     'presence': [],
     'collective-wisdom': [],
     'creation': [],
-    'thought-leaders': []
+    'thought-leaders': [],
+    'nondual-understanding': [],
+    'tantric-yoga': []
 };
 
 // Load signal lessons from cache or fetch from GitHub
