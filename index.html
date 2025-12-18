@@ -12,6 +12,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
+    <!-- OneSignal Push Notifications -->
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    
     <title>Clear Ground</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -605,6 +608,154 @@
                     </div>
                 </div>
             </section>
+
+            <!-- Push Notifications Settings View -->
+            <section id="viewPushSettings" class="view">
+                <div class="view-header">
+                    <button class="back-btn" onclick="showView('settings')">←</button>
+                    <h2>Push Notifications</h2>
+                </div>
+
+                <div class="push-settings-content">
+                    <!-- Main Enable/Disable -->
+                    <div class="push-settings-section main-toggle">
+                        <div class="push-toggle-row">
+                            <div class="push-toggle-info">
+                                <span class="push-toggle-label">Enable Notifications</span>
+                                <span class="push-toggle-status" id="pushStatusText">Checking...</span>
+                            </div>
+                            <button class="btn primary" id="pushEnableBtn" onclick="togglePushNotifications()">Enable</button>
+                        </div>
+                        <p class="push-settings-note" id="pushNote">
+                            Receive reminders for habits, session completions, and mindful moments.
+                        </p>
+                    </div>
+
+                    <!-- Standard Notifications -->
+                    <div class="push-settings-section" id="pushStandardSection">
+                        <h3>Reminders</h3>
+                        
+                        <div class="push-setting-item">
+                            <div class="push-setting-info">
+                                <span class="push-setting-name">Daily Habits</span>
+                                <span class="push-setting-desc">Remind me to complete daily habits</span>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="pushHabits" onchange="savePushSettings()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="push-setting-time" id="pushHabitsTimeRow">
+                            <span>Remind at:</span>
+                            <input type="time" id="pushHabitsTime" value="08:00" onchange="savePushSettings()">
+                        </div>
+
+                        <div class="push-setting-item">
+                            <div class="push-setting-info">
+                                <span class="push-setting-name">Daily Signal</span>
+                                <span class="push-setting-desc">Remind me to read today's signal</span>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="pushSignal" onchange="savePushSettings()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="push-setting-time" id="pushSignalTimeRow">
+                            <span>Remind at:</span>
+                            <input type="time" id="pushSignalTime" value="07:00" onchange="savePushSettings()">
+                        </div>
+
+                        <div class="push-setting-item">
+                            <div class="push-setting-info">
+                                <span class="push-setting-name">Shadow Practice</span>
+                                <span class="push-setting-desc">Remind me to integrate/process</span>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="pushShadow" onchange="savePushSettings()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="push-setting-time" id="pushShadowTimeRow">
+                            <span>Remind at:</span>
+                            <input type="time" id="pushShadowTime" value="20:00" onchange="savePushSettings()">
+                        </div>
+
+                        <div class="push-setting-item">
+                            <div class="push-setting-info">
+                                <span class="push-setting-name">Session Complete</span>
+                                <span class="push-setting-desc">Notify when energy session ends</span>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="pushSession" checked onchange="savePushSettings()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Mindful Alerts (Random Reminders) -->
+                    <div class="push-settings-section" id="pushAlertsSection">
+                        <div class="push-section-header">
+                            <h3>Mindful Alerts</h3>
+                            <button class="btn small secondary" onclick="showAddAlertModal()">+ Add</button>
+                        </div>
+                        <p class="push-settings-note">Random reminders throughout your day</p>
+                        
+                        <div class="mindful-alerts-list" id="mindfulAlertsList">
+                            <!-- Alerts populated by JS -->
+                            <div class="empty-alerts-message" id="emptyAlertsMessage">
+                                No mindful alerts yet. Add one to receive gentle reminders throughout your day.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Add/Edit Mindful Alert Modal -->
+            <div class="modal-overlay hidden" id="alertModal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="alertModalTitle">Add Mindful Alert</h3>
+                        <button class="modal-close" onclick="closeAlertModal()">✕</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>Alert Name</label>
+                            <input type="text" id="alertName" placeholder="e.g., Gratitude, Be Present, Breathe">
+                        </div>
+                        <div class="form-group">
+                            <label>Message</label>
+                            <input type="text" id="alertMessage" placeholder="e.g., Take a moment to feel grateful">
+                        </div>
+                        <div class="form-group">
+                            <label>How often?</label>
+                            <select id="alertFrequency">
+                                <option value="1">1 time per day</option>
+                                <option value="2">2 times per day</option>
+                                <option value="3" selected>3 times per day</option>
+                                <option value="5">5 times per day</option>
+                                <option value="8">8 times per day</option>
+                                <option value="10">10 times per day</option>
+                                <option value="15">15 times per day</option>
+                                <option value="20">20 times per day</option>
+                                <option value="25">25 times per day</option>
+                                <option value="30">30 times per day</option>
+                            </select>
+                        </div>
+                        <div class="form-group time-range">
+                            <label>Active hours</label>
+                            <div class="time-range-inputs">
+                                <input type="time" id="alertStartTime" value="08:00">
+                                <span>to</span>
+                                <input type="time" id="alertEndTime" value="21:00">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn secondary" onclick="closeAlertModal()">Cancel</button>
+                        <button class="btn primary" onclick="saveAlert()">Save</button>
+                    </div>
+                </div>
+            </div>
 
             <!-- Shadow Main View -->
             <section id="viewShadow" class="view">
@@ -1678,6 +1829,16 @@
                     <div class="profile-card-arrow">→</div>
                 </div>
 
+                <!-- Push Notifications Settings Card -->
+                <div class="profile-card" onclick="showView('pushSettings')">
+                    <div class="profile-card-icon">🔔</div>
+                    <div class="profile-card-content">
+                        <div class="profile-card-title">Push Notifications</div>
+                        <div class="profile-card-subtitle">Reminders & mindful alerts</div>
+                    </div>
+                    <div class="profile-card-arrow">→</div>
+                </div>
+
                 <div class="settings-section">
                     <h3>Notifications</h3>
                     <div class="settings-row">
@@ -1721,7 +1882,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Clear Ground v5.4.1</p>
+                    <p class="version">Clear Ground v5.5.1</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>

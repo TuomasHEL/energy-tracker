@@ -295,6 +295,10 @@ async function init() {
         // Initialize shadow tools
         initShadow();
         
+        // Initialize push notifications
+        loadPushSettings();
+        initOneSignal();
+        
         console.log('App init completed successfully');
         
     } catch (error) {
@@ -1417,6 +1421,9 @@ function showView(viewName) {
                 break;
             case 'shadowSettings':
                 renderShadowSettings();
+                break;
+            case 'pushSettings':
+                updatePushUI();
                 break;
             case 'shadow':
                 updateShadowUI();
@@ -9027,6 +9034,428 @@ function updateHabitStats() {
     
     const overallRate = totalPossible > 0 ? Math.round((totalCompleted / totalPossible) * 100) : 0;
     document.getElementById('statsHabitCompletionRate').textContent = `${overallRate}%`;
+}
+
+// ============================================
+// PUSH NOTIFICATIONS (OneSignal)
+// ============================================
+
+const ONESIGNAL_APP_ID = '4a340707-5574-45b1-b514-e7469737cef5';
+
+// Push notification state
+let pushState = {
+    initialized: false,
+    subscribed: false,
+    playerId: null,
+    settings: {
+        habits: false,
+        habitsTime: '08:00',
+        signal: false,
+        signalTime: '07:00',
+        shadow: false,
+        shadowTime: '20:00',
+        session: true
+    },
+    mindfulAlerts: [] // { id, name, message, frequency, startTime, endTime, enabled }
+};
+
+// Initialize OneSignal
+async function initOneSignal() {
+    if (typeof OneSignal === 'undefined') {
+        console.log('OneSignal SDK not loaded');
+        return;
+    }
+    
+    try {
+        window.OneSignalDeferred = window.OneSignalDeferred || [];
+        OneSignalDeferred.push(async function(OneSignal) {
+            await OneSignal.init({
+                appId: ONESIGNAL_APP_ID,
+                allowLocalhostAsSecureOrigin: true
+            });
+            
+            pushState.initialized = true;
+            
+            // Check subscription status
+            const permission = await OneSignal.Notifications.permission;
+            pushState.subscribed = permission;
+            
+            // Listen for subscription changes
+            OneSignal.Notifications.addEventListener('permissionChange', (permission) => {
+                pushState.subscribed = permission;
+                updatePushUI();
+                if (permission) {
+                    syncPushTagsToOneSignal();
+                }
+            });
+            
+            updatePushUI();
+            console.log('OneSignal initialized, subscribed:', pushState.subscribed);
+        });
+    } catch (error) {
+        console.error('OneSignal init error:', error);
+    }
+}
+
+// Toggle push notifications on/off
+async function togglePushNotifications() {
+    if (!pushState.initialized) {
+        showToast('Notifications not ready yet', 'error');
+        return;
+    }
+    
+    try {
+        if (pushState.subscribed) {
+            // Unsubscribe
+            await OneSignal.User.PushSubscription.optOut();
+            pushState.subscribed = false;
+            showToast('Notifications disabled', 'info');
+        } else {
+            // Subscribe
+            await OneSignal.Notifications.requestPermission();
+            const permission = await OneSignal.Notifications.permission;
+            pushState.subscribed = permission;
+            
+            if (permission) {
+                showToast('Notifications enabled!', 'success');
+                syncPushTagsToOneSignal();
+            } else {
+                showToast('Please allow notifications in your browser', 'info');
+            }
+        }
+        updatePushUI();
+    } catch (error) {
+        console.error('Toggle push error:', error);
+        showToast('Error toggling notifications', 'error');
+    }
+}
+
+// Update push settings UI
+function updatePushUI() {
+    const statusText = document.getElementById('pushStatusText');
+    const enableBtn = document.getElementById('pushEnableBtn');
+    const standardSection = document.getElementById('pushStandardSection');
+    const alertsSection = document.getElementById('pushAlertsSection');
+    
+    if (statusText) {
+        if (pushState.subscribed) {
+            statusText.textContent = 'Enabled';
+            statusText.className = 'push-toggle-status enabled';
+        } else {
+            statusText.textContent = 'Disabled';
+            statusText.className = 'push-toggle-status disabled';
+        }
+    }
+    
+    if (enableBtn) {
+        enableBtn.textContent = pushState.subscribed ? 'Disable' : 'Enable';
+        enableBtn.className = pushState.subscribed ? 'btn secondary' : 'btn primary';
+    }
+    
+    // Show/hide settings sections based on subscription
+    if (standardSection) {
+        standardSection.style.opacity = pushState.subscribed ? '1' : '0.5';
+        standardSection.style.pointerEvents = pushState.subscribed ? 'auto' : 'none';
+    }
+    if (alertsSection) {
+        alertsSection.style.opacity = pushState.subscribed ? '1' : '0.5';
+        alertsSection.style.pointerEvents = pushState.subscribed ? 'auto' : 'none';
+    }
+    
+    // Load settings into UI
+    loadPushSettingsToUI();
+    renderMindfulAlerts();
+}
+
+// Load push settings from localStorage
+function loadPushSettings() {
+    const saved = localStorage.getItem('pushSettings');
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            pushState.settings = { ...pushState.settings, ...parsed.settings };
+            pushState.mindfulAlerts = parsed.mindfulAlerts || [];
+        } catch (e) {
+            console.error('Error loading push settings:', e);
+        }
+    }
+}
+
+// Save push settings to localStorage
+function savePushSettings() {
+    // Read from UI
+    pushState.settings.habits = document.getElementById('pushHabits')?.checked || false;
+    pushState.settings.habitsTime = document.getElementById('pushHabitsTime')?.value || '08:00';
+    pushState.settings.signal = document.getElementById('pushSignal')?.checked || false;
+    pushState.settings.signalTime = document.getElementById('pushSignalTime')?.value || '07:00';
+    pushState.settings.shadow = document.getElementById('pushShadow')?.checked || false;
+    pushState.settings.shadowTime = document.getElementById('pushShadowTime')?.value || '20:00';
+    pushState.settings.session = document.getElementById('pushSession')?.checked || true;
+    
+    localStorage.setItem('pushSettings', JSON.stringify({
+        settings: pushState.settings,
+        mindfulAlerts: pushState.mindfulAlerts
+    }));
+    
+    // Sync to OneSignal tags
+    if (pushState.subscribed) {
+        syncPushTagsToOneSignal();
+    }
+    
+    // Sync to backend for server-side scheduling
+    syncPushSettingsToBackend();
+}
+
+// Load settings into UI elements
+function loadPushSettingsToUI() {
+    const habitsEl = document.getElementById('pushHabits');
+    const habitsTimeEl = document.getElementById('pushHabitsTime');
+    const signalEl = document.getElementById('pushSignal');
+    const signalTimeEl = document.getElementById('pushSignalTime');
+    const shadowEl = document.getElementById('pushShadow');
+    const shadowTimeEl = document.getElementById('pushShadowTime');
+    const sessionEl = document.getElementById('pushSession');
+    
+    if (habitsEl) habitsEl.checked = pushState.settings.habits;
+    if (habitsTimeEl) habitsTimeEl.value = pushState.settings.habitsTime;
+    if (signalEl) signalEl.checked = pushState.settings.signal;
+    if (signalTimeEl) signalTimeEl.value = pushState.settings.signalTime;
+    if (shadowEl) shadowEl.checked = pushState.settings.shadow;
+    if (shadowTimeEl) shadowTimeEl.value = pushState.settings.shadowTime;
+    if (sessionEl) sessionEl.checked = pushState.settings.session;
+}
+
+// Sync tags to OneSignal for segmentation
+async function syncPushTagsToOneSignal() {
+    if (!pushState.initialized || !pushState.subscribed) return;
+    
+    try {
+        // Set user tags for targeting
+        await OneSignal.User.addTags({
+            habits_enabled: pushState.settings.habits ? 'true' : 'false',
+            habits_time: pushState.settings.habitsTime,
+            signal_enabled: pushState.settings.signal ? 'true' : 'false',
+            signal_time: pushState.settings.signalTime,
+            shadow_enabled: pushState.settings.shadow ? 'true' : 'false',
+            shadow_time: pushState.settings.shadowTime,
+            session_enabled: pushState.settings.session ? 'true' : 'false',
+            user_id: state.currentUser?.user_id || 'anonymous',
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        });
+        
+        // Get and store player ID for server-side notifications
+        const playerId = await getOneSignalPlayerId();
+        if (playerId) {
+            pushState.playerId = playerId;
+        }
+        
+        console.log('OneSignal tags synced, player ID:', playerId);
+    } catch (e) {
+        console.error('Error syncing OneSignal tags:', e);
+    }
+}
+
+// Get OneSignal player ID
+async function getOneSignalPlayerId() {
+    try {
+        if (typeof OneSignal === 'undefined') return null;
+        const subscription = await OneSignal.User.PushSubscription;
+        return subscription?.id || null;
+    } catch (e) {
+        console.error('Error getting player ID:', e);
+        return null;
+    }
+}
+
+// Sync settings to backend for server-side scheduling
+async function syncPushSettingsToBackend() {
+    if (!state.currentUser) return;
+    
+    try {
+        // Get player ID if we don't have it
+        if (!pushState.playerId && pushState.subscribed) {
+            pushState.playerId = await getOneSignalPlayerId();
+        }
+        
+        await apiCall('savePushSettings', {
+            userId: state.currentUser.user_id,
+            settings: pushState.settings,
+            mindfulAlerts: pushState.mindfulAlerts,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            onesignalPlayerId: pushState.playerId || ''
+        });
+        
+        console.log('Push settings synced to backend');
+    } catch (e) {
+        console.warn('Error syncing push settings to backend:', e);
+    }
+}
+
+// ============================================
+// MINDFUL ALERTS
+// ============================================
+
+let editingAlertId = null;
+
+// Render mindful alerts list
+function renderMindfulAlerts() {
+    const listEl = document.getElementById('mindfulAlertsList');
+    const emptyEl = document.getElementById('emptyAlertsMessage');
+    
+    if (!listEl) return;
+    
+    if (pushState.mindfulAlerts.length === 0) {
+        if (emptyEl) emptyEl.style.display = 'block';
+        listEl.innerHTML = emptyEl ? emptyEl.outerHTML : '<div class="empty-alerts-message">No mindful alerts yet.</div>';
+        return;
+    }
+    
+    if (emptyEl) emptyEl.style.display = 'none';
+    
+    let html = '';
+    pushState.mindfulAlerts.forEach(alert => {
+        html += `
+            <div class="mindful-alert-card" data-alert-id="${alert.id}">
+                <div class="mindful-alert-header">
+                    <span class="mindful-alert-name">${escapeHtml(alert.name)}</span>
+                    <label class="toggle mindful-alert-toggle">
+                        <input type="checkbox" ${alert.enabled ? 'checked' : ''} onchange="toggleAlert('${alert.id}')">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="mindful-alert-message">"${escapeHtml(alert.message)}"</div>
+                <div class="mindful-alert-meta">
+                    <span>${alert.frequency}x/day • ${alert.startTime} - ${alert.endTime}</span>
+                    <div class="mindful-alert-actions">
+                        <button onclick="editAlert('${alert.id}')" title="Edit">✎</button>
+                        <button class="delete" onclick="deleteAlert('${alert.id}')" title="Delete">✕</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    listEl.innerHTML = html;
+}
+
+// Show add alert modal
+function showAddAlertModal() {
+    editingAlertId = null;
+    document.getElementById('alertModalTitle').textContent = 'Add Mindful Alert';
+    document.getElementById('alertName').value = '';
+    document.getElementById('alertMessage').value = '';
+    document.getElementById('alertFrequency').value = '3';
+    document.getElementById('alertStartTime').value = '08:00';
+    document.getElementById('alertEndTime').value = '21:00';
+    document.getElementById('alertModal').classList.remove('hidden');
+}
+
+// Edit existing alert
+function editAlert(alertId) {
+    const alert = pushState.mindfulAlerts.find(a => a.id === alertId);
+    if (!alert) return;
+    
+    editingAlertId = alertId;
+    document.getElementById('alertModalTitle').textContent = 'Edit Mindful Alert';
+    document.getElementById('alertName').value = alert.name;
+    document.getElementById('alertMessage').value = alert.message;
+    document.getElementById('alertFrequency').value = alert.frequency;
+    document.getElementById('alertStartTime').value = alert.startTime;
+    document.getElementById('alertEndTime').value = alert.endTime;
+    document.getElementById('alertModal').classList.remove('hidden');
+}
+
+// Close alert modal
+function closeAlertModal() {
+    document.getElementById('alertModal').classList.add('hidden');
+    editingAlertId = null;
+}
+
+// Save alert (add or edit)
+function saveAlert() {
+    const name = document.getElementById('alertName').value.trim();
+    const message = document.getElementById('alertMessage').value.trim();
+    const frequency = parseInt(document.getElementById('alertFrequency').value);
+    const startTime = document.getElementById('alertStartTime').value;
+    const endTime = document.getElementById('alertEndTime').value;
+    
+    if (!name) {
+        showToast('Please enter a name', 'error');
+        return;
+    }
+    if (!message) {
+        showToast('Please enter a message', 'error');
+        return;
+    }
+    
+    if (editingAlertId) {
+        // Update existing
+        const alert = pushState.mindfulAlerts.find(a => a.id === editingAlertId);
+        if (alert) {
+            alert.name = name;
+            alert.message = message;
+            alert.frequency = frequency;
+            alert.startTime = startTime;
+            alert.endTime = endTime;
+        }
+        showToast('Alert updated', 'success');
+    } else {
+        // Add new
+        const newAlert = {
+            id: 'alert_' + Date.now(),
+            name,
+            message,
+            frequency,
+            startTime,
+            endTime,
+            enabled: true
+        };
+        pushState.mindfulAlerts.push(newAlert);
+        showToast('Alert added', 'success');
+    }
+    
+    savePushSettings();
+    renderMindfulAlerts();
+    closeAlertModal();
+}
+
+// Toggle alert enabled/disabled
+function toggleAlert(alertId) {
+    const alert = pushState.mindfulAlerts.find(a => a.id === alertId);
+    if (alert) {
+        alert.enabled = !alert.enabled;
+        savePushSettings();
+    }
+}
+
+// Delete alert
+function deleteAlert(alertId) {
+    if (!confirm('Delete this mindful alert?')) return;
+    
+    pushState.mindfulAlerts = pushState.mindfulAlerts.filter(a => a.id !== alertId);
+    savePushSettings();
+    renderMindfulAlerts();
+    showToast('Alert deleted', 'info');
+}
+
+// Helper to escape HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Send local notification (for session complete when app is open)
+function sendLocalNotification(title, message) {
+    if (!pushState.settings.session) return;
+    
+    if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(title, {
+            body: message,
+            icon: 'icons/icon-192.png',
+            tag: 'session-complete'
+        });
+    }
 }
 
 // ============================================

@@ -1,5 +1,5 @@
 // Clear Ground - Google Apps Script Backend
-// Version 3.3 - Added Attunements and Shadow progress support
+// Version 3.5 - Push Notifications with server-side scheduler
 
 // ============================================
 // CONFIGURATION
@@ -82,6 +82,16 @@ function createSheet(name) {
       sheet.appendRow([
         'user_id', 'integrate_completed', 'integrate_skipped',
         'process_completed', 'process_skipped', 'deep_clean_data', 'updated_at'
+      ]);
+      break;
+    case 'PushSettings':
+      sheet.appendRow([
+        'user_id', 'settings', 'mindful_alerts', 'timezone', 'onesignal_player_id', 'updated_at'
+      ]);
+      break;
+    case 'ScheduledNotifications':
+      sheet.appendRow([
+        'notification_id', 'user_id', 'alert_id', 'scheduled_time', 'message', 'sent', 'created_at'
       ]);
       break;
   }
@@ -228,6 +238,14 @@ function handleRequest(e) {
         break;
       case 'saveShadowProgress':
         result = saveShadowProgress(params);
+        break;
+        
+      // Push notification operations
+      case 'getPushSettings':
+        result = getPushSettings(params.userId);
+        break;
+      case 'savePushSettings':
+        result = savePushSettings(params);
         break;
         
       // Config operations
@@ -1293,3 +1311,421 @@ function saveLiberationProgress(params) {
   
   return { success: true };
 }
+
+// ============================================
+// PUSH NOTIFICATION SETTINGS & SCHEDULER
+// ============================================
+
+// OneSignal Configuration
+const ONESIGNAL_APP_ID = '4a340707-5574-45b1-b514-e7469737cef5';
+const ONESIGNAL_REST_API_KEY = 'YOUR_REST_API_KEY_HERE'; // Set this in Script Properties
+
+function getOneSignalApiKey() {
+  const props = PropertiesService.getScriptProperties();
+  return props.getProperty('ONESIGNAL_REST_API_KEY') || ONESIGNAL_REST_API_KEY;
+}
+
+function getPushSettings(userId) {
+  const sheet = getSheet('PushSettings');
+  const data = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === userId) {
+      return {
+        pushSettings: {
+          settings: JSON.parse(data[i][1] || '{}'),
+          mindfulAlerts: JSON.parse(data[i][2] || '[]'),
+          timezone: data[i][3] || 'UTC',
+          onesignalPlayerId: data[i][4] || '',
+          updatedAt: data[i][5]
+        }
+      };
+    }
+  }
+  
+  return { pushSettings: null };
+}
+
+function savePushSettings(params) {
+  const sheet = getSheet('PushSettings');
+  const data = sheet.getDataRange().getValues();
+  const now = new Date().toISOString();
+  
+  const rowData = [
+    params.userId,
+    JSON.stringify(params.settings || {}),
+    JSON.stringify(params.mindfulAlerts || []),
+    params.timezone || 'UTC',
+    params.onesignalPlayerId || '',
+    now
+  ];
+  
+  // Check for existing record
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === params.userId) {
+      sheet.getRange(i + 1, 1, 1, rowData.length).setValues([rowData]);
+      // Regenerate schedules for this user
+      generateUserSchedules(params.userId);
+      return { success: true };
+    }
+  }
+  
+  // New record
+  sheet.appendRow(rowData);
+  generateUserSchedules(params.userId);
+  
+  return { success: true };
+}
+
+// ============================================
+// SCHEDULE GENERATION
+// ============================================
+
+// Generate random notification times for a user's mindful alerts
+function generateUserSchedules(userId) {
+  const pushData = getPushSettings(userId);
+  if (!pushData.pushSettings) return;
+  
+  const alerts = pushData.pushSettings.mindfulAlerts || [];
+  const timezone = pushData.pushSettings.timezone || 'UTC';
+  const schedSheet = getSheet('ScheduledNotifications');
+  
+  // Clear existing unsent schedules for this user
+  clearUserSchedules(userId);
+  
+  // Get today in user's timezone
+  const now = new Date();
+  const today = Utilities.formatDate(now, timezone, 'yyyy-MM-dd');
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const tomorrowStr = Utilities.formatDate(tomorrow, timezone, 'yyyy-MM-dd');
+  
+  // Generate schedules for today and tomorrow
+  [today, tomorrowStr].forEach(dateStr => {
+    alerts.forEach(alert => {
+      if (!alert.enabled) return;
+      
+      const times = generateRandomTimes(
+        alert.frequency,
+        alert.startTime,
+        alert.endTime,
+        dateStr,
+        timezone
+      );
+      
+      times.forEach(scheduledTime => {
+        const notifId = 'N_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        schedSheet.appendRow([
+          notifId,
+          userId,
+          alert.id,
+          scheduledTime.toISOString(),
+          alert.message,
+          'false',
+          new Date().toISOString()
+        ]);
+      });
+    });
+  });
+}
+
+// Generate random times within a time window
+function generateRandomTimes(frequency, startTime, endTime, dateStr, timezone) {
+  const times = [];
+  
+  // Parse start and end times
+  const [startHour, startMin] = startTime.split(':').map(Number);
+  const [endHour, endMin] = endTime.split(':').map(Number);
+  
+  // Calculate total minutes in window
+  const startMinutes = startHour * 60 + startMin;
+  const endMinutes = endHour * 60 + endMin;
+  const windowMinutes = endMinutes - startMinutes;
+  
+  if (windowMinutes <= 0 || frequency <= 0) return times;
+  
+  // Generate random times, ensuring minimum spacing
+  const minSpacing = Math.floor(windowMinutes / (frequency + 1));
+  const usedSlots = [];
+  
+  for (let i = 0; i < frequency; i++) {
+    let attempts = 0;
+    let randomMinute;
+    
+    do {
+      randomMinute = startMinutes + Math.floor(Math.random() * windowMinutes);
+      attempts++;
+    } while (
+      attempts < 50 &&
+      usedSlots.some(slot => Math.abs(slot - randomMinute) < Math.min(minSpacing, 15))
+    );
+    
+    usedSlots.push(randomMinute);
+    
+    // Convert to Date object
+    const hour = Math.floor(randomMinute / 60);
+    const minute = randomMinute % 60;
+    
+    // Create date in UTC, adjusted for timezone
+    const dateTime = new Date(dateStr + 'T' + 
+      String(hour).padStart(2, '0') + ':' + 
+      String(minute).padStart(2, '0') + ':00');
+    
+    // Adjust for timezone offset
+    const tzOffset = getTimezoneOffset(timezone, dateTime);
+    dateTime.setMinutes(dateTime.getMinutes() - tzOffset);
+    
+    times.push(dateTime);
+  }
+  
+  return times.sort((a, b) => a - b);
+}
+
+// Get timezone offset in minutes
+function getTimezoneOffset(timezone, date) {
+  try {
+    const utcDate = new Date(date.toLocaleString('en-US', { timeZone: 'UTC' }));
+    const tzDate = new Date(date.toLocaleString('en-US', { timeZone: timezone }));
+    return (utcDate - tzDate) / 60000;
+  } catch (e) {
+    return 0; // Default to UTC if timezone invalid
+  }
+}
+
+// Clear unsent schedules for a user
+function clearUserSchedules(userId) {
+  const sheet = getSheet('ScheduledNotifications');
+  const data = sheet.getDataRange().getValues();
+  
+  // Find rows to delete (from bottom up to maintain indices)
+  const rowsToDelete = [];
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][1] === userId && data[i][5] === 'false') {
+      rowsToDelete.push(i + 1);
+    }
+  }
+  
+  // Delete from bottom up
+  rowsToDelete.reverse().forEach(row => {
+    sheet.deleteRow(row);
+  });
+}
+
+// ============================================
+// NOTIFICATION DISPATCHER (Called by trigger)
+// ============================================
+
+// This function runs every 5 minutes via time-based trigger
+function processScheduledNotifications() {
+  const sheet = getSheet('ScheduledNotifications');
+  const data = sheet.getDataRange().getValues();
+  const now = new Date();
+  
+  // Check notifications that should fire within ±3 minutes of now
+  const windowMs = 3 * 60 * 1000; // 3 minutes
+  
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const notifId = row[0];
+    const userId = row[1];
+    const alertId = row[2];
+    const scheduledTime = new Date(row[3]);
+    const message = row[4];
+    const sent = row[5] === 'true' || row[5] === true;
+    
+    if (sent) continue;
+    
+    const timeDiff = scheduledTime.getTime() - now.getTime();
+    
+    // If within window (past or up to 3 min in future)
+    if (timeDiff >= -windowMs && timeDiff <= windowMs) {
+      // Get user's OneSignal player ID
+      const pushData = getPushSettings(userId);
+      if (pushData.pushSettings && pushData.pushSettings.onesignalPlayerId) {
+        // Send notification
+        const success = sendOneSignalNotification(
+          pushData.pushSettings.onesignalPlayerId,
+          'Clear Ground',
+          message
+        );
+        
+        // Mark as sent
+        if (success) {
+          sheet.getRange(i + 1, 6).setValue('true');
+        }
+      }
+    }
+    
+    // Clean up old notifications (older than 1 hour)
+    if (timeDiff < -60 * 60 * 1000) {
+      sheet.getRange(i + 1, 6).setValue('expired');
+    }
+  }
+  
+  // Generate tomorrow's schedules if needed
+  generateNextDaySchedulesIfNeeded();
+}
+
+// Send notification via OneSignal API
+function sendOneSignalNotification(playerId, title, message) {
+  const apiKey = getOneSignalApiKey();
+  
+  if (apiKey === 'YOUR_REST_API_KEY_HERE') {
+    console.log('OneSignal API key not configured');
+    return false;
+  }
+  
+  try {
+    const payload = {
+      app_id: ONESIGNAL_APP_ID,
+      include_player_ids: [playerId],
+      headings: { en: title },
+      contents: { en: message },
+      url: 'https://tuomashel.github.io/energy-tracker/'
+    };
+    
+    const response = UrlFetchApp.fetch('https://onesignal.com/api/v1/notifications', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Basic ' + apiKey
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+    
+    const result = JSON.parse(response.getContentText());
+    console.log('OneSignal response:', result);
+    
+    return result.id !== undefined;
+  } catch (e) {
+    console.error('OneSignal send error:', e);
+    return false;
+  }
+}
+
+// Generate next day's schedules
+function generateNextDaySchedulesIfNeeded() {
+  const pushSheet = getSheet('PushSettings');
+  const pushData = pushSheet.getDataRange().getValues();
+  
+  // Check each user
+  for (let i = 1; i < pushData.length; i++) {
+    const userId = pushData[i][0];
+    const alerts = JSON.parse(pushData[i][2] || '[]');
+    const timezone = pushData[i][3] || 'UTC';
+    
+    if (alerts.length === 0) continue;
+    
+    // Check if we need to generate schedules
+    const schedSheet = getSheet('ScheduledNotifications');
+    const schedData = schedSheet.getDataRange().getValues();
+    
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = Utilities.formatDate(tomorrow, timezone, 'yyyy-MM-dd');
+    
+    // Check if user has schedules for tomorrow
+    const hasTomorrowSchedules = schedData.some(row => 
+      row[1] === userId && 
+      row[5] === 'false' &&
+      new Date(row[3]).toISOString().startsWith(tomorrowStr)
+    );
+    
+    if (!hasTomorrowSchedules) {
+      generateUserSchedules(userId);
+    }
+  }
+}
+
+// ============================================
+// STANDARD REMINDERS (Habits, Signal, Shadow)
+// ============================================
+
+// Process daily reminders - runs once per hour
+function processDailyReminders() {
+  const pushSheet = getSheet('PushSettings');
+  const pushData = pushSheet.getDataRange().getValues();
+  const now = new Date();
+  
+  for (let i = 1; i < pushData.length; i++) {
+    const userId = pushData[i][0];
+    const settings = JSON.parse(pushData[i][1] || '{}');
+    const timezone = pushData[i][3] || 'UTC';
+    const playerId = pushData[i][4];
+    
+    if (!playerId) continue;
+    
+    const currentHour = parseInt(Utilities.formatDate(now, timezone, 'HH'));
+    const currentMinute = parseInt(Utilities.formatDate(now, timezone, 'mm'));
+    
+    // Only send if within first 10 minutes of the hour
+    if (currentMinute > 10) continue;
+    
+    // Check habits reminder
+    if (settings.habits) {
+      const [targetHour] = settings.habitsTime.split(':').map(Number);
+      if (currentHour === targetHour) {
+        sendOneSignalNotification(playerId, 'Clear Ground', 'Time to check your daily habits ✓');
+      }
+    }
+    
+    // Check signal reminder
+    if (settings.signal) {
+      const [targetHour] = settings.signalTime.split(':').map(Number);
+      if (currentHour === targetHour) {
+        sendOneSignalNotification(playerId, 'Clear Ground', "Your daily signal is waiting 📡");
+      }
+    }
+    
+    // Check shadow reminder
+    if (settings.shadow) {
+      const [targetHour] = settings.shadowTime.split(':').map(Number);
+      if (currentHour === targetHour) {
+        sendOneSignalNotification(playerId, 'Clear Ground', 'Time for shadow work ☯');
+      }
+    }
+  }
+}
+
+// ============================================
+// TRIGGER SETUP (Run once manually)
+// ============================================
+
+// Run this function once to set up the time-based triggers
+function setupNotificationTriggers() {
+  // Remove existing triggers
+  const triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(trigger => {
+    if (trigger.getHandlerFunction() === 'processScheduledNotifications' ||
+        trigger.getHandlerFunction() === 'processDailyReminders') {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
+  
+  // Create new triggers
+  
+  // Run every 5 minutes for mindful alerts (random timing)
+  ScriptApp.newTrigger('processScheduledNotifications')
+    .timeBased()
+    .everyMinutes(5)
+    .create();
+  
+  // Run every hour for standard reminders
+  ScriptApp.newTrigger('processDailyReminders')
+    .timeBased()
+    .everyHours(1)
+    .create();
+  
+  console.log('Notification triggers set up successfully!');
+  return { success: true, message: 'Triggers created: 5-min for mindful alerts, hourly for reminders' };
+}
+
+// View current triggers
+function listTriggers() {
+  const triggers = ScriptApp.getProjectTriggers();
+  return triggers.map(t => ({
+    function: t.getHandlerFunction(),
+    type: t.getEventType().toString()
+  }));
+}
+
