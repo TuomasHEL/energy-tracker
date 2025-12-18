@@ -9061,17 +9061,17 @@ let pushState = {
 
 // Initialize OneSignal
 async function initOneSignal() {
-    if (typeof OneSignal === 'undefined') {
-        console.log('OneSignal SDK not loaded');
-        return;
-    }
+    // OneSignal uses deferred loading - set up callback that runs when SDK is ready
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
     
-    try {
-        window.OneSignalDeferred = window.OneSignalDeferred || [];
-        OneSignalDeferred.push(async function(OneSignal) {
+    OneSignalDeferred.push(async function(OneSignal) {
+        try {
             await OneSignal.init({
                 appId: ONESIGNAL_APP_ID,
-                allowLocalhostAsSecureOrigin: true
+                allowLocalhostAsSecureOrigin: true,
+                notifyButton: {
+                    enable: false  // We use our own UI
+                }
             });
             
             pushState.initialized = true;
@@ -9079,6 +9079,16 @@ async function initOneSignal() {
             // Check subscription status
             const permission = await OneSignal.Notifications.permission;
             pushState.subscribed = permission;
+            
+            // Get player ID if subscribed
+            if (permission) {
+                try {
+                    const subscription = OneSignal.User.PushSubscription;
+                    pushState.playerId = subscription?.id || null;
+                } catch (e) {
+                    console.log('Could not get player ID:', e);
+                }
+            }
             
             // Listen for subscription changes
             OneSignal.Notifications.addEventListener('permissionChange', (permission) => {
@@ -9090,17 +9100,26 @@ async function initOneSignal() {
             });
             
             updatePushUI();
-            console.log('OneSignal initialized, subscribed:', pushState.subscribed);
-        });
-    } catch (error) {
-        console.error('OneSignal init error:', error);
-    }
+            console.log('OneSignal initialized successfully, subscribed:', pushState.subscribed);
+            
+        } catch (error) {
+            console.error('OneSignal init error:', error);
+            pushState.initialized = false;
+        }
+    });
 }
 
 // Toggle push notifications on/off
 async function togglePushNotifications() {
     if (!pushState.initialized) {
-        showToast('Notifications not ready yet', 'error');
+        showToast('Notifications not ready yet. Please wait a moment and try again.', 'error');
+        return;
+    }
+    
+    // Access OneSignal through window since it's loaded via deferred
+    const OneSignal = window.OneSignal;
+    if (!OneSignal) {
+        showToast('OneSignal not available', 'error');
         return;
     }
     
@@ -9134,11 +9153,15 @@ async function togglePushNotifications() {
 function updatePushUI() {
     const statusText = document.getElementById('pushStatusText');
     const enableBtn = document.getElementById('pushEnableBtn');
+    const noteText = document.getElementById('pushNote');
     const standardSection = document.getElementById('pushStandardSection');
     const alertsSection = document.getElementById('pushAlertsSection');
     
     if (statusText) {
-        if (pushState.subscribed) {
+        if (!pushState.initialized) {
+            statusText.textContent = 'Loading...';
+            statusText.className = 'push-toggle-status';
+        } else if (pushState.subscribed) {
             statusText.textContent = 'Enabled';
             statusText.className = 'push-toggle-status enabled';
         } else {
@@ -9148,8 +9171,25 @@ function updatePushUI() {
     }
     
     if (enableBtn) {
-        enableBtn.textContent = pushState.subscribed ? 'Disable' : 'Enable';
-        enableBtn.className = pushState.subscribed ? 'btn secondary' : 'btn primary';
+        if (!pushState.initialized) {
+            enableBtn.textContent = 'Loading...';
+            enableBtn.className = 'btn secondary';
+            enableBtn.disabled = true;
+        } else {
+            enableBtn.textContent = pushState.subscribed ? 'Disable' : 'Enable';
+            enableBtn.className = pushState.subscribed ? 'btn secondary' : 'btn primary';
+            enableBtn.disabled = false;
+        }
+    }
+    
+    if (noteText) {
+        if (!pushState.initialized) {
+            noteText.textContent = 'Connecting to notification service...';
+        } else if (pushState.subscribed) {
+            noteText.textContent = 'You will receive notifications based on your settings below.';
+        } else {
+            noteText.textContent = 'Enable to receive reminders for habits, session completions, and mindful moments.';
+        }
     }
     
     // Show/hide settings sections based on subscription
@@ -9229,6 +9269,9 @@ function loadPushSettingsToUI() {
 async function syncPushTagsToOneSignal() {
     if (!pushState.initialized || !pushState.subscribed) return;
     
+    const OneSignal = window.OneSignal;
+    if (!OneSignal) return;
+    
     try {
         // Set user tags for targeting
         await OneSignal.User.addTags({
@@ -9258,8 +9301,9 @@ async function syncPushTagsToOneSignal() {
 // Get OneSignal player ID
 async function getOneSignalPlayerId() {
     try {
-        if (typeof OneSignal === 'undefined') return null;
-        const subscription = await OneSignal.User.PushSubscription;
+        const OneSignal = window.OneSignal;
+        if (!OneSignal) return null;
+        const subscription = OneSignal.User.PushSubscription;
         return subscription?.id || null;
     } catch (e) {
         console.error('Error getting player ID:', e);
