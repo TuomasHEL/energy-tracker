@@ -1205,23 +1205,56 @@ function getShadowProgress(userId) {
     return { shadowProgress: null };
   }
   
+  // Helper to parse array data (handles both JSON and comma-separated formats)
+  function parseArrayData(value) {
+    if (!value || value === '[]') return [];
+    
+    // If it's already an array (shouldn't happen from sheet, but just in case)
+    if (Array.isArray(value)) return value;
+    
+    const str = String(value).trim();
+    
+    // Try JSON parse first
+    try {
+      const parsed = JSON.parse(str);
+      if (Array.isArray(parsed)) return parsed;
+      return [];
+    } catch (e) {
+      // Not valid JSON - try comma-separated format
+      if (str.includes(',') || /^\d+$/.test(str)) {
+        // It's a comma-separated list of numbers like "1,2,3,4,5"
+        return str.split(',').map(s => {
+          const num = parseInt(s.trim(), 10);
+          return isNaN(num) ? s.trim() : num;
+        }).filter(v => v !== '');
+      }
+      return [];
+    }
+  }
+  
+  // Helper to parse object data
+  function parseObjectData(value) {
+    if (!value || value === '{}' || value === '[object Object]') return {};
+    
+    try {
+      const parsed = JSON.parse(String(value));
+      if (typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+      return {};
+    } catch (e) {
+      return {};
+    }
+  }
+  
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     if (row[0] === userId) {
-      let deepClean = {};
-      try {
-        deepClean = JSON.parse(row[5] || '{}');
-      } catch (e) {
-        deepClean = {};
-      }
-      
       return {
         shadowProgress: {
-          integrateCompleted: JSON.parse(row[1] || '[]'),
-          integrateSkipped: JSON.parse(row[2] || '[]'),
-          processCompleted: JSON.parse(row[3] || '[]'),
-          processSkipped: JSON.parse(row[4] || '[]'),
-          deepClean: deepClean
+          integrateCompleted: parseArrayData(row[1]),
+          integrateSkipped: parseArrayData(row[2]),
+          processCompleted: parseArrayData(row[3]),
+          processSkipped: parseArrayData(row[4]),
+          deepClean: parseObjectData(row[5])
         }
       };
     }
@@ -1235,34 +1268,66 @@ function saveShadowProgress(params) {
   const data = sheet.getDataRange().getValues();
   const now = new Date().toISOString();
   
+  // Helper to ensure proper JSON string
+  function ensureJsonArray(value) {
+    if (!value) return '[]';
+    if (typeof value === 'string') {
+      // Already a string - check if it's valid JSON
+      try {
+        JSON.parse(value);
+        return value; // Valid JSON, use as is
+      } catch (e) {
+        // Not valid JSON - might be comma-separated, convert to JSON array
+        if (value.includes(',') || /^\d+$/.test(value)) {
+          const arr = value.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+          return JSON.stringify(arr);
+        }
+        return '[]';
+      }
+    }
+    if (Array.isArray(value)) {
+      return JSON.stringify(value);
+    }
+    return '[]';
+  }
+  
+  function ensureJsonObject(value) {
+    if (!value) return '{}';
+    if (typeof value === 'string') {
+      try {
+        JSON.parse(value);
+        return value;
+      } catch (e) {
+        return '{}';
+      }
+    }
+    if (typeof value === 'object') {
+      return JSON.stringify(value);
+    }
+    return '{}';
+  }
+  
+  const rowData = [
+    params.userId,
+    ensureJsonArray(params.integrateCompleted),
+    ensureJsonArray(params.integrateSkipped),
+    ensureJsonArray(params.processCompleted),
+    ensureJsonArray(params.processSkipped),
+    ensureJsonObject(params.deepClean),
+    now
+  ];
+  
   // Check for existing record
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] === params.userId) {
       const rowIndex = i + 1;
-      const rowData = [
-        params.userId,
-        JSON.stringify(params.integrateCompleted || []),
-        JSON.stringify(params.integrateSkipped || []),
-        JSON.stringify(params.processCompleted || []),
-        JSON.stringify(params.processSkipped || []),
-        JSON.stringify(params.deepClean || {}),
-        now
-      ];
       sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
       return { success: true };
     }
   }
   
   // New record
-  sheet.appendRow([
-    params.userId,
-    JSON.stringify(params.integrateCompleted || []),
-    JSON.stringify(params.integrateSkipped || []),
-    JSON.stringify(params.processCompleted || []),
-    JSON.stringify(params.processSkipped || []),
-    JSON.stringify(params.deepClean || {}),
-    now
-  ]);
+  sheet.appendRow(rowData);
   
   return { success: true };
 }
@@ -1342,8 +1407,11 @@ function getPushSettings(userId) {
   const sheet = getSheet('PushSettings');
   const data = sheet.getDataRange().getValues();
   
+  // Convert userId to string for comparison
+  const userIdStr = String(userId);
+  
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === userId) {
+    if (String(data[i][0]) === userIdStr) {
       return {
         pushSettings: {
           settings: JSON.parse(data[i][1] || '{}'),
@@ -1576,12 +1644,19 @@ function clearUserSchedules(userId) {
 
 // This function runs every 5 minutes via time-based trigger
 function processScheduledNotifications() {
+  console.log('processScheduledNotifications running at:', new Date().toISOString());
+  
   const sheet = getSheet('ScheduledNotifications');
   const data = sheet.getDataRange().getValues();
   const now = new Date();
   
+  console.log('Total notifications in sheet:', data.length - 1);
+  
   // Check notifications that should fire within ±3 minutes of now
   const windowMs = 3 * 60 * 1000; // 3 minutes
+  let checkedCount = 0;
+  let sentCount = 0;
+  let expiredCount = 0;
   
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
@@ -1590,36 +1665,51 @@ function processScheduledNotifications() {
     const alertId = row[2];
     const scheduledTime = new Date(row[3]);
     const message = row[4];
-    const sent = row[5] === 'true' || row[5] === true;
+    const sent = row[5] === 'true' || row[5] === true || row[5] === 'TRUE';
     
-    if (sent) continue;
+    if (sent || row[5] === 'expired') continue;
     
+    checkedCount++;
     const timeDiff = scheduledTime.getTime() - now.getTime();
     
     // If within window (past or up to 3 min in future)
     if (timeDiff >= -windowMs && timeDiff <= windowMs) {
+      console.log('Notification due:', notifId, 'scheduled:', scheduledTime.toISOString(), 'diff:', timeDiff);
+      
       // Get user's OneSignal player ID
       const pushData = getPushSettings(userId);
-      if (pushData.pushSettings && pushData.pushSettings.onesignalPlayerId) {
+      const playerId = pushData.pushSettings?.onesignalPlayerId;
+      
+      console.log('User', userId, 'player ID:', playerId);
+      
+      if (playerId) {
         // Send notification
         const success = sendOneSignalNotification(
-          pushData.pushSettings.onesignalPlayerId,
+          playerId,
           'Clear Ground',
           message
         );
         
+        console.log('Send result:', success);
+        
         // Mark as sent
         if (success) {
           sheet.getRange(i + 1, 6).setValue('true');
+          sentCount++;
         }
+      } else {
+        console.log('No player ID for user:', userId);
       }
     }
     
     // Clean up old notifications (older than 1 hour)
     if (timeDiff < -60 * 60 * 1000) {
       sheet.getRange(i + 1, 6).setValue('expired');
+      expiredCount++;
     }
   }
+  
+  console.log('Checked:', checkedCount, 'Sent:', sentCount, 'Expired:', expiredCount);
   
   // Generate tomorrow's schedules if needed
   generateNextDaySchedulesIfNeeded();
@@ -1792,6 +1882,63 @@ function listTriggers() {
 // ============================================
 // DEBUG/TEST FUNCTIONS
 // ============================================
+
+// Migrate/fix corrupted ShadowProgress data
+function migrateShadowProgressData() {
+  const sheet = getSheet('ShadowProgress');
+  const data = sheet.getDataRange().getValues();
+  
+  console.log('Migrating ShadowProgress data, rows:', data.length - 1);
+  
+  // Helper to convert comma-separated to JSON array
+  function fixArrayData(value) {
+    if (!value || value === '[]') return '[]';
+    
+    const str = String(value).trim();
+    
+    // Already valid JSON?
+    try {
+      const parsed = JSON.parse(str);
+      if (Array.isArray(parsed)) return str;
+    } catch (e) {}
+    
+    // Convert comma-separated to JSON array
+    if (str.includes(',') || /^\d+$/.test(str)) {
+      const arr = str.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+      return JSON.stringify(arr);
+    }
+    
+    return '[]';
+  }
+  
+  // Process each row (skip header)
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const userId = row[0];
+    
+    if (!userId) continue;
+    
+    const fixedRow = [
+      userId,
+      fixArrayData(row[1]), // integrate_completed
+      fixArrayData(row[2]), // integrate_skipped
+      fixArrayData(row[3]), // process_completed
+      fixArrayData(row[4]), // process_skipped
+      '{}', // deep_clean_data - reset since it was corrupted
+      new Date().toISOString()
+    ];
+    
+    console.log('Fixing row', i, ':', {
+      before: { col1: row[1], col3: row[3], col5: row[5] },
+      after: { col1: fixedRow[1], col3: fixedRow[3], col5: fixedRow[5] }
+    });
+    
+    sheet.getRange(i + 1, 1, 1, fixedRow.length).setValues([fixedRow]);
+  }
+  
+  console.log('Migration complete');
+  return { success: true, rowsFixed: data.length - 1 };
+}
 
 // Test sending a notification (run manually to test)
 function testSendNotification() {
