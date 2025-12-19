@@ -574,8 +574,8 @@ function showNotification(title, body, tag = 'timer') {
     if ('Notification' in window && Notification.permission === 'granted') {
         const notification = new Notification(title, {
             body: body,
-            icon: 'icons/icon-192.png',
-            badge: 'icons/icon-96.png',
+            icon: 'icons/icon.svg',
+            badge: 'icons/icon.svg',
             tag: tag,
             requireInteraction: true,
             vibrate: [200, 100, 200]
@@ -9339,10 +9339,11 @@ async function syncPushSettingsToBackend() {
             alertCount: pushState.mindfulAlerts.length
         });
         
+        // Must stringify objects/arrays for URL params
         await apiCall('savePushSettings', {
             userId: state.currentUser.user_id,
-            settings: pushState.settings,
-            mindfulAlerts: pushState.mindfulAlerts,
+            settings: JSON.stringify(pushState.settings),
+            mindfulAlerts: JSON.stringify(pushState.mindfulAlerts),
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             onesignalPlayerId: pushState.playerId || ''
         });

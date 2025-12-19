@@ -1364,14 +1364,35 @@ function savePushSettings(params) {
   const data = sheet.getDataRange().getValues();
   const now = new Date().toISOString();
   
+  // Handle settings - might be string or object
+  let settingsStr = params.settings;
+  if (typeof settingsStr === 'object') {
+    settingsStr = JSON.stringify(settingsStr);
+  } else if (typeof settingsStr !== 'string') {
+    settingsStr = '{}';
+  }
+  
+  // Handle mindfulAlerts - might be string or array
+  let alertsStr = params.mindfulAlerts;
+  if (Array.isArray(alertsStr)) {
+    alertsStr = JSON.stringify(alertsStr);
+  } else if (typeof alertsStr !== 'string') {
+    alertsStr = '[]';
+  }
+  
   const rowData = [
     params.userId,
-    JSON.stringify(params.settings || {}),
-    JSON.stringify(params.mindfulAlerts || []),
+    settingsStr,
+    alertsStr,
     params.timezone || 'UTC',
     params.onesignalPlayerId || '',
     now
   ];
+  
+  console.log('Saving push settings for user:', params.userId);
+  console.log('Settings:', settingsStr);
+  console.log('Alerts:', alertsStr);
+  console.log('Player ID:', params.onesignalPlayerId);
   
   // Check for existing record
   for (let i = 1; i < data.length; i++) {
@@ -1396,12 +1417,25 @@ function savePushSettings(params) {
 
 // Generate random notification times for a user's mindful alerts
 function generateUserSchedules(userId) {
+  console.log('Generating schedules for user:', userId);
+  
   const pushData = getPushSettings(userId);
-  if (!pushData.pushSettings) return;
+  if (!pushData.pushSettings) {
+    console.log('No push settings found for user');
+    return;
+  }
   
   const alerts = pushData.pushSettings.mindfulAlerts || [];
   const timezone = pushData.pushSettings.timezone || 'UTC';
   const schedSheet = getSheet('ScheduledNotifications');
+  
+  console.log('Found', alerts.length, 'mindful alerts');
+  console.log('Alerts:', JSON.stringify(alerts));
+  
+  if (alerts.length === 0) {
+    console.log('No alerts to schedule');
+    return;
+  }
   
   // Clear existing unsent schedules for this user
   clearUserSchedules(userId);
@@ -1412,10 +1446,18 @@ function generateUserSchedules(userId) {
   const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
   const tomorrowStr = Utilities.formatDate(tomorrow, timezone, 'yyyy-MM-dd');
   
+  console.log('Scheduling for dates:', today, tomorrowStr);
+  
   // Generate schedules for today and tomorrow
+  let scheduledCount = 0;
   [today, tomorrowStr].forEach(dateStr => {
     alerts.forEach(alert => {
-      if (!alert.enabled) return;
+      if (!alert.enabled) {
+        console.log('Alert disabled:', alert.name);
+        return;
+      }
+      
+      console.log('Generating times for alert:', alert.name, 'frequency:', alert.frequency);
       
       const times = generateRandomTimes(
         alert.frequency,
@@ -1424,6 +1466,8 @@ function generateUserSchedules(userId) {
         dateStr,
         timezone
       );
+      
+      console.log('Generated', times.length, 'times for', dateStr);
       
       times.forEach(scheduledTime => {
         const notifId = 'N_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
@@ -1436,9 +1480,12 @@ function generateUserSchedules(userId) {
           'false',
           new Date().toISOString()
         ]);
+        scheduledCount++;
       });
     });
   });
+  
+  console.log('Total scheduled notifications:', scheduledCount);
 }
 
 // Generate random times within a time window
@@ -1742,3 +1789,71 @@ function listTriggers() {
   }));
 }
 
+// ============================================
+// DEBUG/TEST FUNCTIONS
+// ============================================
+
+// Test sending a notification (run manually to test)
+function testSendNotification() {
+  const sheet = getSheet('PushSettings');
+  const data = sheet.getDataRange().getValues();
+  
+  // Find first user with a player ID
+  for (let i = 1; i < data.length; i++) {
+    const playerId = data[i][4]; // onesignal_player_id column
+    if (playerId && playerId.length > 10) {
+      console.log('Sending test notification to player:', playerId);
+      const result = sendOneSignalNotification(
+        playerId,
+        'Test Notification',
+        'If you see this, push notifications are working!'
+      );
+      console.log('Result:', result);
+      return { success: result, playerId: playerId };
+    }
+  }
+  
+  return { error: 'No user with player ID found' };
+}
+
+// Debug: View all push settings
+function debugPushSettings() {
+  const sheet = getSheet('PushSettings');
+  const data = sheet.getDataRange().getValues();
+  
+  console.log('PushSettings rows:', data.length - 1);
+  
+  for (let i = 1; i < data.length; i++) {
+    console.log('Row', i, ':', {
+      userId: data[i][0],
+      settings: data[i][1],
+      mindfulAlerts: data[i][2],
+      timezone: data[i][3],
+      playerId: data[i][4],
+      updatedAt: data[i][5]
+    });
+  }
+  
+  return { rows: data.length - 1 };
+}
+
+// Debug: Manually trigger schedule generation for a user
+function debugGenerateSchedules() {
+  const sheet = getSheet('PushSettings');
+  const data = sheet.getDataRange().getValues();
+  
+  if (data.length > 1) {
+    const userId = data[1][0];
+    console.log('Generating schedules for:', userId);
+    generateUserSchedules(userId);
+    
+    // Check what was created
+    const schedSheet = getSheet('ScheduledNotifications');
+    const schedData = schedSheet.getDataRange().getValues();
+    console.log('Scheduled notifications:', schedData.length - 1);
+    
+    return { userId: userId, scheduledCount: schedData.length - 1 };
+  }
+  
+  return { error: 'No users found' };
+}
