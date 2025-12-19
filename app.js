@@ -9080,6 +9080,72 @@ let pushState = {
     mindfulAlerts: [] // { id, name, message, frequency, startTime, endTime, enabled }
 };
 
+// ============================================
+// SCREEN WAKE LOCK
+// ============================================
+
+let wakeLock = null;
+let wakeLockEnabled = false;
+
+async function toggleWakeLock() {
+    if (wakeLockEnabled) {
+        await releaseWakeLock();
+    } else {
+        await requestWakeLock();
+    }
+    updateWakeLockUI();
+}
+
+async function requestWakeLock() {
+    if (!('wakeLock' in navigator)) {
+        showToast('Wake Lock not supported on this device', 'error');
+        return;
+    }
+    
+    try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLockEnabled = true;
+        
+        // Re-acquire on visibility change (when returning to app)
+        wakeLock.addEventListener('release', () => {
+            console.log('Wake lock released');
+            // Don't set wakeLockEnabled to false - we'll try to re-acquire
+        });
+        
+        console.log('Wake lock acquired');
+        showToast('Screen will stay awake', 'success');
+    } catch (err) {
+        console.error('Wake lock error:', err);
+        wakeLockEnabled = false;
+        showToast('Could not enable wake lock', 'error');
+    }
+}
+
+async function releaseWakeLock() {
+    if (wakeLock) {
+        await wakeLock.release();
+        wakeLock = null;
+    }
+    wakeLockEnabled = false;
+    console.log('Wake lock disabled');
+    showToast('Screen can sleep normally', 'info');
+}
+
+function updateWakeLockUI() {
+    const btn = document.getElementById('wakeLockBtn');
+    if (btn) {
+        btn.classList.toggle('active', wakeLockEnabled);
+        btn.title = wakeLockEnabled ? 'Screen staying awake (tap to disable)' : 'Keep screen awake';
+    }
+}
+
+// Re-acquire wake lock when app becomes visible again
+document.addEventListener('visibilitychange', async () => {
+    if (wakeLockEnabled && document.visibilityState === 'visible') {
+        await requestWakeLock();
+    }
+});
+
 // Initialize OneSignal
 async function initOneSignal() {
     // OneSignal uses deferred loading - set up callback that runs when SDK is ready

@@ -1251,19 +1251,35 @@ function getShadowProgress(userId) {
   // Convert userId to string for comparison
   const userIdStr = String(userId);
   
+  // Find ALL rows for this user, return the one with most progress (latest)
+  let bestRow = null;
+  let bestProgress = -1;
+  
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     if (String(row[0]) === userIdStr) {
-      return {
-        shadowProgress: {
-          integrateCompleted: parseArrayData(row[1]),
-          integrateSkipped: parseArrayData(row[2]),
-          processCompleted: parseArrayData(row[3]),
-          processSkipped: parseArrayData(row[4]),
-          deepClean: parseObjectData(row[5])
-        }
-      };
+      // Calculate total progress for this row
+      const integrateCompleted = parseArrayData(row[1]);
+      const processCompleted = parseArrayData(row[3]);
+      const totalProgress = integrateCompleted.length + processCompleted.length;
+      
+      if (totalProgress > bestProgress) {
+        bestProgress = totalProgress;
+        bestRow = row;
+      }
     }
+  }
+  
+  if (bestRow) {
+    return {
+      shadowProgress: {
+        integrateCompleted: parseArrayData(bestRow[1]),
+        integrateSkipped: parseArrayData(bestRow[2]),
+        processCompleted: parseArrayData(bestRow[3]),
+        processSkipped: parseArrayData(bestRow[4]),
+        deepClean: parseObjectData(bestRow[5])
+      }
+    };
   }
   
   return { shadowProgress: null };
@@ -1974,6 +1990,71 @@ function migrateShadowProgressData() {
   
   console.log('Migration complete');
   return { success: true, rowsFixed: data.length - 1 };
+}
+
+// Clean up duplicate ShadowProgress rows - keep only the one with most progress per user
+function cleanupShadowProgressDuplicates() {
+  const sheet = getSheet('ShadowProgress');
+  const data = sheet.getDataRange().getValues();
+  
+  console.log('Cleaning up ShadowProgress duplicates, total rows:', data.length - 1);
+  
+  // Helper to parse array and get length
+  function getArrayLength(value) {
+    if (!value || value === '[]') return 0;
+    try {
+      const parsed = JSON.parse(String(value));
+      return Array.isArray(parsed) ? parsed.length : 0;
+    } catch (e) {
+      // Try comma-separated
+      if (String(value).includes(',')) {
+        return String(value).split(',').length;
+      }
+      return 0;
+    }
+  }
+  
+  // Group rows by userId, find the best one for each
+  const userRows = {};
+  for (let i = 1; i < data.length; i++) {
+    const userId = String(data[i][0]);
+    if (!userId) continue;
+    
+    const progress = getArrayLength(data[i][1]) + getArrayLength(data[i][3]);
+    
+    if (!userRows[userId] || progress > userRows[userId].progress) {
+      userRows[userId] = {
+        rowIndex: i + 1,
+        progress: progress,
+        data: data[i]
+      };
+    }
+  }
+  
+  console.log('Unique users found:', Object.keys(userRows).length);
+  
+  // Get all rows to delete (all except the best one per user)
+  const rowsToDelete = [];
+  for (let i = 1; i < data.length; i++) {
+    const userId = String(data[i][0]);
+    if (userId && userRows[userId] && userRows[userId].rowIndex !== i + 1) {
+      rowsToDelete.push(i + 1);
+    }
+  }
+  
+  console.log('Rows to delete:', rowsToDelete.length);
+  
+  // Delete from bottom up
+  rowsToDelete.sort((a, b) => b - a).forEach(row => {
+    sheet.deleteRow(row);
+  });
+  
+  console.log('Cleanup complete');
+  return { 
+    success: true, 
+    usersKept: Object.keys(userRows).length,
+    rowsDeleted: rowsToDelete.length 
+  };
 }
 
 // Clear all scheduled notifications and regenerate with correct timezone

@@ -255,6 +255,43 @@ body {
     border-color: var(--accent-primary);
 }
 
+.global-header-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.wake-lock-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.wake-lock-btn:hover {
+    border-color: var(--text-secondary);
+    color: var(--text-secondary);
+}
+
+.wake-lock-btn.active {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+    box-shadow: 0 0 12px rgba(150, 130, 90, 0.4);
+}
+
+.wake-lock-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
 /* ============================================
    MAIN CONTENT AREA
    ============================================ */
