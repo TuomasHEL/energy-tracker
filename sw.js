@@ -1,5 +1,5 @@
 // Clear Ground - Service Worker
-const CACHE_NAME = 'clear-ground-v5.5.2';
+const CACHE_NAME = 'clear-ground-v5.5.3';
 const BASE_PATH = '/energy-tracker/';
 
 // Static assets to cache immediately

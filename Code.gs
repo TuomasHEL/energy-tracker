@@ -84,6 +84,11 @@ function createSheet(name) {
         'process_completed', 'process_skipped', 'deep_clean_data', 'updated_at'
       ]);
       break;
+    case 'LiberationProgress':
+      sheet.appendRow([
+        'user_id', 'total_rounds', 'current_streak', 'last_completed_date', 'updated_at'
+      ]);
+      break;
     case 'PushSettings':
       sheet.appendRow([
         'user_id', 'settings', 'mindful_alerts', 'timezone', 'onesignal_player_id', 'updated_at'
@@ -238,6 +243,14 @@ function handleRequest(e) {
         break;
       case 'saveShadowProgress':
         result = saveShadowProgress(params);
+        break;
+        
+      // Liberation progress operations
+      case 'getLiberationProgress':
+        result = getLiberationProgress(params.userId);
+        break;
+      case 'saveLiberationProgress':
+        result = saveLiberationProgress(params);
         break;
         
       // Push notification operations

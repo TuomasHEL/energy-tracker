@@ -9069,6 +9069,8 @@ async function initOneSignal() {
             await OneSignal.init({
                 appId: ONESIGNAL_APP_ID,
                 allowLocalhostAsSecureOrigin: true,
+                serviceWorkerPath: '/energy-tracker/OneSignalSDKWorker.js',
+                serviceWorkerParam: { scope: '/energy-tracker/' },
                 notifyButton: {
                     enable: false  // We use our own UI
                 }
@@ -10887,7 +10889,7 @@ async function syncSignalDataWithBackend() {
     // Update UI after sync
     updateSignalView();
     updateSignalSettingsView();
-    updateSignalHistory();
+    renderSignalHistory('favorites');
     recalculateSignalStats();
 }
 
