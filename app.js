@@ -6385,10 +6385,18 @@ async function loadShadowFromBackend() {
     if (!state.currentUser) return;
     
     try {
+        console.log('Loading shadow progress for user:', state.currentUser.user_id);
         const result = await apiCall('getShadowProgress', { userId: state.currentUser.user_id });
+        
+        console.log('Shadow progress result:', result);
         
         if (result?.shadowProgress) {
             const progress = result.shadowProgress;
+            
+            console.log('Shadow progress data:', {
+                integrateCompleted: progress.integrateCompleted?.length || 0,
+                processCompleted: progress.processCompleted?.length || 0
+            });
             
             // Merge with local state (backend takes precedence if it has data)
             if (progress.integrateCompleted && progress.integrateCompleted.length > 0) {
@@ -6410,8 +6418,9 @@ async function loadShadowFromBackend() {
             // Update cache and UI
             saveShadowState();
             updateShadowUI();
-            console.log('Shadow progress loaded from backend');
+            console.log('Shadow progress loaded from backend, integrate completed:', shadowState.integrate.completed.length);
         } else {
+            console.log('No shadow progress found in backend');
             // Backend is empty - upload local data if we have any
             const hasLocalData = 
                 shadowState.integrate.completed.length > 0 ||
@@ -9510,29 +9519,33 @@ function escapeHtml(text) {
 
 // Send local notification (for session complete when app is open)
 function sendLocalNotification(title, message) {
-    console.log('Sending local notification:', title, message);
+    console.log('Sending notification:', title, message);
     
-    // Try standard Notification API first
-    if ('Notification' in window) {
-        if (Notification.permission === 'granted') {
-            try {
-                new Notification(title, {
-                    body: message,
-                    icon: 'icons/icon.svg',
-                    tag: 'session-complete',
-                    requireInteraction: true
-                });
-                console.log('Notification sent via Notification API');
-            } catch (e) {
-                console.error('Notification error:', e);
-            }
-        } else if (Notification.permission !== 'denied') {
-            // Request permission
-            Notification.requestPermission().then(permission => {
-                if (permission === 'granted') {
-                    new Notification(title, { body: message, icon: 'icons/icon.svg' });
-                }
+    // Send via backend/OneSignal for reliable mobile delivery
+    if (state.currentUser && pushState.subscribed) {
+        apiCall('sendInstantNotification', {
+            userId: state.currentUser.user_id,
+            title: title,
+            message: message
+        }).then(result => {
+            console.log('Backend notification result:', result);
+        }).catch(e => {
+            console.error('Backend notification error:', e);
+        });
+    }
+    
+    // Also try local Notification API (works on desktop)
+    if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+            new Notification(title, {
+                body: message,
+                icon: 'icons/icon.svg',
+                tag: 'session-complete',
+                requireInteraction: true
             });
+            console.log('Local notification sent');
+        } catch (e) {
+            console.error('Local notification error:', e);
         }
     }
 }

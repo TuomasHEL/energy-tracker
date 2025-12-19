@@ -260,6 +260,9 @@ function handleRequest(e) {
       case 'savePushSettings':
         result = savePushSettings(params);
         break;
+      case 'sendInstantNotification':
+        result = sendInstantNotification(params.userId, params.title, params.message);
+        break;
         
       // Config operations
       case 'getConfig':
@@ -1245,9 +1248,12 @@ function getShadowProgress(userId) {
     }
   }
   
+  // Convert userId to string for comparison
+  const userIdStr = String(userId);
+  
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    if (row[0] === userId) {
+    if (String(row[0]) === userIdStr) {
       return {
         shadowProgress: {
           integrateCompleted: parseArrayData(row[1]),
@@ -1317,9 +1323,10 @@ function saveShadowProgress(params) {
     now
   ];
   
-  // Check for existing record
+  // Check for existing record - use string comparison
+  const userIdStr = String(params.userId);
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === params.userId) {
+    if (String(data[i][0]) === userIdStr) {
       const rowIndex = i + 1;
       sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
       return { success: true };
@@ -1340,9 +1347,11 @@ function getLiberationProgress(userId) {
   const sheet = getSheet('LiberationProgress');
   const data = sheet.getDataRange().getValues();
   
-  // Skip header row
+  // Use string comparison
+  const userIdStr = String(userId);
+  
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === userId) {
+    if (String(data[i][0]) === userIdStr) {
       return {
         liberationProgress: {
           totalRounds: data[i][1] || 0,
@@ -1362,9 +1371,11 @@ function saveLiberationProgress(params) {
   const data = sheet.getDataRange().getValues();
   const now = new Date().toISOString();
   
-  // Check for existing record
+  // Use string comparison
+  const userIdStr = String(params.userId);
+  
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === params.userId) {
+    if (String(data[i][0]) === userIdStr) {
       const rowIndex = i + 1;
       const rowData = [
         params.userId,
@@ -1462,9 +1473,10 @@ function savePushSettings(params) {
   console.log('Alerts:', alertsStr);
   console.log('Player ID:', params.onesignalPlayerId);
   
-  // Check for existing record
+  // Check for existing record - use string comparison
+  const userIdStr = String(params.userId);
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === params.userId) {
+    if (String(data[i][0]) === userIdStr) {
       sheet.getRange(i + 1, 1, 1, rowData.length).setValues([rowData]);
       // Regenerate schedules for this user
       generateUserSchedules(params.userId);
@@ -1593,14 +1605,16 @@ function generateRandomTimes(frequency, startTime, endTime, dateStr, timezone) {
     const hour = Math.floor(randomMinute / 60);
     const minute = randomMinute % 60;
     
-    // Create date in UTC, adjusted for timezone
+    // Create date representing LOCAL time, then convert to UTC
     const dateTime = new Date(dateStr + 'T' + 
       String(hour).padStart(2, '0') + ':' + 
-      String(minute).padStart(2, '0') + ':00');
+      String(minute).padStart(2, '0') + ':00Z'); // Z means UTC
     
-    // Adjust for timezone offset
+    // Adjust from local time to UTC
+    // tzOffset is (UTC - Local), so for Helsinki (UTC+2) it's -120
+    // To convert local to UTC: add the offset (subtracts the hours)
     const tzOffset = getTimezoneOffset(timezone, dateTime);
-    dateTime.setMinutes(dateTime.getMinutes() - tzOffset);
+    dateTime.setMinutes(dateTime.getMinutes() + tzOffset);
     
     times.push(dateTime);
   }
@@ -1624,10 +1638,13 @@ function clearUserSchedules(userId) {
   const sheet = getSheet('ScheduledNotifications');
   const data = sheet.getDataRange().getValues();
   
+  // Use string comparison
+  const userIdStr = String(userId);
+  
   // Find rows to delete (from bottom up to maintain indices)
   const rowsToDelete = [];
   for (let i = 1; i < data.length; i++) {
-    if (data[i][1] === userId && data[i][5] === 'false') {
+    if (String(data[i][1]) === userIdStr && (data[i][5] === 'false' || data[i][5] === false || data[i][5] === 'FALSE')) {
       rowsToDelete.push(i + 1);
     }
   }
@@ -1751,6 +1768,25 @@ function sendOneSignalNotification(playerId, title, message) {
     console.error('OneSignal send error:', e);
     return false;
   }
+}
+
+// Send instant notification for a user (called from frontend)
+function sendInstantNotification(userId, title, message) {
+  console.log('sendInstantNotification called:', userId, title, message);
+  
+  // Get user's player ID
+  const pushData = getPushSettings(userId);
+  if (!pushData.pushSettings || !pushData.pushSettings.onesignalPlayerId) {
+    console.log('No player ID for user:', userId);
+    return { success: false, error: 'No player ID found' };
+  }
+  
+  const playerId = pushData.pushSettings.onesignalPlayerId;
+  console.log('Sending to player:', playerId);
+  
+  const success = sendOneSignalNotification(playerId, title, message);
+  
+  return { success: success };
 }
 
 // Generate next day's schedules
@@ -1938,6 +1974,39 @@ function migrateShadowProgressData() {
   
   console.log('Migration complete');
   return { success: true, rowsFixed: data.length - 1 };
+}
+
+// Clear all scheduled notifications and regenerate with correct timezone
+function resetAllSchedules() {
+  console.log('Resetting all scheduled notifications...');
+  
+  // Clear ScheduledNotifications sheet (keep header)
+  const schedSheet = getSheet('ScheduledNotifications');
+  const lastRow = schedSheet.getLastRow();
+  if (lastRow > 1) {
+    schedSheet.deleteRows(2, lastRow - 1);
+  }
+  console.log('Cleared old schedules');
+  
+  // Regenerate for all users with push settings
+  const pushSheet = getSheet('PushSettings');
+  const pushData = pushSheet.getDataRange().getValues();
+  
+  let usersProcessed = 0;
+  for (let i = 1; i < pushData.length; i++) {
+    const userId = pushData[i][0];
+    if (userId) {
+      console.log('Regenerating schedules for user:', userId);
+      generateUserSchedules(userId);
+      usersProcessed++;
+    }
+  }
+  
+  // Check results
+  const newCount = schedSheet.getLastRow() - 1;
+  console.log('Done! Users processed:', usersProcessed, 'New schedules:', newCount);
+  
+  return { success: true, usersProcessed: usersProcessed, schedulesCreated: newCount };
 }
 
 // Test sending a notification (run manually to test)
