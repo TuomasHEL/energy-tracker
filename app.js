@@ -652,6 +652,9 @@ function restoreTimerState() {
                 });
             }
             
+            // Send push notification for session complete
+            sendLocalNotification('Session Complete', `${timerData.targetName} - ${durationMinutes} minutes completed 🎉`);
+            
             playCompletionSound();
             vibrate();
             return;
@@ -2414,6 +2417,15 @@ async function endTimer(completed = false) {
         playCompletionSound();
         vibrate();
         
+        // Always send push notification on completion
+        if (pushState.settings.session) {
+            sendLocalNotification(
+                'Session Complete! 🎉',
+                `${state.timer.targetName} - ${durationMinutes} minutes`
+            );
+        }
+        
+        // Also show browser notification if app is hidden
         if (document.hidden) {
             showNotification(
                 'Session Complete! 🎉',
@@ -9321,6 +9333,12 @@ async function syncPushSettingsToBackend() {
             pushState.playerId = await getOneSignalPlayerId();
         }
         
+        console.log('Syncing push settings to backend:', {
+            userId: state.currentUser.user_id,
+            playerId: pushState.playerId,
+            alertCount: pushState.mindfulAlerts.length
+        });
+        
         await apiCall('savePushSettings', {
             userId: state.currentUser.user_id,
             settings: pushState.settings,
@@ -9329,7 +9347,7 @@ async function syncPushSettingsToBackend() {
             onesignalPlayerId: pushState.playerId || ''
         });
         
-        console.log('Push settings synced to backend');
+        console.log('Push settings synced to backend successfully');
     } catch (e) {
         console.warn('Error syncing push settings to backend:', e);
     }
@@ -9491,14 +9509,30 @@ function escapeHtml(text) {
 
 // Send local notification (for session complete when app is open)
 function sendLocalNotification(title, message) {
-    if (!pushState.settings.session) return;
+    console.log('Sending local notification:', title, message);
     
-    if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(title, {
-            body: message,
-            icon: 'icons/icon-192.png',
-            tag: 'session-complete'
-        });
+    // Try standard Notification API first
+    if ('Notification' in window) {
+        if (Notification.permission === 'granted') {
+            try {
+                new Notification(title, {
+                    body: message,
+                    icon: 'icons/icon.svg',
+                    tag: 'session-complete',
+                    requireInteraction: true
+                });
+                console.log('Notification sent via Notification API');
+            } catch (e) {
+                console.error('Notification error:', e);
+            }
+        } else if (Notification.permission !== 'denied') {
+            // Request permission
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    new Notification(title, { body: message, icon: 'icons/icon.svg' });
+                }
+            });
+        }
     }
 }
 
