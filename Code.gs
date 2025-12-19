@@ -1593,7 +1593,7 @@ function sendOneSignalNotification(playerId, title, message) {
       include_player_ids: [playerId],
       headings: { en: title },
       contents: { en: message },
-      url: 'https://tuomashel.github.io/energy-tracker/'
+      url: 'https://my.clearground.org/'
     };
     
     const response = UrlFetchApp.fetch('https://onesignal.com/api/v1/notifications', {
