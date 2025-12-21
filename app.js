@@ -295,6 +295,10 @@ async function init() {
         // Initialize shadow tools
         initShadow();
         
+        // Initialize daily check-in
+        initCheckin();
+        loadCheckins();
+        
         // Initialize push notifications
         loadPushSettings();
         initOneSignal();
@@ -1455,6 +1459,16 @@ function showView(viewName) {
                 break;
             case 'liberationComplete':
                 // Handled by completeLiberationProcess
+                break;
+            case 'checkin':
+                // Handled by startCheckin
+                break;
+            case 'checkinSettings':
+                loadCheckinSettings();
+                updateCheckinStats();
+                break;
+            case 'checkinTrends':
+                loadCheckinTrends();
                 break;
         }
     } catch (error) {
@@ -9075,6 +9089,8 @@ let pushState = {
         signalTime: '07:00',
         shadow: false,
         shadowTime: '20:00',
+        checkin: false,
+        checkinTime: '20:00',
         session: true
     },
     mindfulAlerts: [] // { id, name, message, frequency, startTime, endTime, enabled }
@@ -9145,6 +9161,538 @@ document.addEventListener('visibilitychange', async () => {
         await requestWakeLock();
     }
 });
+
+// ============================================
+// DAILY CHECK-IN
+// ============================================
+
+let checkinState = {
+    enabled: true,
+    reminderEnabled: false,
+    reminderTime: '20:00',
+    currentStep: 'intro',
+    values: {
+        mood: 5,
+        stress: 5,
+        thoughts: 5,
+        presence: 5,
+        vitality: 5
+    },
+    tags: [],
+    note: '',
+    todayCompleted: false,
+    checkins: [] // Cache of recent check-ins
+};
+
+const CHECKIN_STEPS = ['intro', 'mood', 'stress', 'thoughts', 'presence', 'vitality', 'tags', 'result'];
+
+// Start check-in flow
+function startCheckin() {
+    if (checkinState.todayCompleted) {
+        // Already completed today - show result or trends
+        showView('checkinTrends');
+        return;
+    }
+    
+    // Reset values for new check-in
+    checkinState.currentStep = 'intro';
+    checkinState.values = { mood: 5, stress: 5, thoughts: 5, presence: 5, vitality: 5 };
+    checkinState.tags = [];
+    checkinState.note = '';
+    
+    // Reset slider values
+    ['mood', 'stress', 'thoughts', 'presence', 'vitality'].forEach(metric => {
+        const slider = document.getElementById(`checkin${metric.charAt(0).toUpperCase() + metric.slice(1)}`);
+        const valueEl = document.getElementById(`checkin${metric.charAt(0).toUpperCase() + metric.slice(1)}Value`);
+        if (slider) slider.value = 5;
+        if (valueEl) valueEl.textContent = '5';
+    });
+    
+    // Reset tags
+    document.querySelectorAll('.checkin-tag').forEach(tag => tag.classList.remove('selected'));
+    
+    // Reset note
+    const noteInput = document.getElementById('checkinNote');
+    if (noteInput) noteInput.value = '';
+    
+    showCheckinStep('intro');
+    showView('checkin');
+}
+
+// Show specific step
+function showCheckinStep(step) {
+    checkinState.currentStep = step;
+    
+    document.querySelectorAll('.checkin-screen').forEach(screen => {
+        screen.classList.remove('active');
+    });
+    
+    const targetScreen = document.querySelector(`.checkin-screen[data-step="${step}"]`);
+    if (targetScreen) {
+        targetScreen.classList.add('active');
+    }
+}
+
+// Next step
+function nextCheckinStep() {
+    const currentIndex = CHECKIN_STEPS.indexOf(checkinState.currentStep);
+    if (currentIndex < CHECKIN_STEPS.length - 1) {
+        const nextStep = CHECKIN_STEPS[currentIndex + 1];
+        showCheckinStep(nextStep);
+    }
+}
+
+// Previous step
+function prevCheckinStep() {
+    const currentIndex = CHECKIN_STEPS.indexOf(checkinState.currentStep);
+    if (currentIndex > 0) {
+        const prevStep = CHECKIN_STEPS[currentIndex - 1];
+        showCheckinStep(prevStep);
+    }
+}
+
+// Update slider value display
+function updateSliderValue(metric) {
+    const slider = document.getElementById(`checkin${metric.charAt(0).toUpperCase() + metric.slice(1)}`);
+    const valueEl = document.getElementById(`checkin${metric.charAt(0).toUpperCase() + metric.slice(1)}Value`);
+    
+    if (slider && valueEl) {
+        const value = parseInt(slider.value);
+        valueEl.textContent = value;
+        checkinState.values[metric] = value;
+    }
+}
+
+// Toggle tag selection
+function toggleCheckinTag(button) {
+    const tag = button.dataset.tag;
+    button.classList.toggle('selected');
+    
+    if (button.classList.contains('selected')) {
+        if (!checkinState.tags.includes(tag)) {
+            checkinState.tags.push(tag);
+        }
+    } else {
+        checkinState.tags = checkinState.tags.filter(t => t !== tag);
+    }
+}
+
+// Calculate vibe score
+function calculateVibeScore() {
+    const { mood, stress, thoughts, presence, vitality } = checkinState.values;
+    
+    // Normalize to "higher = better"
+    const moodPos = mood;
+    const presencePos = presence;
+    const vitalityPos = vitality;
+    const stressPos = 10 - stress;     // Invert: low stress = good
+    const thoughtsPos = 10 - thoughts; // Invert: quiet mind = good
+    
+    // Average and scale to 0-100
+    const vibeRaw = (moodPos + stressPos + thoughtsPos + presencePos + vitalityPos) / 5;
+    return Math.round(vibeRaw * 10);
+}
+
+// Save check-in
+async function saveCheckin() {
+    if (!state.currentUser) {
+        showToast('Please select a user first', 'error');
+        return;
+    }
+    
+    const noteInput = document.getElementById('checkinNote');
+    checkinState.note = noteInput ? noteInput.value.trim() : '';
+    
+    const vibeScore = calculateVibeScore();
+    const today = new Date().toISOString().split('T')[0];
+    
+    const checkinData = {
+        userId: state.currentUser.user_id,
+        date: today,
+        mood: checkinState.values.mood,
+        stress: checkinState.values.stress,
+        thoughts: checkinState.values.thoughts,
+        presence: checkinState.values.presence,
+        vitality: checkinState.values.vitality,
+        tags: JSON.stringify(checkinState.tags),
+        note: checkinState.note,
+        vibeScore: vibeScore
+    };
+    
+    try {
+        await apiCall('saveCheckin', checkinData);
+        
+        // Update local state
+        checkinState.todayCompleted = true;
+        updateCheckinHomeCard();
+        
+        // Show result
+        document.getElementById('checkinVibeScore').textContent = vibeScore;
+        showCheckinStep('result');
+        
+        // Reload check-ins
+        await loadCheckins();
+        
+        showToast('Check-in saved!', 'success');
+    } catch (e) {
+        console.error('Error saving check-in:', e);
+        showToast('Error saving check-in', 'error');
+    }
+}
+
+// Skip check-in for today
+function skipCheckinToday() {
+    closeCheckin();
+    showToast('Check-in skipped', 'info');
+}
+
+// Close check-in
+function closeCheckin() {
+    showView('dashboard');
+}
+
+// Load check-ins from backend
+async function loadCheckins() {
+    if (!state.currentUser) return;
+    
+    try {
+        const endDate = new Date().toISOString().split('T')[0];
+        const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        
+        const result = await apiCall('getCheckins', {
+            userId: state.currentUser.user_id,
+            startDate: startDate,
+            endDate: endDate
+        });
+        
+        checkinState.checkins = result?.checkins || [];
+        
+        // Check if today is completed
+        const today = new Date().toISOString().split('T')[0];
+        checkinState.todayCompleted = checkinState.checkins.some(c => c.date === today);
+        
+        updateCheckinHomeCard();
+        updateCheckinStats();
+        
+    } catch (e) {
+        console.error('Error loading check-ins:', e);
+    }
+}
+
+// Update home card
+function updateCheckinHomeCard() {
+    const statusEl = document.getElementById('checkinTodayStatus');
+    const card = document.getElementById('checkinHomeCard');
+    
+    if (!statusEl || !card) return;
+    
+    if (checkinState.todayCompleted) {
+        const today = new Date().toISOString().split('T')[0];
+        const todayCheckin = checkinState.checkins.find(c => c.date === today);
+        if (todayCheckin) {
+            statusEl.textContent = `Today's vibe: ${todayCheckin.vibeScore}/100`;
+        } else {
+            statusEl.textContent = 'Completed today ✓';
+        }
+        card.classList.add('completed');
+    } else {
+        statusEl.textContent = '20 seconds. Track your vibe.';
+        card.classList.remove('completed');
+    }
+    
+    // Hide if disabled
+    card.style.display = checkinState.enabled ? 'flex' : 'none';
+}
+
+// Update check-in stats
+function updateCheckinStats() {
+    const checkins = checkinState.checkins;
+    
+    // Total count
+    const totalEl = document.getElementById('checkinTotalCount');
+    if (totalEl) totalEl.textContent = checkins.length;
+    
+    // Current streak
+    const streakEl = document.getElementById('checkinCurrentStreak');
+    if (streakEl) {
+        const streak = calculateCheckinStreak(checkins);
+        streakEl.textContent = streak;
+    }
+    
+    // 7-day average
+    const avgEl = document.getElementById('checkinAvgVibe');
+    if (avgEl) {
+        const last7Days = checkins.slice(0, 7);
+        if (last7Days.length > 0) {
+            const avg = Math.round(last7Days.reduce((sum, c) => sum + (c.vibeScore || 0), 0) / last7Days.length);
+            avgEl.textContent = avg;
+        } else {
+            avgEl.textContent = '--';
+        }
+    }
+}
+
+// Calculate streak
+function calculateCheckinStreak(checkins) {
+    if (checkins.length === 0) return 0;
+    
+    // Sort by date descending
+    const sorted = [...checkins].sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    let streak = 0;
+    let currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0);
+    
+    for (const checkin of sorted) {
+        const checkinDate = new Date(checkin.date);
+        checkinDate.setHours(0, 0, 0, 0);
+        
+        const daysDiff = Math.floor((currentDate - checkinDate) / (1000 * 60 * 60 * 24));
+        
+        if (daysDiff === 0 || daysDiff === 1) {
+            streak++;
+            currentDate = checkinDate;
+        } else if (daysDiff > 1) {
+            break;
+        }
+    }
+    
+    return streak;
+}
+
+// Load and render trends
+function loadCheckinTrends() {
+    const checkins = checkinState.checkins;
+    
+    // Current vibe (most recent)
+    const currentVibeEl = document.getElementById('trendsCurrentVibe');
+    const baselineEl = document.getElementById('trendsBaselineText');
+    
+    if (checkins.length > 0) {
+        currentVibeEl.textContent = checkins[0].vibeScore || '--';
+        
+        // Calculate 28-day baseline
+        if (checkins.length >= 14) {
+            const baseline = Math.round(checkins.slice(0, 28).reduce((sum, c) => sum + (c.vibeScore || 0), 0) / Math.min(checkins.length, 28));
+            baselineEl.textContent = `Baseline: ${baseline}`;
+        } else {
+            baselineEl.textContent = 'Baseline: need more data';
+        }
+    } else {
+        currentVibeEl.textContent = '--';
+        baselineEl.textContent = 'Start checking in to see your baseline';
+    }
+    
+    // 7-day metric averages
+    const last7 = checkins.slice(0, 7);
+    if (last7.length > 0) {
+        const avgMood = last7.reduce((s, c) => s + (c.mood || 5), 0) / last7.length;
+        const avgStress = 10 - (last7.reduce((s, c) => s + (c.stress || 5), 0) / last7.length); // Inverted
+        const avgThoughts = 10 - (last7.reduce((s, c) => s + (c.thoughts || 5), 0) / last7.length); // Inverted
+        const avgPresence = last7.reduce((s, c) => s + (c.presence || 5), 0) / last7.length;
+        const avgVitality = last7.reduce((s, c) => s + (c.vitality || 5), 0) / last7.length;
+        
+        updateMetricBar('Mood', avgMood);
+        updateMetricBar('Stress', avgStress);
+        updateMetricBar('Thoughts', avgThoughts);
+        updateMetricBar('Presence', avgPresence);
+        updateMetricBar('Vitality', avgVitality);
+    }
+    
+    // Render chart
+    renderVibeChart(checkins);
+    
+    // Render recent check-ins
+    renderRecentCheckins(checkins.slice(0, 7));
+    
+    // Show/hide empty state
+    const emptyState = document.getElementById('trendsEmptyState');
+    const canvas = document.getElementById('vibeChartCanvas');
+    if (checkins.length < 2) {
+        emptyState.style.display = 'block';
+        canvas.style.display = 'none';
+    } else {
+        emptyState.style.display = 'none';
+        canvas.style.display = 'block';
+    }
+}
+
+// Update metric bar
+function updateMetricBar(name, value) {
+    const bar = document.getElementById(`trends${name}Bar`);
+    const valueEl = document.getElementById(`trends${name}Value`);
+    
+    if (bar) bar.style.width = `${value * 10}%`;
+    if (valueEl) valueEl.textContent = value.toFixed(1);
+}
+
+// Render vibe chart (simple canvas chart)
+function renderVibeChart(checkins) {
+    const canvas = document.getElementById('vibeChartCanvas');
+    if (!canvas || checkins.length < 2) return;
+    
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = 150;
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Get last 30 days of data
+    const data = checkins.slice(0, 30).reverse();
+    if (data.length < 2) return;
+    
+    const padding = 20;
+    const chartWidth = canvas.width - padding * 2;
+    const chartHeight = canvas.height - padding * 2;
+    
+    // Draw grid lines
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+        const y = padding + (chartHeight / 4) * i;
+        ctx.beginPath();
+        ctx.moveTo(padding, y);
+        ctx.lineTo(canvas.width - padding, y);
+        ctx.stroke();
+    }
+    
+    // Draw line chart
+    ctx.strokeStyle = 'rgb(150, 130, 90)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    
+    data.forEach((checkin, i) => {
+        const x = padding + (chartWidth / (data.length - 1)) * i;
+        const y = padding + chartHeight - ((checkin.vibeScore || 50) / 100) * chartHeight;
+        
+        if (i === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+    });
+    
+    ctx.stroke();
+    
+    // Draw points
+    ctx.fillStyle = 'rgb(150, 130, 90)';
+    data.forEach((checkin, i) => {
+        const x = padding + (chartWidth / (data.length - 1)) * i;
+        const y = padding + chartHeight - ((checkin.vibeScore || 50) / 100) * chartHeight;
+        
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+    });
+}
+
+// Render recent check-ins list
+function renderRecentCheckins(checkins) {
+    const list = document.getElementById('recentCheckinsList');
+    if (!list) return;
+    
+    if (checkins.length === 0) {
+        list.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: var(--space-md);">No check-ins yet</p>';
+        return;
+    }
+    
+    list.innerHTML = checkins.map(c => {
+        const date = new Date(c.date);
+        const dateStr = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        const tags = Array.isArray(c.tags) ? c.tags : (c.tags ? JSON.parse(c.tags) : []);
+        
+        return `
+            <div class="recent-checkin-item">
+                <div>
+                    <div class="recent-checkin-date">${dateStr}</div>
+                    ${tags.length > 0 ? `
+                        <div class="recent-checkin-tags">
+                            ${tags.slice(0, 3).map(t => `<span class="recent-tag">${t.replace('-', ' ')}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+                <span class="recent-checkin-vibe">${c.vibeScore}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+// Save check-in settings
+async function saveCheckinSettings() {
+    const enabled = document.getElementById('checkinEnabled')?.checked ?? true;
+    const reminderEnabled = document.getElementById('checkinReminderEnabled')?.checked ?? false;
+    const reminderTime = document.getElementById('checkinReminderTime')?.value ?? '20:00';
+    
+    checkinState.enabled = enabled;
+    checkinState.reminderEnabled = reminderEnabled;
+    checkinState.reminderTime = reminderTime;
+    
+    // Save to localStorage
+    localStorage.setItem('checkinSettings', JSON.stringify({
+        enabled,
+        reminderEnabled,
+        reminderTime
+    }));
+    
+    updateCheckinHomeCard();
+    
+    // Update push settings if subscribed
+    if (pushState.subscribed) {
+        await syncCheckinReminderToPush();
+        showToast('Check-in reminder updated', 'success');
+    }
+}
+
+// Load check-in settings
+function loadCheckinSettings() {
+    const saved = localStorage.getItem('checkinSettings');
+    if (saved) {
+        try {
+            const settings = JSON.parse(saved);
+            checkinState.enabled = settings.enabled ?? true;
+            checkinState.reminderEnabled = settings.reminderEnabled ?? false;
+            checkinState.reminderTime = settings.reminderTime ?? '20:00';
+        } catch (e) {
+            console.error('Error loading check-in settings:', e);
+        }
+    }
+    
+    // Sync with push settings if available
+    if (pushState.settings.checkin !== undefined) {
+        checkinState.reminderEnabled = pushState.settings.checkin;
+    }
+    if (pushState.settings.checkinTime) {
+        checkinState.reminderTime = pushState.settings.checkinTime;
+    }
+    
+    // Update UI
+    const enabledEl = document.getElementById('checkinEnabled');
+    const reminderEl = document.getElementById('checkinReminderEnabled');
+    const timeEl = document.getElementById('checkinReminderTime');
+    
+    if (enabledEl) enabledEl.checked = checkinState.enabled;
+    if (reminderEl) reminderEl.checked = checkinState.reminderEnabled;
+    if (timeEl) timeEl.value = checkinState.reminderTime;
+}
+
+// Sync check-in reminder to push settings
+async function syncCheckinReminderToPush() {
+    // Update push settings with check-in reminder
+    pushState.settings.checkin = checkinState.reminderEnabled;
+    pushState.settings.checkinTime = checkinState.reminderTime;
+    
+    console.log('Syncing check-in reminder to push:', checkinState.reminderEnabled, checkinState.reminderTime);
+    
+    // Sync to backend
+    await syncPushSettingsToBackend();
+}
+
+// Initialize check-in on app load
+function initCheckin() {
+    loadCheckinSettings();
+    updateCheckinHomeCard();
+}
 
 // Initialize OneSignal
 async function initOneSignal() {

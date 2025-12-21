@@ -99,6 +99,18 @@ function createSheet(name) {
         'notification_id', 'user_id', 'alert_id', 'scheduled_time', 'message', 'sent', 'created_at'
       ]);
       break;
+    case 'DailyCheckins':
+      sheet.appendRow([
+        'checkin_id', 'user_id', 'date', 'mood', 'stress', 'thoughts', 'presence', 'vitality', 'tags', 'note', 'vibe_score', 'created_at'
+      ]);
+      break;
+    case 'InsightCooldowns':
+      sheet.appendRow([
+        'user_id', 'last_global_insight', 'mood_improve', 'mood_decline', 'stress_improve', 'stress_decline',
+        'thoughts_improve', 'thoughts_decline', 'presence_improve', 'presence_decline', 
+        'vitality_improve', 'vitality_decline', 'vibe_improve', 'vibe_decline'
+      ]);
+      break;
   }
   
   return sheet;
@@ -251,6 +263,14 @@ function handleRequest(e) {
         break;
       case 'saveLiberationProgress':
         result = saveLiberationProgress(params);
+        break;
+        
+      // Daily Check-in operations
+      case 'saveCheckin':
+        result = saveCheckin(params);
+        break;
+      case 'getCheckins':
+        result = getCheckins(params.userId, params.startDate, params.endDate);
         break;
         
       // Push notification operations
@@ -1418,6 +1438,409 @@ function saveLiberationProgress(params) {
 }
 
 // ============================================
+// DAILY CHECK-IN
+// ============================================
+
+function saveCheckin(params) {
+  const sheet = getSheet('DailyCheckins');
+  const data = sheet.getDataRange().getValues();
+  const now = new Date().toISOString();
+  
+  const userIdStr = String(params.userId);
+  const date = params.date;
+  
+  // Check if check-in already exists for this user and date
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][1]) === userIdStr && data[i][2] === date) {
+      // Update existing check-in
+      const rowData = [
+        data[i][0], // Keep existing checkin_id
+        params.userId,
+        date,
+        params.mood || 5,
+        params.stress || 5,
+        params.thoughts || 5,
+        params.presence || 5,
+        params.vitality || 5,
+        params.tags || '[]',
+        params.note || '',
+        params.vibeScore || 50,
+        now
+      ];
+      sheet.getRange(i + 1, 1, 1, rowData.length).setValues([rowData]);
+      
+      // Check for baseline shifts (async, don't block response)
+      try {
+        checkBaselineShifts(params.userId);
+      } catch (e) {
+        console.error('Baseline check error:', e);
+      }
+      
+      return { success: true, checkinId: data[i][0] };
+    }
+  }
+  
+  // New check-in
+  const checkinId = 'CHK_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  sheet.appendRow([
+    checkinId,
+    params.userId,
+    date,
+    params.mood || 5,
+    params.stress || 5,
+    params.thoughts || 5,
+    params.presence || 5,
+    params.vitality || 5,
+    params.tags || '[]',
+    params.note || '',
+    params.vibeScore || 50,
+    now
+  ]);
+  
+  // Check for baseline shifts (async, don't block response)
+  try {
+    checkBaselineShifts(params.userId);
+  } catch (e) {
+    console.error('Baseline check error:', e);
+  }
+  
+  return { success: true, checkinId: checkinId };
+}
+
+function getCheckins(userId, startDate, endDate) {
+  const sheet = getSheet('DailyCheckins');
+  const data = sheet.getDataRange().getValues();
+  
+  if (data.length <= 1) {
+    return { checkins: [] };
+  }
+  
+  const userIdStr = String(userId);
+  const checkins = [];
+  
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (String(row[1]) !== userIdStr) continue;
+    
+    const date = row[2];
+    if (startDate && date < startDate) continue;
+    if (endDate && date > endDate) continue;
+    
+    let tags = [];
+    try {
+      tags = JSON.parse(row[8] || '[]');
+    } catch (e) {
+      tags = [];
+    }
+    
+    checkins.push({
+      checkinId: row[0],
+      userId: row[1],
+      date: row[2],
+      mood: row[3],
+      stress: row[4],
+      thoughts: row[5],
+      presence: row[6],
+      vitality: row[7],
+      tags: tags,
+      note: row[9],
+      vibeScore: row[10],
+      createdAt: row[11]
+    });
+  }
+  
+  // Sort by date descending (most recent first)
+  checkins.sort((a, b) => new Date(b.date) - new Date(a.date));
+  
+  return { checkins: checkins };
+}
+
+// ============================================
+// BASELINE SHIFT DETECTION
+// ============================================
+
+// Thresholds for detecting shifts
+const BASELINE_THRESHOLDS = {
+  mood: 1.0,      // 0-10 scale
+  stress: 1.0,    // 0-10 scale (inverted)
+  thoughts: 1.0,  // 0-10 scale (inverted)
+  presence: 1.0,  // 0-10 scale
+  vitality: 1.0,  // 0-10 scale
+  vibe: 7         // 0-100 scale
+};
+
+// Cooldown periods in days
+const GLOBAL_COOLDOWN_DAYS = 7;
+const METRIC_COOLDOWN_DAYS = 30;
+
+// Check for baseline shifts after a check-in
+function checkBaselineShifts(userId) {
+  console.log('Checking baseline shifts for user:', userId);
+  
+  // Get last 28 days of check-ins
+  const endDate = new Date().toISOString().split('T')[0];
+  const startDate = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  
+  const result = getCheckins(userId, startDate, endDate);
+  const checkins = result.checkins || [];
+  
+  console.log('Check-ins in last 28 days:', checkins.length);
+  
+  // Need at least 4 check-ins for MA7 and 14 for MA28
+  if (checkins.length < 4) {
+    console.log('Not enough check-ins for baseline calculation');
+    return;
+  }
+  
+  // Calculate baselines for each metric
+  const baselines = calculateBaselines(checkins);
+  console.log('Baselines calculated:', JSON.stringify(baselines));
+  
+  // Check cooldowns
+  const cooldowns = getInsightCooldowns(userId);
+  const now = new Date();
+  
+  // Check global cooldown (7 days)
+  if (cooldowns.lastGlobalInsight) {
+    const lastGlobal = new Date(cooldowns.lastGlobalInsight);
+    const daysSince = (now - lastGlobal) / (1000 * 60 * 60 * 24);
+    if (daysSince < GLOBAL_COOLDOWN_DAYS) {
+      console.log('Global cooldown active, days since last:', daysSince.toFixed(1));
+      return;
+    }
+  }
+  
+  // Find the best insight to send
+  const insight = findBestInsight(baselines, cooldowns, now);
+  
+  if (insight) {
+    console.log('Sending insight:', insight.metric, insight.type);
+    sendBaselineInsight(userId, insight, baselines);
+  } else {
+    console.log('No qualifying insights found');
+  }
+}
+
+// Calculate MA7 and MA28 for each metric
+function calculateBaselines(checkins) {
+  // Sort by date descending (most recent first)
+  const sorted = [...checkins].sort((a, b) => new Date(b.date) - new Date(a.date));
+  
+  // Get check-ins from last 7 and 28 days
+  const now = new Date();
+  const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+  const twentyEightDaysAgo = new Date(now - 28 * 24 * 60 * 60 * 1000);
+  
+  const last7 = sorted.filter(c => new Date(c.date) >= sevenDaysAgo);
+  const last28 = sorted.filter(c => new Date(c.date) >= twentyEightDaysAgo);
+  
+  const baselines = {};
+  
+  const metrics = ['mood', 'stress', 'thoughts', 'presence', 'vitality', 'vibe'];
+  
+  metrics.forEach(metric => {
+    // Calculate MA7 (need at least 4 entries)
+    let ma7 = null;
+    if (last7.length >= 4) {
+      if (metric === 'vibe') {
+        ma7 = last7.reduce((sum, c) => sum + (c.vibeScore || 50), 0) / last7.length;
+      } else if (metric === 'stress' || metric === 'thoughts') {
+        // Invert: lower raw = better = higher pos
+        ma7 = 10 - (last7.reduce((sum, c) => sum + (c[metric] || 5), 0) / last7.length);
+      } else {
+        ma7 = last7.reduce((sum, c) => sum + (c[metric] || 5), 0) / last7.length;
+      }
+    }
+    
+    // Calculate MA28 (need at least 14 entries)
+    let ma28 = null;
+    if (last28.length >= 14) {
+      if (metric === 'vibe') {
+        ma28 = last28.reduce((sum, c) => sum + (c.vibeScore || 50), 0) / last28.length;
+      } else if (metric === 'stress' || metric === 'thoughts') {
+        // Invert: lower raw = better = higher pos
+        ma28 = 10 - (last28.reduce((sum, c) => sum + (c[metric] || 5), 0) / last28.length);
+      } else {
+        ma28 = last28.reduce((sum, c) => sum + (c[metric] || 5), 0) / last28.length;
+      }
+    }
+    
+    baselines[metric] = { ma7, ma28 };
+  });
+  
+  return baselines;
+}
+
+// Get insight cooldowns for a user
+function getInsightCooldowns(userId) {
+  const sheet = getSheet('InsightCooldowns');
+  const data = sheet.getDataRange().getValues();
+  const userIdStr = String(userId);
+  
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === userIdStr) {
+      return {
+        lastGlobalInsight: data[i][1],
+        moodImprove: data[i][2],
+        moodDecline: data[i][3],
+        stressImprove: data[i][4],
+        stressDecline: data[i][5],
+        thoughtsImprove: data[i][6],
+        thoughtsDecline: data[i][7],
+        presenceImprove: data[i][8],
+        presenceDecline: data[i][9],
+        vitalityImprove: data[i][10],
+        vitalityDecline: data[i][11],
+        vibeImprove: data[i][12],
+        vibeDecline: data[i][13],
+        rowIndex: i + 1
+      };
+    }
+  }
+  
+  return {}; // No cooldowns found
+}
+
+// Save insight cooldown
+function saveInsightCooldown(userId, metric, type, now) {
+  const sheet = getSheet('InsightCooldowns');
+  const data = sheet.getDataRange().getValues();
+  const userIdStr = String(userId);
+  const nowStr = now.toISOString();
+  
+  // Column mapping
+  const columns = {
+    moodImprove: 2, moodDecline: 3,
+    stressImprove: 4, stressDecline: 5,
+    thoughtsImprove: 6, thoughtsDecline: 7,
+    presenceImprove: 8, presenceDecline: 9,
+    vitalityImprove: 10, vitalityDecline: 11,
+    vibeImprove: 12, vibeDecline: 13
+  };
+  
+  const colKey = metric + (type === 'improve' ? 'Improve' : 'Decline');
+  const colIndex = columns[colKey];
+  
+  // Find or create row
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === userIdStr) {
+      // Update global and specific cooldown
+      sheet.getRange(i + 1, 2).setValue(nowStr); // last_global_insight
+      if (colIndex) {
+        sheet.getRange(i + 1, colIndex + 1).setValue(nowStr);
+      }
+      return;
+    }
+  }
+  
+  // Create new row
+  const newRow = [userId, nowStr, '', '', '', '', '', '', '', '', '', '', '', ''];
+  if (colIndex) {
+    newRow[colIndex] = nowStr;
+  }
+  sheet.appendRow(newRow);
+}
+
+// Find the best insight to send
+function findBestInsight(baselines, cooldowns, now) {
+  const candidates = [];
+  
+  const metrics = ['mood', 'stress', 'thoughts', 'presence', 'vitality', 'vibe'];
+  
+  metrics.forEach(metric => {
+    const { ma7, ma28 } = baselines[metric];
+    if (ma7 === null || ma28 === null) return;
+    
+    const threshold = BASELINE_THRESHOLDS[metric];
+    const diff = ma7 - ma28;
+    
+    // Check improvement
+    if (diff >= threshold) {
+      const cooldownKey = metric + 'Improve';
+      const lastSent = cooldowns[cooldownKey];
+      if (!lastSent || (now - new Date(lastSent)) / (1000 * 60 * 60 * 24) >= METRIC_COOLDOWN_DAYS) {
+        candidates.push({ metric, type: 'improve', diff, ma7, ma28 });
+      }
+    }
+    
+    // Check decline
+    if (diff <= -threshold) {
+      const cooldownKey = metric + 'Decline';
+      const lastSent = cooldowns[cooldownKey];
+      if (!lastSent || (now - new Date(lastSent)) / (1000 * 60 * 60 * 24) >= METRIC_COOLDOWN_DAYS) {
+        candidates.push({ metric, type: 'decline', diff: Math.abs(diff), ma7, ma28 });
+      }
+    }
+  });
+  
+  if (candidates.length === 0) return null;
+  
+  // Prioritize improvements over declines, then by magnitude
+  const improvements = candidates.filter(c => c.type === 'improve');
+  const declines = candidates.filter(c => c.type === 'decline');
+  
+  if (improvements.length > 0) {
+    // Return improvement with largest diff
+    return improvements.sort((a, b) => b.diff - a.diff)[0];
+  } else if (declines.length > 0) {
+    // Return decline with largest diff
+    return declines.sort((a, b) => b.diff - a.diff)[0];
+  }
+  
+  return null;
+}
+
+// Send baseline insight notification
+function sendBaselineInsight(userId, insight, baselines) {
+  // Get user's player ID
+  const pushData = getPushSettings(userId);
+  if (!pushData.pushSettings || !pushData.pushSettings.onesignalPlayerId) {
+    console.log('No player ID for baseline insight');
+    return;
+  }
+  
+  const playerId = pushData.pushSettings.onesignalPlayerId;
+  const { metric, type, ma7, ma28 } = insight;
+  
+  // Format values
+  const formatValue = (val, isVibe) => isVibe ? Math.round(val) : val.toFixed(1);
+  const isVibe = metric === 'vibe';
+  const ma7Str = formatValue(ma7, isVibe);
+  const ma28Str = formatValue(ma28, isVibe);
+  
+  // Notification messages
+  const messages = {
+    improve: {
+      mood: `New normal noticed: your mood has been higher lately. (7-day avg ${ma7Str} vs 28-day avg ${ma28Str})`,
+      stress: `New normal noticed: your stress has been lower lately. (7-day avg ${ma7Str} vs 28-day avg ${ma28Str})`,
+      thoughts: `New normal noticed: your mind has been quieter lately. (7-day avg ${ma7Str} vs 28-day avg ${ma28Str})`,
+      presence: `New normal noticed: your presence has been higher lately. (7-day avg ${ma7Str} vs 28-day avg ${ma28Str})`,
+      vitality: `New normal noticed: your energy has been higher lately. (7-day avg ${ma7Str} vs 28-day avg ${ma28Str})`,
+      vibe: `New normal noticed: your Vibe Score has been higher lately. (7-day avg ${ma7Str} vs 28-day avg ${ma28Str})`
+    },
+    decline: {
+      mood: `Mood has been a bit lower than your baseline lately. (7-day avg ${ma7Str} vs 28-day avg ${ma28Str})`,
+      stress: `Looks like stress has been higher than your baseline lately. (7-day avg ${ma7Str} vs 28-day avg ${ma28Str})`,
+      thoughts: `Looks like your mind has been busier than your baseline lately. (7-day avg ${ma7Str} vs 28-day avg ${ma28Str})`,
+      presence: `Presence has been a bit lower than your baseline lately. (7-day avg ${ma7Str} vs 28-day avg ${ma28Str})`,
+      vitality: `Energy has been lower than your baseline lately. (7-day avg ${ma7Str} vs 28-day avg ${ma28Str})`,
+      vibe: `Your Vibe Score has dipped below your baseline lately. (7-day avg ${ma7Str} vs 28-day avg ${ma28Str})`
+    }
+  };
+  
+  const message = messages[type][metric];
+  
+  // Send notification
+  const success = sendOneSignalNotification(playerId, 'Clear Ground', message);
+  
+  if (success) {
+    // Save cooldown
+    saveInsightCooldown(userId, metric, type, new Date());
+    console.log('Baseline insight sent:', metric, type);
+  }
+}
+
+// ============================================
 // PUSH NOTIFICATION SETTINGS & SCHEDULER
 // ============================================
 
@@ -1884,6 +2307,19 @@ function processDailyReminders() {
       const [targetHour] = settings.shadowTime.split(':').map(Number);
       if (currentHour === targetHour) {
         sendOneSignalNotification(playerId, 'Clear Ground', 'Time for shadow work ☯');
+      }
+    }
+    
+    // Check daily check-in reminder
+    if (settings.checkin) {
+      const [targetHour] = (settings.checkinTime || '20:00').split(':').map(Number);
+      if (currentHour === targetHour) {
+        // Check if user already completed check-in today
+        const today = Utilities.formatDate(now, timezone, 'yyyy-MM-dd');
+        const checkinsResult = getCheckins(userId, today, today);
+        if (!checkinsResult.checkins || checkinsResult.checkins.length === 0) {
+          sendOneSignalNotification(playerId, 'Clear Ground', '20 seconds to log your vibe ◉');
+        }
       }
     }
   }

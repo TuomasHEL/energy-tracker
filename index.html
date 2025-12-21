@@ -152,6 +152,18 @@
                     </div>
                     <div class="shadow-home-arrow">→</div>
                 </div>
+
+                <!-- Daily Check-in Card -->
+                <div class="checkin-home-card" id="checkinHomeCard" onclick="startCheckin()">
+                    <div class="checkin-home-icon">◉</div>
+                    <div class="checkin-home-content">
+                        <div class="checkin-home-title">Daily Check-in</div>
+                        <div class="checkin-home-stats">
+                            <span id="checkinTodayStatus">20 seconds. Track your vibe.</span>
+                        </div>
+                    </div>
+                    <div class="checkin-home-arrow">→</div>
+                </div>
             </section>
 
             <!-- Signal View -->
@@ -1847,6 +1859,16 @@
                     <div class="profile-card-arrow">→</div>
                 </div>
 
+                <!-- Daily Check-in Settings Card -->
+                <div class="profile-card" onclick="showView('checkinSettings')">
+                    <div class="profile-card-icon">◉</div>
+                    <div class="profile-card-content">
+                        <div class="profile-card-title">Daily Check-in</div>
+                        <div class="profile-card-subtitle">Reminders & view trends</div>
+                    </div>
+                    <div class="profile-card-arrow">→</div>
+                </div>
+
                 <div class="settings-section">
                     <h3>Notifications</h3>
                     <div class="settings-row">
@@ -1890,7 +1912,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Clear Ground v5.6.6</p>
+                    <p class="version">Clear Ground v5.7.1</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>
@@ -2272,6 +2294,351 @@
                             <span class="signal-stat-value" id="settingsSignalFavorites">0</span>
                             <span class="signal-stat-label">Favorites</span>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Daily Check-in Modal -->
+            <section id="viewCheckin" class="view checkin-view">
+                <div class="checkin-modal">
+                    <!-- Intro Screen -->
+                    <div class="checkin-screen active" data-step="intro">
+                        <div class="checkin-header">
+                            <button class="checkin-close" onclick="closeCheckin()">✕</button>
+                        </div>
+                        <div class="checkin-body">
+                            <div class="checkin-intro-icon">◉</div>
+                            <h2 class="checkin-title">Daily Check-in</h2>
+                            <p class="checkin-intro-text">Track your vibe in under 20 seconds. No need to overthink—pick the closest number for how you feel right now.</p>
+                            <p class="checkin-intro-note">You'll get a note when your baseline shifts.</p>
+                        </div>
+                        <div class="checkin-footer">
+                            <button class="btn primary" onclick="nextCheckinStep()">Start</button>
+                            <button class="btn secondary" onclick="skipCheckinToday()">Skip for today</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 1: Mood -->
+                    <div class="checkin-screen" data-step="mood">
+                        <div class="checkin-header">
+                            <button class="checkin-back" onclick="prevCheckinStep()">←</button>
+                            <span class="checkin-progress">Step 1 of 5</span>
+                            <button class="checkin-close" onclick="closeCheckin()">✕</button>
+                        </div>
+                        <div class="checkin-body">
+                            <h3 class="checkin-question">How do you feel overall right now?</h3>
+                            <p class="checkin-context">This is your overall emotional tone. Over time, this helps you notice if your "normal" mood is lifting.</p>
+                            <div class="checkin-slider-container">
+                                <input type="range" class="checkin-slider" id="checkinMood" min="0" max="10" value="5" oninput="updateSliderValue('mood')">
+                                <div class="checkin-slider-value" id="checkinMoodValue">5</div>
+                                <div class="checkin-slider-labels">
+                                    <span>Very bad</span>
+                                    <span>Very good</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="checkin-footer">
+                            <button class="btn primary" onclick="nextCheckinStep()">Next</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Stress -->
+                    <div class="checkin-screen" data-step="stress">
+                        <div class="checkin-header">
+                            <button class="checkin-back" onclick="prevCheckinStep()">←</button>
+                            <span class="checkin-progress">Step 2 of 5</span>
+                            <button class="checkin-close" onclick="closeCheckin()">✕</button>
+                        </div>
+                        <div class="checkin-body">
+                            <h3 class="checkin-question">How stressed do you feel right now?</h3>
+                            <p class="checkin-context">Stress often shows up as tension, worry, or pressure. Tracking this helps you see if calm is becoming more stable.</p>
+                            <div class="checkin-slider-container">
+                                <input type="range" class="checkin-slider" id="checkinStress" min="0" max="10" value="5" oninput="updateSliderValue('stress')">
+                                <div class="checkin-slider-value" id="checkinStressValue">5</div>
+                                <div class="checkin-slider-labels">
+                                    <span>Not stressed</span>
+                                    <span>Extremely stressed</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="checkin-footer">
+                            <button class="btn primary" onclick="nextCheckinStep()">Next</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Thoughts -->
+                    <div class="checkin-screen" data-step="thoughts">
+                        <div class="checkin-header">
+                            <button class="checkin-back" onclick="prevCheckinStep()">←</button>
+                            <span class="checkin-progress">Step 3 of 5</span>
+                            <button class="checkin-close" onclick="closeCheckin()">✕</button>
+                        </div>
+                        <div class="checkin-body">
+                            <h3 class="checkin-question">How busy is your mind right now?</h3>
+                            <p class="checkin-context">This measures mental noise and looping thoughts. Many people notice progress as the mind becomes quieter and clearer.</p>
+                            <div class="checkin-slider-container">
+                                <input type="range" class="checkin-slider" id="checkinThoughts" min="0" max="10" value="5" oninput="updateSliderValue('thoughts')">
+                                <div class="checkin-slider-value" id="checkinThoughtsValue">5</div>
+                                <div class="checkin-slider-labels">
+                                    <span>Very quiet</span>
+                                    <span>Extremely busy</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="checkin-footer">
+                            <button class="btn primary" onclick="nextCheckinStep()">Next</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 4: Presence -->
+                    <div class="checkin-screen" data-step="presence">
+                        <div class="checkin-header">
+                            <button class="checkin-back" onclick="prevCheckinStep()">←</button>
+                            <span class="checkin-progress">Step 4 of 5</span>
+                            <button class="checkin-close" onclick="closeCheckin()">✕</button>
+                        </div>
+                        <div class="checkin-body">
+                            <h3 class="checkin-question">How present and aware do you feel?</h3>
+                            <p class="checkin-context">Presence is how "here" you feel in this moment. Tracking this helps you notice gradual increases in clarity and groundedness.</p>
+                            <div class="checkin-slider-container">
+                                <input type="range" class="checkin-slider" id="checkinPresence" min="0" max="10" value="5" oninput="updateSliderValue('presence')">
+                                <div class="checkin-slider-value" id="checkinPresenceValue">5</div>
+                                <div class="checkin-slider-labels">
+                                    <span>Lost in thoughts</span>
+                                    <span>Very present</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="checkin-footer">
+                            <button class="btn primary" onclick="nextCheckinStep()">Next</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 5: Vitality -->
+                    <div class="checkin-screen" data-step="vitality">
+                        <div class="checkin-header">
+                            <button class="checkin-back" onclick="prevCheckinStep()">←</button>
+                            <span class="checkin-progress">Step 5 of 5</span>
+                            <button class="checkin-close" onclick="closeCheckin()">✕</button>
+                        </div>
+                        <div class="checkin-body">
+                            <h3 class="checkin-question">How energised do you feel right now?</h3>
+                            <p class="checkin-context">Vitality is your sense of inner energy and liveliness. This can shift a lot with emotional clearing and awakening.</p>
+                            <div class="checkin-slider-container">
+                                <input type="range" class="checkin-slider" id="checkinVitality" min="0" max="10" value="5" oninput="updateSliderValue('vitality')">
+                                <div class="checkin-slider-value" id="checkinVitalityValue">5</div>
+                                <div class="checkin-slider-labels">
+                                    <span>Exhausted</span>
+                                    <span>Very energised</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="checkin-footer">
+                            <button class="btn primary" onclick="nextCheckinStep()">Next</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 6: Tags + Note -->
+                    <div class="checkin-screen" data-step="tags">
+                        <div class="checkin-header">
+                            <button class="checkin-back" onclick="prevCheckinStep()">←</button>
+                            <span class="checkin-progress">Add context (optional)</span>
+                            <button class="checkin-close" onclick="closeCheckin()">✕</button>
+                        </div>
+                        <div class="checkin-body">
+                            <p class="checkin-tags-intro">Skip if you want. This helps you remember what influenced your day.</p>
+                            <div class="checkin-tags">
+                                <button class="checkin-tag" data-tag="heavy-emotions" onclick="toggleCheckinTag(this)">Heavy emotions</button>
+                                <button class="checkin-tag" data-tag="light-open" onclick="toggleCheckinTag(this)">Light / open</button>
+                                <button class="checkin-tag" data-tag="triggered" onclick="toggleCheckinTag(this)">Triggered</button>
+                                <button class="checkin-tag" data-tag="calm" onclick="toggleCheckinTag(this)">Calm</button>
+                                <button class="checkin-tag" data-tag="breakthrough" onclick="toggleCheckinTag(this)">Breakthrough</button>
+                                <button class="checkin-tag" data-tag="overthinking" onclick="toggleCheckinTag(this)">Overthinking</button>
+                                <button class="checkin-tag" data-tag="flow" onclick="toggleCheckinTag(this)">Flow</button>
+                                <button class="checkin-tag" data-tag="social-drain" onclick="toggleCheckinTag(this)">Social drain</button>
+                                <button class="checkin-tag" data-tag="low-energy" onclick="toggleCheckinTag(this)">Low energy</button>
+                                <button class="checkin-tag" data-tag="rested" onclick="toggleCheckinTag(this)">Rested</button>
+                            </div>
+                            <div class="checkin-note-container">
+                                <label>Quick note (optional)</label>
+                                <input type="text" id="checkinNote" maxlength="120" placeholder="What affected your vibe?">
+                            </div>
+                        </div>
+                        <div class="checkin-footer">
+                            <button class="btn primary" onclick="saveCheckin()">Save</button>
+                        </div>
+                    </div>
+
+                    <!-- Result Screen -->
+                    <div class="checkin-screen" data-step="result">
+                        <div class="checkin-header">
+                            <button class="checkin-close" onclick="closeCheckin()">✕</button>
+                        </div>
+                        <div class="checkin-body checkin-result">
+                            <div class="checkin-result-icon">✓</div>
+                            <h2 class="checkin-result-title">Saved</h2>
+                            <div class="checkin-vibe-score">
+                                <span class="vibe-label">Vibe Score</span>
+                                <span class="vibe-value" id="checkinVibeScore">--</span>
+                                <span class="vibe-max">/100</span>
+                            </div>
+                            <p class="checkin-result-text">Small daily check-ins add up. You'll get a note when your baseline shifts.</p>
+                        </div>
+                        <div class="checkin-footer">
+                            <button class="btn primary" onclick="closeCheckin()">Done</button>
+                            <button class="btn secondary" onclick="showView('checkinTrends')">View trends</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Check-in Settings View -->
+            <section id="viewCheckinSettings" class="view">
+                <div class="view-header">
+                    <button class="back-btn" onclick="showView('settings')">←</button>
+                    <h2>Daily Check-in</h2>
+                </div>
+
+                <!-- Enable/Disable Check-in -->
+                <div class="settings-card">
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            <span>Enable Daily Check-in</span>
+                            <span class="settings-hint">Show check-in card on home screen</span>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="checkinEnabled" checked onchange="saveCheckinSettings()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Reminder Settings -->
+                <div class="settings-card">
+                    <h3 class="settings-card-title">Reminder</h3>
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            <span>Daily reminder</span>
+                            <span class="settings-hint">Get notified to check in</span>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="checkinReminderEnabled" onchange="saveCheckinSettings()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="settings-row" id="checkinTimeRow">
+                        <div class="settings-label">
+                            <span>Reminder time</span>
+                        </div>
+                        <input type="time" id="checkinReminderTime" value="20:00" onchange="saveCheckinSettings()">
+                    </div>
+                </div>
+
+                <!-- Trends Button -->
+                <div class="settings-card clickable" onclick="showView('checkinTrends')">
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            <span>View Trends</span>
+                            <span class="settings-hint">See your vibe score over time</span>
+                        </div>
+                        <span class="settings-arrow">→</span>
+                    </div>
+                </div>
+
+                <!-- Stats -->
+                <div class="settings-card">
+                    <h3 class="settings-card-title">Statistics</h3>
+                    <div class="checkin-settings-stats">
+                        <div class="checkin-stat">
+                            <span class="checkin-stat-value" id="checkinTotalCount">0</span>
+                            <span class="checkin-stat-label">Total check-ins</span>
+                        </div>
+                        <div class="checkin-stat">
+                            <span class="checkin-stat-value" id="checkinCurrentStreak">0</span>
+                            <span class="checkin-stat-label">Current streak</span>
+                        </div>
+                        <div class="checkin-stat">
+                            <span class="checkin-stat-value" id="checkinAvgVibe">--</span>
+                            <span class="checkin-stat-label">Avg vibe (7 days)</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Check-in Trends View -->
+            <section id="viewCheckinTrends" class="view">
+                <div class="view-header">
+                    <button class="back-btn" onclick="showView('checkinSettings')">←</button>
+                    <h2>Trends</h2>
+                </div>
+
+                <!-- Vibe Score Overview -->
+                <div class="trends-overview">
+                    <div class="trends-current">
+                        <span class="trends-label">Current Vibe</span>
+                        <span class="trends-value" id="trendsCurrentVibe">--</span>
+                        <span class="trends-baseline" id="trendsBaselineText">Baseline: --</span>
+                    </div>
+                </div>
+
+                <!-- Vibe Chart -->
+                <div class="trends-chart-container">
+                    <h3>Last 30 Days</h3>
+                    <div class="trends-chart" id="vibeChart">
+                        <div class="trends-chart-empty" id="trendsEmptyState">
+                            Check in a few more times to see your trend.
+                        </div>
+                        <canvas id="vibeChartCanvas"></canvas>
+                    </div>
+                </div>
+
+                <!-- Metric Breakdown -->
+                <div class="trends-metrics">
+                    <h3>7-Day Averages</h3>
+                    <div class="trends-metric-grid">
+                        <div class="trends-metric">
+                            <span class="metric-name">Mood</span>
+                            <div class="metric-bar-container">
+                                <div class="metric-bar" id="trendsMoodBar" style="width: 50%"></div>
+                            </div>
+                            <span class="metric-value" id="trendsMoodValue">--</span>
+                        </div>
+                        <div class="trends-metric">
+                            <span class="metric-name">Calm</span>
+                            <div class="metric-bar-container">
+                                <div class="metric-bar" id="trendsStressBar" style="width: 50%"></div>
+                            </div>
+                            <span class="metric-value" id="trendsStressValue">--</span>
+                        </div>
+                        <div class="trends-metric">
+                            <span class="metric-name">Clarity</span>
+                            <div class="metric-bar-container">
+                                <div class="metric-bar" id="trendsThoughtsBar" style="width: 50%"></div>
+                            </div>
+                            <span class="metric-value" id="trendsThoughtsValue">--</span>
+                        </div>
+                        <div class="trends-metric">
+                            <span class="metric-name">Presence</span>
+                            <div class="metric-bar-container">
+                                <div class="metric-bar" id="trendsPresenceBar" style="width: 50%"></div>
+                            </div>
+                            <span class="metric-value" id="trendsPresenceValue">--</span>
+                        </div>
+                        <div class="trends-metric">
+                            <span class="metric-name">Vitality</span>
+                            <div class="metric-bar-container">
+                                <div class="metric-bar" id="trendsVitalityBar" style="width: 50%"></div>
+                            </div>
+                            <span class="metric-value" id="trendsVitalityValue">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Check-ins -->
+                <div class="trends-recent">
+                    <h3>Recent Check-ins</h3>
+                    <div id="recentCheckinsList" class="recent-checkins-list">
+                        <!-- Will be populated dynamically -->
                     </div>
                 </div>
             </section>
