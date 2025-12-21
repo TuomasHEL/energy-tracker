@@ -47,7 +47,8 @@ const state = {
     settings: {
         soundEnabled: false,
         vibrationEnabled: false,
-        collapsedCategories: {}
+        collapsedCategories: {},
+        transmissions: [] // List of custom transmission types
     },
     
     // Timer state
@@ -2626,7 +2627,8 @@ function addPlaylistItem() {
     
     // Build transmission options
     let transmissionOptions = '<option value="">Energy type...</option>';
-    state.settings.transmissions.forEach(t => {
+    const transmissions = state.settings.transmissions || [];
+    transmissions.forEach(t => {
         transmissionOptions += `<option value="${t}">${t}</option>`;
     });
     
@@ -2850,7 +2852,8 @@ function editPlaylist(playlistId) {
         
         // Build transmission options
         let transmissionOptions = '<option value="">Energy type...</option>';
-        state.settings.transmissions.forEach(t => {
+        const transmissions = state.settings.transmissions || [];
+        transmissions.forEach(t => {
             transmissionOptions += `<option value="${t}" ${t === item.transmission ? 'selected' : ''}>${t}</option>`;
         });
         
@@ -9646,25 +9649,21 @@ async function saveCheckinSettings() {
 
 // Load check-in settings
 function loadCheckinSettings() {
+    // First, load from dedicated check-in localStorage (for enabled state)
     const saved = localStorage.getItem('checkinSettings');
     if (saved) {
         try {
             const settings = JSON.parse(saved);
             checkinState.enabled = settings.enabled ?? true;
-            checkinState.reminderEnabled = settings.reminderEnabled ?? false;
-            checkinState.reminderTime = settings.reminderTime ?? '20:00';
+            // Don't load reminder settings from here - use pushState instead
         } catch (e) {
             console.error('Error loading check-in settings:', e);
         }
     }
     
-    // Sync with push settings if available
-    if (pushState.settings.checkin !== undefined) {
-        checkinState.reminderEnabled = pushState.settings.checkin;
-    }
-    if (pushState.settings.checkinTime) {
-        checkinState.reminderTime = pushState.settings.checkinTime;
-    }
+    // Load reminder settings from pushState (which was loaded from pushSettings localStorage)
+    checkinState.reminderEnabled = pushState.settings.checkin || false;
+    checkinState.reminderTime = pushState.settings.checkinTime || '20:00';
     
     // Update UI
     const enabledEl = document.getElementById('checkinEnabled');
@@ -9683,6 +9682,12 @@ async function syncCheckinReminderToPush() {
     pushState.settings.checkinTime = checkinState.reminderTime;
     
     console.log('Syncing check-in reminder to push:', checkinState.reminderEnabled, checkinState.reminderTime);
+    
+    // Save to localStorage (pushSettings key)
+    localStorage.setItem('pushSettings', JSON.stringify({
+        settings: pushState.settings,
+        mindfulAlerts: pushState.mindfulAlerts
+    }));
     
     // Sync to backend
     await syncPushSettingsToBackend();
@@ -9858,14 +9863,15 @@ function loadPushSettings() {
 
 // Save push settings to localStorage
 function savePushSettings() {
-    // Read from UI
+    // Read from UI (these DOM elements exist on Push Settings page)
     pushState.settings.habits = document.getElementById('pushHabits')?.checked || false;
     pushState.settings.habitsTime = document.getElementById('pushHabitsTime')?.value || '08:00';
     pushState.settings.signal = document.getElementById('pushSignal')?.checked || false;
     pushState.settings.signalTime = document.getElementById('pushSignalTime')?.value || '07:00';
     pushState.settings.shadow = document.getElementById('pushShadow')?.checked || false;
     pushState.settings.shadowTime = document.getElementById('pushShadowTime')?.value || '20:00';
-    pushState.settings.session = document.getElementById('pushSession')?.checked || true;
+    pushState.settings.session = document.getElementById('pushSession')?.checked ?? true;
+    // Note: checkin and checkinTime are preserved from pushState.settings (set via syncCheckinReminderToPush)
     
     localStorage.setItem('pushSettings', JSON.stringify({
         settings: pushState.settings,
