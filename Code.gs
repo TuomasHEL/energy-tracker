@@ -2135,7 +2135,7 @@ function processScheduledNotifications() {
       // Get user's OneSignal player ID and mindful alerts
       const pushData = getPushSettings(userId);
       const playerId = pushData.pushSettings?.onesignalPlayerId;
-      const alerts = pushData.mindfulAlerts || [];
+      const alerts = pushData.pushSettings?.mindfulAlerts || [];
       
       // Find the alert to get its redirect
       const alert = alerts.find(a => a.id === alertId);

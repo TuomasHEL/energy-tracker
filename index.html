@@ -66,115 +66,9 @@
                     <img src="icons/icon.svg" alt="" class="hero-icon">
                 </div>
 
-                <!-- Quick Actions -->
-                <div class="quick-actions">
-                    <button class="action-btn" onclick="showView('track')">
-                        <span class="btn-icon">◎</span>
-                        <span class="btn-text">Track Progress</span>
-                    </button>
-                    <button class="action-btn" onclick="showView('timer')">
-                        <span class="btn-icon">⏱</span>
-                        <span class="btn-text">Do a Session</span>
-                    </button>
-                    <button class="action-btn" onclick="showView('playlists')">
-                        <span class="btn-icon">▶</span>
-                        <span class="btn-text">Programs</span>
-                    </button>
-                    <button class="action-btn" onclick="showView('stats')">
-                        <span class="btn-icon">☰</span>
-                        <span class="btn-text">Statistics</span>
-                    </button>
-                </div>
-
-                <!-- Stats Summary (moved below actions) -->
-                <div class="stats-summary">
-                    <div class="stat-card">
-                        <span class="stat-value" id="statTotalMarkers">-</span>
-                        <span class="stat-label">Markers</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-value" id="statTodaySessions">-</span>
-                        <span class="stat-label">Today</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-value" id="statTotalTime">-</span>
-                        <span class="stat-label">Total</span>
-                    </div>
-                </div>
-
-                <!-- Signal Card -->
-                <div class="signal-home-card" onclick="showView('signal')">
-                    <div class="signal-home-icon">⚡</div>
-                    <div class="signal-home-content">
-                        <div class="signal-home-title">Daily Signal</div>
-                        <div class="signal-home-stats">
-                            <span id="signalTodayProgress">0 of 1 today</span>
-                            <span class="signal-streak" id="signalStreakDisplay">🔥 0 day streak</span>
-                        </div>
-                    </div>
-                    <div class="signal-home-arrow">→</div>
-                </div>
-
-                <!-- Habit Tracker Card -->
-                <div class="habit-home-card" onclick="showView('habits')">
-                    <div class="habit-home-icon">✓</div>
-                    <div class="habit-home-content">
-                        <div class="habit-home-title">Daily Habits</div>
-                        <div class="habit-home-stats">
-                            <span id="habitTodayProgress">0 of 6 today</span>
-                            <span class="habit-streak" id="habitStreakDisplay">🔥 0 day streak</span>
-                        </div>
-                    </div>
-                    <div class="habit-home-arrow">→</div>
-                </div>
-
-                <!-- Attunements Card -->
-                <div class="attunement-home-card" onclick="showView('attunements')">
-                    <div class="attunement-home-icon">✦</div>
-                    <div class="attunement-home-content">
-                        <div class="attunement-home-title">Attunements</div>
-                        <div class="attunement-home-stats">
-                            <span id="attunementReceivedCount">0 received</span>
-                            <span class="attunement-available" id="attunementAvailableCount">0 available</span>
-                        </div>
-                    </div>
-                    <div class="attunement-home-arrow">→</div>
-                </div>
-
-                <!-- Shadow Card -->
-                <div class="shadow-home-card" onclick="showView('shadow')">
-                    <div class="shadow-home-icon">◐</div>
-                    <div class="shadow-home-content">
-                        <div class="shadow-home-title">Shadow</div>
-                        <div class="shadow-home-stats">
-                            <span id="shadowOverallProgress">Integration & processing tools</span>
-                        </div>
-                    </div>
-                    <div class="shadow-home-arrow">→</div>
-                </div>
-
-                <!-- Daily Check-in Card -->
-                <div class="checkin-home-card" id="checkinHomeCard" onclick="startCheckin()">
-                    <div class="checkin-home-icon">◉</div>
-                    <div class="checkin-home-content">
-                        <div class="checkin-home-title">Daily Check-in</div>
-                        <div class="checkin-home-stats">
-                            <span id="checkinTodayStatus">20 seconds. Track your vibe.</span>
-                        </div>
-                    </div>
-                    <div class="checkin-home-arrow">→</div>
-                </div>
-
-                <!-- Intentions Card -->
-                <div class="intentions-home-card" onclick="showView('intentions')">
-                    <div class="intentions-home-icon">★</div>
-                    <div class="intentions-home-content">
-                        <div class="intentions-home-title">Intentions</div>
-                        <div class="intentions-home-stats">
-                            <span id="intentionsStatus">Your northstar guidance</span>
-                        </div>
-                    </div>
-                    <div class="intentions-home-arrow">→</div>
+                <!-- Dynamic Home Cards Container -->
+                <div id="homeCardsContainer">
+                    <!-- Cards will be rendered dynamically -->
                 </div>
             </section>
 
@@ -1854,6 +1748,16 @@
                     <h2>Settings</h2>
                 </div>
 
+                <!-- Homescreen Settings Card -->
+                <div class="profile-card" onclick="showView('homescreenSettings')">
+                    <div class="profile-card-icon">⌂</div>
+                    <div class="profile-card-content">
+                        <div class="profile-card-title">Homescreen</div>
+                        <div class="profile-card-subtitle">Customize cards & navigation</div>
+                    </div>
+                    <div class="profile-card-arrow">→</div>
+                </div>
+
                 <!-- Profile Card -->
                 <div class="profile-card" onclick="showView('profile')">
                     <div class="profile-card-icon">👤</div>
@@ -1987,9 +1891,37 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Clear Ground v5.8.1</p>
+                    <p class="version">Clear Ground v5.9.0</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
+            </section>
+
+            <!-- Homescreen Settings View -->
+            <section id="viewHomescreenSettings" class="view">
+                <div class="view-header">
+                    <button class="back-btn" onclick="showView('settings')">←</button>
+                    <h2>Homescreen</h2>
+                </div>
+
+                <div class="homescreen-settings-section">
+                    <h3>Home Cards</h3>
+                    <p class="settings-hint">Drag to reorder, toggle to show/hide</p>
+                    <div id="homeCardsList" class="homescreen-cards-list">
+                        <!-- Will be populated dynamically -->
+                    </div>
+                </div>
+
+                <div class="homescreen-settings-section">
+                    <h3>Bottom Navigation</h3>
+                    <p class="settings-hint">Choose 3 shortcuts for quick access (Home & Settings are fixed)</p>
+                    <div id="bottomNavSettings" class="bottom-nav-settings">
+                        <!-- Will be populated dynamically -->
+                    </div>
+                </div>
+
+                <button class="btn secondary" onclick="resetHomescreenDefaults()" style="margin-top: var(--space-lg);">
+                    Reset to Defaults
+                </button>
             </section>
 
             <!-- Profile View -->
@@ -2807,27 +2739,9 @@
         </main>
 
         <!-- Bottom Navigation -->
-        <nav class="bottom-nav">
-            <button class="nav-btn active" onclick="showView('dashboard')" data-view="dashboard">
-                <span class="nav-icon">⌂</span>
-                <span class="nav-label">Home</span>
-            </button>
-            <button class="nav-btn" onclick="showView('signal')" data-view="signal">
-                <span class="nav-icon">⚡</span>
-                <span class="nav-label">Signal</span>
-            </button>
-            <button class="nav-btn" onclick="showView('awaken')" data-view="awaken">
-                <span class="nav-icon">✦</span>
-                <span class="nav-label">Recognize</span>
-            </button>
-            <button class="nav-btn" onclick="showView('timer')" data-view="timer">
-                <span class="nav-icon">⏱</span>
-                <span class="nav-label">Energy</span>
-            </button>
-            <button class="nav-btn" onclick="showView('settings')" data-view="settings">
-                <span class="nav-icon">⚙</span>
-                <span class="nav-label">Settings</span>
-            </button>
+        <nav class="bottom-nav" id="bottomNav">
+            <!-- Will be rendered dynamically -->
+        </nav>
         </nav>
 
         <!-- Add User Modal -->

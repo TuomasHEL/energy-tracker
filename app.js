@@ -93,6 +93,142 @@ const state = {
 };
 
 // ============================================
+// HOMESCREEN CONFIGURATION
+// ============================================
+
+// All available home cards
+const HOME_CARDS_CONFIG = {
+    session: { id: 'session', name: 'Do a Session', icon: '⏱', view: 'timer', getStats: () => getSessionStats() },
+    track: { id: 'track', name: 'Track Progress', icon: '◎', view: 'track', getStats: () => getTrackStats() },
+    programs: { id: 'programs', name: 'Programs', icon: '▶', view: 'playlists', getStats: () => getProgramStats() },
+    stats: { id: 'stats', name: 'Statistics', icon: '▤', view: 'stats', getStats: () => getStatsCardStats() },
+    signal: { id: 'signal', name: 'Daily Signal', icon: '⚡', view: 'signal', getStats: () => getSignalStats() },
+    habits: { id: 'habits', name: 'Daily Habits', icon: '✓', view: 'habits', getStats: () => getHabitStats() },
+    checkin: { id: 'checkin', name: 'Daily Check-in', icon: '◉', view: 'checkin', action: 'startCheckin', getStats: () => getCheckinStats() },
+    shadow: { id: 'shadow', name: 'Shadow', icon: '◐', view: 'shadow', getStats: () => getShadowStats() },
+    attunements: { id: 'attunements', name: 'Attunements', icon: '✦', view: 'attunements', getStats: () => getAttunementStats() },
+    intentions: { id: 'intentions', name: 'Intentions', icon: '★', view: 'intentions', getStats: () => ({ primary: 'Your northstar guidance' }) },
+    awaken: { id: 'awaken', name: 'Recognize', icon: '☀', view: 'awaken', getStats: () => ({ primary: 'Non-dual recognition' }) },
+    liberation: { id: 'liberation', name: 'Liberation Process', icon: '♡', view: 'liberation', getStats: () => getLiberationStats() }
+};
+
+// All available nav items
+const NAV_ITEMS_CONFIG = {
+    signal: { id: 'signal', name: 'Signal', icon: '⚡', view: 'signal' },
+    awaken: { id: 'awaken', name: 'Recognize', icon: '✦', view: 'awaken' },
+    timer: { id: 'timer', name: 'Session', icon: '⏱', view: 'timer' },
+    habits: { id: 'habits', name: 'Habits', icon: '✓', view: 'habits' },
+    shadow: { id: 'shadow', name: 'Shadow', icon: '◐', view: 'shadow' },
+    track: { id: 'track', name: 'Track', icon: '◎', view: 'track' },
+    stats: { id: 'stats', name: 'Stats', icon: '▤', view: 'stats' },
+    attunements: { id: 'attunements', name: 'Attune', icon: '✦', view: 'attunements' }
+};
+
+// Default configuration
+const DEFAULT_HOME_CARDS = ['session', 'track', 'programs', 'signal', 'habits', 'checkin', 'shadow', 'attunements', 'intentions', 'stats'];
+const DEFAULT_NAV_ITEMS = ['signal', 'awaken', 'timer'];
+
+// Homescreen state
+let homescreenConfig = {
+    cards: [...DEFAULT_HOME_CARDS],
+    hiddenCards: [],
+    navItems: [...DEFAULT_NAV_ITEMS]
+};
+
+// Load homescreen config from localStorage
+function loadHomescreenConfig() {
+    const saved = localStorage.getItem('homescreenConfig');
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            homescreenConfig = {
+                cards: parsed.cards || [...DEFAULT_HOME_CARDS],
+                hiddenCards: parsed.hiddenCards || [],
+                navItems: parsed.navItems || [...DEFAULT_NAV_ITEMS]
+            };
+        } catch (e) {
+            console.error('Error loading homescreen config:', e);
+        }
+    }
+}
+
+// Save homescreen config to localStorage
+function saveHomescreenConfig() {
+    localStorage.setItem('homescreenConfig', JSON.stringify(homescreenConfig));
+}
+
+// Get stats for each card type
+function getSessionStats() {
+    const today = new Date().toISOString().split('T')[0];
+    const sessions = state.sessions || [];
+    const todaySessions = sessions.filter(s => s.start_time?.startsWith(today)).length;
+    const totalMinutes = sessions.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+    const hours = Math.floor(totalMinutes / 60);
+    return { primary: `${todaySessions} today`, secondary: `${hours}h total` };
+}
+
+function getTrackStats() {
+    const markerCount = state.markers?.length || 0;
+    const progressCount = state.progress?.length || 0;
+    return { primary: `${markerCount} markers`, secondary: `${progressCount} records` };
+}
+
+function getProgramStats() {
+    const programCount = state.playlists?.length || 0;
+    return { primary: `${programCount} programs`, secondary: 'Structured sequences' };
+}
+
+function getStatsCardStats() {
+    const sessions = state.sessions || [];
+    const totalMinutes = sessions.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+    const hours = Math.floor(totalMinutes / 60);
+    return { primary: `${hours}h tracked`, secondary: 'View charts & progress' };
+}
+
+function getSignalStats() {
+    const today = new Date().toISOString().split('T')[0];
+    const todaySignals = signalState?.completions?.[today]?.length || 0;
+    const target = signalState?.settings?.dailyGoal || 1;
+    const streak = signalState?.stats?.currentStreak || 0;
+    return { primary: `${todaySignals} of ${target} today`, secondary: `🔥 ${streak} day streak` };
+}
+
+function getHabitStats() {
+    const today = getTodayDateString();
+    const todayCompletions = habitState?.completions?.[today] || {};
+    const enabledHabits = habitState?.habits?.filter(h => h.enabled) || [];
+    const completedCount = enabledHabits.filter(h => todayCompletions[h.id]).length;
+    const streak = habitState?.stats?.currentStreak || 0;
+    return { primary: `${completedCount} of ${enabledHabits.length} today`, secondary: `🔥 ${streak} day streak` };
+}
+
+function getCheckinStats() {
+    if (checkinState?.todayCompleted) {
+        const score = checkinState?.todayScore || '--';
+        return { primary: `✓ Vibe: ${score}`, secondary: 'Completed today', completed: true };
+    }
+    return { primary: '20 seconds', secondary: 'Track your vibe' };
+}
+
+function getShadowStats() {
+    const integrateCount = shadowState?.integrate?.completed?.length || 0;
+    const processCount = shadowState?.process?.completed?.length || 0;
+    return { primary: `${integrateCount} integrated`, secondary: `${processCount} processed` };
+}
+
+function getAttunementStats() {
+    const received = attunementState?.received?.length || 0;
+    const available = ATTUNEMENTS_DATA?.length || 0;
+    return { primary: `${received} received`, secondary: `${available - received} available` };
+}
+
+function getLiberationStats() {
+    const rounds = liberationState?.totalRounds || 0;
+    const streak = liberationState?.currentStreak || 0;
+    return { primary: `${rounds} rounds`, secondary: `🔥 ${streak} day streak` };
+}
+
+// ============================================
 // LOCAL CACHE MANAGEMENT
 // ============================================
 
@@ -183,6 +319,10 @@ async function init() {
         // Load settings
         loadSettings();
         console.log('Settings loaded');
+        
+        // Load homescreen configuration
+        loadHomescreenConfig();
+        renderBottomNav();
         
         // Initialize audio context
         initAudio();
@@ -1377,6 +1517,14 @@ function populateProgressTrendSelect() {
 
 function showView(viewName) {
     try {
+        // Scroll to top of page on every view change
+        window.scrollTo(0, 0);
+        // Also scroll the content area container if it exists
+        const contentArea = document.querySelector('.content-area');
+        if (contentArea) {
+            contentArea.scrollTo(0, 0);
+        }
+        
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         
         const viewElement = document.getElementById(`view${capitalize(viewName)}`);
@@ -1506,6 +1654,9 @@ function showView(viewName) {
             case 'intentionsSettings':
                 updateIntentionSettingsPreviews();
                 break;
+            case 'homescreenSettings':
+                renderHomescreenSettings();
+                break;
         }
     } catch (error) {
         console.error('Error in showView:', error);
@@ -1520,20 +1671,267 @@ function capitalize(str) {
 // DASHBOARD
 // ============================================
 
+// Render home cards dynamically
+function renderHomeCards() {
+    const container = document.getElementById('homeCardsContainer');
+    if (!container) return;
+    
+    let html = '';
+    
+    // Render visible cards in order
+    homescreenConfig.cards.forEach(cardId => {
+        if (homescreenConfig.hiddenCards.includes(cardId)) return;
+        
+        const config = HOME_CARDS_CONFIG[cardId];
+        if (!config) return;
+        
+        const stats = config.getStats ? config.getStats() : { primary: '', secondary: '' };
+        const completedClass = stats.completed ? 'completed' : '';
+        const onclick = config.action ? `${config.action}()` : `showView('${config.view}')`;
+        
+        html += `
+            <div class="home-card ${completedClass}" onclick="${onclick}" data-card-id="${cardId}">
+                <div class="home-card-icon">${config.icon}</div>
+                <div class="home-card-content">
+                    <div class="home-card-title">${config.name}</div>
+                    <div class="home-card-stats">
+                        <span class="home-card-primary">${stats.primary || ''}</span>
+                        ${stats.secondary ? `<span class="home-card-secondary">${stats.secondary}</span>` : ''}
+                    </div>
+                </div>
+                <div class="home-card-arrow">→</div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// Render bottom navigation dynamically
+function renderBottomNav() {
+    const nav = document.getElementById('bottomNav');
+    if (!nav) return;
+    
+    let html = '';
+    
+    // Home button (fixed)
+    html += `
+        <button class="nav-btn active" onclick="showView('dashboard')" data-view="dashboard">
+            <span class="nav-icon">⌂</span>
+            <span class="nav-label">Home</span>
+        </button>
+    `;
+    
+    // Dynamic middle buttons
+    homescreenConfig.navItems.forEach(itemId => {
+        const config = NAV_ITEMS_CONFIG[itemId];
+        if (!config) return;
+        
+        html += `
+            <button class="nav-btn" onclick="showView('${config.view}')" data-view="${config.view}">
+                <span class="nav-icon">${config.icon}</span>
+                <span class="nav-label">${config.name}</span>
+            </button>
+        `;
+    });
+    
+    // Settings button (fixed)
+    html += `
+        <button class="nav-btn" onclick="showView('settings')" data-view="settings">
+            <span class="nav-icon">⚙</span>
+            <span class="nav-label">Settings</span>
+        </button>
+    `;
+    
+    nav.innerHTML = html;
+}
+
+// Render homescreen settings
+function renderHomescreenSettings() {
+    renderHomeCardsSettings();
+    renderBottomNavSettings();
+}
+
+// Render home cards settings (with drag to reorder)
+function renderHomeCardsSettings() {
+    const container = document.getElementById('homeCardsList');
+    if (!container) return;
+    
+    let html = '';
+    
+    // Show all cards in current order
+    homescreenConfig.cards.forEach((cardId, index) => {
+        const config = HOME_CARDS_CONFIG[cardId];
+        if (!config) return;
+        
+        const isHidden = homescreenConfig.hiddenCards.includes(cardId);
+        
+        html += `
+            <div class="homescreen-card-item" data-card-id="${cardId}" draggable="true">
+                <div class="homescreen-card-drag">⋮⋮</div>
+                <div class="homescreen-card-icon">${config.icon}</div>
+                <div class="homescreen-card-name">${config.name}</div>
+                <label class="toggle">
+                    <input type="checkbox" ${!isHidden ? 'checked' : ''} 
+                        onchange="toggleHomeCard('${cardId}', this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+                <div class="homescreen-card-move">
+                    <button onclick="moveHomeCard('${cardId}', -1)" ${index === 0 ? 'disabled' : ''}>↑</button>
+                    <button onclick="moveHomeCard('${cardId}', 1)" ${index === homescreenConfig.cards.length - 1 ? 'disabled' : ''}>↓</button>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+    
+    // Add drag and drop listeners
+    initCardDragAndDrop();
+}
+
+// Render bottom nav settings
+function renderBottomNavSettings() {
+    const container = document.getElementById('bottomNavSettings');
+    if (!container) return;
+    
+    let html = '<div class="nav-slots">';
+    
+    // Show 3 slots
+    for (let i = 0; i < 3; i++) {
+        const currentItem = homescreenConfig.navItems[i];
+        
+        html += `
+            <div class="nav-slot">
+                <label>Slot ${i + 1}</label>
+                <select onchange="setNavItem(${i}, this.value)">
+        `;
+        
+        Object.values(NAV_ITEMS_CONFIG).forEach(config => {
+            const selected = currentItem === config.id ? 'selected' : '';
+            const disabled = homescreenConfig.navItems.includes(config.id) && currentItem !== config.id ? 'disabled' : '';
+            html += `<option value="${config.id}" ${selected} ${disabled}>${config.icon} ${config.name}</option>`;
+        });
+        
+        html += `
+                </select>
+            </div>
+        `;
+    }
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// Toggle home card visibility
+function toggleHomeCard(cardId, visible) {
+    if (visible) {
+        homescreenConfig.hiddenCards = homescreenConfig.hiddenCards.filter(id => id !== cardId);
+    } else {
+        if (!homescreenConfig.hiddenCards.includes(cardId)) {
+            homescreenConfig.hiddenCards.push(cardId);
+        }
+    }
+    saveHomescreenConfig();
+    renderHomeCards();
+}
+
+// Move home card up or down
+function moveHomeCard(cardId, direction) {
+    const index = homescreenConfig.cards.indexOf(cardId);
+    if (index === -1) return;
+    
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= homescreenConfig.cards.length) return;
+    
+    // Swap
+    [homescreenConfig.cards[index], homescreenConfig.cards[newIndex]] = 
+    [homescreenConfig.cards[newIndex], homescreenConfig.cards[index]];
+    
+    saveHomescreenConfig();
+    renderHomeCardsSettings();
+    renderHomeCards();
+}
+
+// Set nav item for a slot
+function setNavItem(slotIndex, itemId) {
+    homescreenConfig.navItems[slotIndex] = itemId;
+    saveHomescreenConfig();
+    renderBottomNav();
+    renderBottomNavSettings();
+}
+
+// Reset homescreen to defaults
+function resetHomescreenDefaults() {
+    if (!confirm('Reset homescreen to default layout?')) return;
+    
+    homescreenConfig = {
+        cards: [...DEFAULT_HOME_CARDS],
+        hiddenCards: [],
+        navItems: [...DEFAULT_NAV_ITEMS]
+    };
+    
+    saveHomescreenConfig();
+    renderHomeCards();
+    renderBottomNav();
+    renderHomescreenSettings();
+    showToast('Homescreen reset to defaults', 'success');
+}
+
+// Initialize drag and drop for cards
+function initCardDragAndDrop() {
+    const container = document.getElementById('homeCardsList');
+    if (!container) return;
+    
+    const items = container.querySelectorAll('.homescreen-card-item');
+    
+    items.forEach(item => {
+        item.addEventListener('dragstart', handleDragStart);
+        item.addEventListener('dragend', handleDragEnd);
+        item.addEventListener('dragover', handleDragOver);
+        item.addEventListener('drop', handleDrop);
+    });
+}
+
+let draggedCardId = null;
+
+function handleDragStart(e) {
+    draggedCardId = e.target.dataset.cardId;
+    e.target.classList.add('dragging');
+}
+
+function handleDragEnd(e) {
+    e.target.classList.remove('dragging');
+    draggedCardId = null;
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    const targetId = e.target.closest('.homescreen-card-item')?.dataset.cardId;
+    
+    if (!draggedCardId || !targetId || draggedCardId === targetId) return;
+    
+    const fromIndex = homescreenConfig.cards.indexOf(draggedCardId);
+    const toIndex = homescreenConfig.cards.indexOf(targetId);
+    
+    if (fromIndex === -1 || toIndex === -1) return;
+    
+    // Remove and insert at new position
+    homescreenConfig.cards.splice(fromIndex, 1);
+    homescreenConfig.cards.splice(toIndex, 0, draggedCardId);
+    
+    saveHomescreenConfig();
+    renderHomeCardsSettings();
+    renderHomeCards();
+}
+
+// Legacy function for compatibility
 function updateDashboard() {
-    document.getElementById('statTotalMarkers').textContent = state.markers?.length || 0;
-    
-    const today = new Date().toISOString().split('T')[0];
-    const sessions = state.sessions || [];
-    const todaySessions = sessions.filter(s => 
-        s.start_time && s.start_time.startsWith(today)
-    ).length;
-    document.getElementById('statTodaySessions').textContent = todaySessions;
-    
-    const totalMinutes = sessions.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
-    const hours = Math.floor(totalMinutes / 60);
-    const mins = totalMinutes % 60;
-    document.getElementById('statTotalTime').textContent = `${hours}h ${mins}m`;
+    renderHomeCards();
 }
 
 function renderRecentActivity() {
