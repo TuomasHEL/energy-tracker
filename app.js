@@ -2126,7 +2126,7 @@ async function saveAssessment() {
 // Simple mode state
 const simpleMode = {
     selectedWork: 'vitality',
-    duration: 60,
+    duration: 30, // Default 30 min
     showElapsed: false,
     isSimpleSession: false,
     customTransmission: '',
@@ -2223,9 +2223,9 @@ function populateSimplePrograms() {
     });
 }
 
-// Adjust simple mode duration
+// Adjust simple mode duration (5 min intervals, min 5, max 180)
 function adjustSimpleDuration(delta) {
-    simpleMode.duration = Math.max(15, Math.min(180, simpleMode.duration + delta));
+    simpleMode.duration = Math.max(5, Math.min(180, simpleMode.duration + delta));
     document.getElementById('simpleDurationDisplay').textContent = `${simpleMode.duration} min`;
 }
 
@@ -2240,6 +2240,8 @@ async function startSimpleSession() {
         }
         // Run the program using existing functionality
         runPlaylist(programId);
+        // Navigate to playlists view to show the runner
+        showView('playlists');
         return;
     }
     
@@ -2298,8 +2300,9 @@ async function startSimpleSession() {
     
     saveTimerState();
     
-    // Show simple active view
+    // Show simple active view, hide setup views
     document.getElementById('simpleSetup').classList.add('hidden');
+    document.getElementById('timerSetup').classList.add('hidden'); // Also hide advanced setup
     document.getElementById('simpleActive').classList.remove('hidden');
     document.getElementById('simpleActiveWork').textContent = workName;
     document.getElementById('simpleTimerLabel').textContent = 'remaining';
@@ -2610,12 +2613,14 @@ function resetTimer() {
     if (simpleMode.isSimpleSession) {
         document.getElementById('simpleActive').classList.add('hidden');
         document.getElementById('simpleSetup').classList.remove('hidden');
+        document.getElementById('timerSetup').classList.add('hidden'); // Ensure advanced setup is hidden
         document.querySelector('.mode-toggle').style.display = '';
         simpleMode.isSimpleSession = false;
     } else {
         // Reset advanced mode views
         document.getElementById('timerSetup').classList.remove('hidden');
         document.getElementById('timerActive').classList.add('hidden');
+        document.getElementById('simpleSetup').classList.add('hidden'); // Ensure simple setup is hidden
     }
     
     // Reset advanced mode form
