@@ -159,73 +159,113 @@ function saveHomescreenConfig() {
 
 // Get stats for each card type
 function getSessionStats() {
-    const today = new Date().toISOString().split('T')[0];
-    const sessions = state.sessions || [];
-    const todaySessions = sessions.filter(s => s.start_time?.startsWith(today)).length;
-    const totalMinutes = sessions.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
-    const hours = Math.floor(totalMinutes / 60);
-    return { primary: `${todaySessions} today`, secondary: `${hours}h total` };
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        const sessions = state.sessions || [];
+        const todaySessions = sessions.filter(s => s.start_time?.startsWith(today)).length;
+        const totalMinutes = sessions.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+        const hours = Math.floor(totalMinutes / 60);
+        return { primary: `${todaySessions} today`, secondary: `${hours}h total` };
+    } catch (e) {
+        return { primary: 'Start a session', secondary: '' };
+    }
 }
 
 function getTrackStats() {
-    const markerCount = state.markers?.length || 0;
-    const progressCount = state.progress?.length || 0;
-    return { primary: `${markerCount} markers`, secondary: `${progressCount} records` };
+    try {
+        const markerCount = state.markers?.length || 0;
+        const progressCount = state.progress?.length || 0;
+        return { primary: `${markerCount} markers`, secondary: `${progressCount} records` };
+    } catch (e) {
+        return { primary: 'Track progress', secondary: '' };
+    }
 }
 
 function getProgramStats() {
-    const programCount = state.playlists?.length || 0;
-    return { primary: `${programCount} programs`, secondary: 'Structured sequences' };
+    try {
+        const programCount = state.playlists?.length || 0;
+        return { primary: `${programCount} programs`, secondary: 'Structured sequences' };
+    } catch (e) {
+        return { primary: 'Programs', secondary: '' };
+    }
 }
 
 function getStatsCardStats() {
-    const sessions = state.sessions || [];
-    const totalMinutes = sessions.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
-    const hours = Math.floor(totalMinutes / 60);
-    return { primary: `${hours}h tracked`, secondary: 'View charts & progress' };
+    try {
+        const sessions = state.sessions || [];
+        const totalMinutes = sessions.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+        const hours = Math.floor(totalMinutes / 60);
+        return { primary: `${hours}h tracked`, secondary: 'View charts & progress' };
+    } catch (e) {
+        return { primary: 'View statistics', secondary: '' };
+    }
 }
 
 function getSignalStats() {
-    const today = new Date().toISOString().split('T')[0];
-    const todaySignals = signalState?.completions?.[today]?.length || 0;
-    const target = signalState?.settings?.dailyGoal || 1;
-    const streak = signalState?.stats?.currentStreak || 0;
-    return { primary: `${todaySignals} of ${target} today`, secondary: `🔥 ${streak} day streak` };
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        const todaySignals = signalState?.completions?.[today]?.length || 0;
+        const target = signalState?.settings?.dailyGoal || 1;
+        const streak = signalState?.stats?.currentStreak || 0;
+        return { primary: `${todaySignals} of ${target} today`, secondary: `🔥 ${streak} day streak` };
+    } catch (e) {
+        return { primary: 'Daily wisdom', secondary: 'Tap to begin' };
+    }
 }
 
 function getHabitStats() {
-    const today = getTodayDateString();
-    const todayCompletions = habitState?.completions?.[today] || {};
-    const enabledHabits = habitState?.habits?.filter(h => h.enabled) || [];
-    const completedCount = enabledHabits.filter(h => todayCompletions[h.id]).length;
-    const streak = habitState?.stats?.currentStreak || 0;
-    return { primary: `${completedCount} of ${enabledHabits.length} today`, secondary: `🔥 ${streak} day streak` };
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        const todayCompletions = habitState?.completions?.[today] || {};
+        const enabledHabits = habitState?.habits?.filter(h => h.enabled) || [];
+        const completedCount = enabledHabits.filter(h => todayCompletions[h.id]).length;
+        const streak = habitState?.stats?.currentStreak || 0;
+        return { primary: `${completedCount} of ${enabledHabits.length} today`, secondary: `🔥 ${streak} day streak` };
+    } catch (e) {
+        return { primary: 'Track daily habits', secondary: '' };
+    }
 }
 
 function getCheckinStats() {
-    if (checkinState?.todayCompleted) {
-        const score = checkinState?.todayScore || '--';
-        return { primary: `✓ Vibe: ${score}`, secondary: 'Completed today', completed: true };
+    try {
+        if (checkinState?.todayCompleted) {
+            const score = checkinState?.todayScore || '--';
+            return { primary: `✓ Vibe: ${score}`, secondary: 'Completed today', completed: true };
+        }
+        return { primary: '20 seconds', secondary: 'Track your vibe' };
+    } catch (e) {
+        return { primary: '20 seconds', secondary: 'Track your vibe' };
     }
-    return { primary: '20 seconds', secondary: 'Track your vibe' };
 }
 
 function getShadowStats() {
-    const integrateCount = shadowState?.integrate?.completed?.length || 0;
-    const processCount = shadowState?.process?.completed?.length || 0;
-    return { primary: `${integrateCount} integrated`, secondary: `${processCount} processed` };
+    try {
+        const integrateCount = shadowState?.integrate?.completed?.length || 0;
+        const processCount = shadowState?.process?.completed?.length || 0;
+        return { primary: `${integrateCount} integrated`, secondary: `${processCount} processed` };
+    } catch (e) {
+        return { primary: 'Integration tools', secondary: '' };
+    }
 }
 
 function getAttunementStats() {
-    const received = attunementState?.received?.length || 0;
-    const available = ATTUNEMENTS_DATA?.length || 0;
-    return { primary: `${received} received`, secondary: `${available - received} available` };
+    try {
+        const received = attunementState?.received?.length || 0;
+        const available = attunementState?.attunements?.length || 0;
+        return { primary: `${received} received`, secondary: `${available - received} available` };
+    } catch (e) {
+        return { primary: 'Energy attunements', secondary: '' };
+    }
 }
 
 function getLiberationStats() {
-    const rounds = liberationState?.totalRounds || 0;
-    const streak = liberationState?.currentStreak || 0;
-    return { primary: `${rounds} rounds`, secondary: `🔥 ${streak} day streak` };
+    try {
+        const rounds = liberationState?.totalRounds || 0;
+        const streak = liberationState?.currentStreak || 0;
+        return { primary: `${rounds} rounds`, secondary: `🔥 ${streak} day streak` };
+    } catch (e) {
+        return { primary: 'Liberation process', secondary: '' };
+    }
 }
 
 // ============================================
@@ -321,8 +361,13 @@ async function init() {
         console.log('Settings loaded');
         
         // Load homescreen configuration
-        loadHomescreenConfig();
-        renderBottomNav();
+        try {
+            loadHomescreenConfig();
+            renderBottomNav();
+            console.log('Homescreen config loaded');
+        } catch (e) {
+            console.error('Error loading homescreen config:', e);
+        }
         
         // Initialize audio context
         initAudio();
@@ -1673,77 +1718,95 @@ function capitalize(str) {
 
 // Render home cards dynamically
 function renderHomeCards() {
-    const container = document.getElementById('homeCardsContainer');
-    if (!container) return;
-    
-    let html = '';
-    
-    // Render visible cards in order
-    homescreenConfig.cards.forEach(cardId => {
-        if (homescreenConfig.hiddenCards.includes(cardId)) return;
+    try {
+        const container = document.getElementById('homeCardsContainer');
+        if (!container) return;
         
-        const config = HOME_CARDS_CONFIG[cardId];
-        if (!config) return;
+        // Ensure homescreenConfig is valid
+        const cards = homescreenConfig?.cards || DEFAULT_HOME_CARDS;
+        const hiddenCards = homescreenConfig?.hiddenCards || [];
         
-        const stats = config.getStats ? config.getStats() : { primary: '', secondary: '' };
-        const completedClass = stats.completed ? 'completed' : '';
-        const onclick = config.action ? `${config.action}()` : `showView('${config.view}')`;
+        let html = '';
         
-        html += `
-            <div class="home-card ${completedClass}" onclick="${onclick}" data-card-id="${cardId}">
-                <div class="home-card-icon">${config.icon}</div>
-                <div class="home-card-content">
-                    <div class="home-card-title">${config.name}</div>
-                    <div class="home-card-stats">
-                        <span class="home-card-primary">${stats.primary || ''}</span>
-                        ${stats.secondary ? `<span class="home-card-secondary">${stats.secondary}</span>` : ''}
+        // Render visible cards in order
+        cards.forEach(cardId => {
+            if (hiddenCards.includes(cardId)) return;
+            
+            const config = HOME_CARDS_CONFIG[cardId];
+            if (!config) return;
+            
+            let stats = { primary: '', secondary: '' };
+            try {
+                stats = config.getStats ? config.getStats() : { primary: '', secondary: '' };
+            } catch (e) {
+                console.warn('Error getting stats for card:', cardId, e);
+            }
+            
+            const completedClass = stats.completed ? 'completed' : '';
+            const onclick = config.action ? `${config.action}()` : `showView('${config.view}')`;
+            
+            html += `
+                <div class="home-card ${completedClass}" onclick="${onclick}" data-card-id="${cardId}">
+                    <div class="home-card-icon">${config.icon}</div>
+                    <div class="home-card-content">
+                        <div class="home-card-title">${config.name}</div>
+                        <div class="home-card-stats">
+                            <span class="home-card-primary">${stats.primary || ''}</span>
+                            ${stats.secondary ? `<span class="home-card-secondary">${stats.secondary}</span>` : ''}
+                        </div>
                     </div>
+                    <div class="home-card-arrow">→</div>
                 </div>
-                <div class="home-card-arrow">→</div>
-            </div>
-        `;
-    });
-    
-    container.innerHTML = html;
+            `;
+        });
+        
+        container.innerHTML = html;
+    } catch (e) {
+        console.error('Error rendering home cards:', e);
+    }
 }
 
 // Render bottom navigation dynamically
 function renderBottomNav() {
-    const nav = document.getElementById('bottomNav');
-    if (!nav) return;
-    
-    let html = '';
-    
-    // Home button (fixed)
-    html += `
-        <button class="nav-btn active" onclick="showView('dashboard')" data-view="dashboard">
-            <span class="nav-icon">⌂</span>
-            <span class="nav-label">Home</span>
-        </button>
-    `;
-    
-    // Dynamic middle buttons
-    homescreenConfig.navItems.forEach(itemId => {
-        const config = NAV_ITEMS_CONFIG[itemId];
-        if (!config) return;
+    try {
+        const nav = document.getElementById('bottomNav');
+        if (!nav) return;
         
+        let html = '';
+        
+        // Home button (fixed)
         html += `
-            <button class="nav-btn" onclick="showView('${config.view}')" data-view="${config.view}">
-                <span class="nav-icon">${config.icon}</span>
-                <span class="nav-label">${config.name}</span>
+            <button class="nav-btn active" onclick="showView('dashboard')" data-view="dashboard">
+                <span class="nav-icon">⌂</span>
+                <span class="nav-label">Home</span>
             </button>
         `;
-    });
-    
-    // Settings button (fixed)
-    html += `
-        <button class="nav-btn" onclick="showView('settings')" data-view="settings">
-            <span class="nav-icon">⚙</span>
-            <span class="nav-label">Settings</span>
-        </button>
-    `;
-    
-    nav.innerHTML = html;
+        
+        // Dynamic middle buttons
+        (homescreenConfig.navItems || []).forEach(itemId => {
+            const config = NAV_ITEMS_CONFIG[itemId];
+            if (!config) return;
+            
+            html += `
+                <button class="nav-btn" onclick="showView('${config.view}')" data-view="${config.view}">
+                    <span class="nav-icon">${config.icon}</span>
+                    <span class="nav-label">${config.name}</span>
+                </button>
+            `;
+        });
+        
+        // Settings button (fixed)
+        html += `
+            <button class="nav-btn" onclick="showView('settings')" data-view="settings">
+                <span class="nav-icon">⚙</span>
+                <span class="nav-label">Settings</span>
+            </button>
+        `;
+        
+        nav.innerHTML = html;
+    } catch (e) {
+        console.error('Error rendering bottom nav:', e);
+    }
 }
 
 // Render homescreen settings
