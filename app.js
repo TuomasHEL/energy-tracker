@@ -304,12 +304,34 @@ async function init() {
         loadPushSettings();
         initOneSignal();
         
+        // Handle URL redirect from push notification
+        handleNotificationRedirect();
+        
         console.log('App init completed successfully');
         
     } catch (error) {
         console.error('Init error:', error);
         showToast('Failed to initialize app', 'error');
         hideLoading();
+    }
+}
+
+// Handle redirect from push notification
+function handleNotificationRedirect() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirect = urlParams.get('redirect');
+    
+    if (redirect) {
+        console.log('Handling push notification redirect:', redirect);
+        // Remove the redirect param from URL
+        const url = new URL(window.location);
+        url.searchParams.delete('redirect');
+        window.history.replaceState({}, '', url);
+        
+        // Navigate to the view after a short delay to ensure everything is loaded
+        setTimeout(() => {
+            showView(redirect);
+        }, 100);
     }
 }
 
@@ -1471,6 +1493,19 @@ function showView(viewName) {
             case 'checkinTrends':
                 loadCheckinTrends();
                 break;
+            case 'timer':
+                // If a program is running, show the program runner view instead
+                if (state.playlistRunner && state.playlistRunner.isRunning) {
+                    showView('playlists');
+                    return;
+                }
+                break;
+            case 'intentions':
+                renderIntentionsView();
+                break;
+            case 'intentionsSettings':
+                updateIntentionSettingsPreviews();
+                break;
         }
     } catch (error) {
         console.error('Error in showView:', error);
@@ -2212,14 +2247,18 @@ function populateSimpleTransmissions() {
     });
 }
 
-// Populate programs dropdown
+// Populate programs dropdown with duration
 function populateSimplePrograms() {
     const select = document.getElementById('simpleProgramSelect');
     select.innerHTML = '<option value="">Select program...</option>';
     
     const playlists = state.playlists || [];
     playlists.forEach(pl => {
-        select.innerHTML += `<option value="${pl.playlist_id}">${pl.name}</option>`;
+        // Calculate total duration
+        const items = pl.items || [];
+        const totalMinutes = items.reduce((sum, item) => sum + (item.duration || 0), 0);
+        const durationStr = totalMinutes > 0 ? ` (${totalMinutes} min)` : '';
+        select.innerHTML += `<option value="${pl.playlist_id}">${pl.name}${durationStr}</option>`;
     });
 }
 
@@ -4721,15 +4760,105 @@ function updateIntentionPreviews() {
 }
 
 function switchIntentionTab(tab) {
-    // Update tab buttons
+    // Update tab buttons (for old profile view - backward compatibility)
     document.querySelectorAll('.intention-tab').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === tab);
     });
     
     // Update content panels
-    document.getElementById('intentionRelease').classList.toggle('active', tab === 'release');
-    document.getElementById('intentionRaise').classList.toggle('active', tab === 'raise');
-    document.getElementById('intentionRealize').classList.toggle('active', tab === 'realize');
+    const releaseEl = document.getElementById('intentionRelease');
+    const raiseEl = document.getElementById('intentionRaise');
+    const realizeEl = document.getElementById('intentionRealize');
+    
+    if (releaseEl) releaseEl.classList.toggle('active', tab === 'release');
+    if (raiseEl) raiseEl.classList.toggle('active', tab === 'raise');
+    if (realizeEl) realizeEl.classList.toggle('active', tab === 'realize');
+}
+
+// Switch tab in Intentions View (view-only)
+function switchIntentionsViewTab(tab) {
+    // Update tab buttons
+    document.querySelectorAll('.intentions-view-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    
+    // Update content panels
+    document.getElementById('intentionsViewRelease').classList.toggle('active', tab === 'release');
+    document.getElementById('intentionsViewRaise').classList.toggle('active', tab === 'raise');
+    document.getElementById('intentionsViewRealize').classList.toggle('active', tab === 'realize');
+}
+
+// Switch tab in Intentions Settings View (editable)
+function switchIntentionSettingsTab(tab) {
+    // Update tab buttons
+    document.querySelectorAll('#viewIntentionsSettings .intention-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    
+    // Update content panels
+    document.getElementById('intentionSettingsRelease').classList.toggle('active', tab === 'release');
+    document.getElementById('intentionSettingsRaise').classList.toggle('active', tab === 'raise');
+    document.getElementById('intentionSettingsRealize').classList.toggle('active', tab === 'realize');
+}
+
+// Render Intentions View (view-only cards)
+function renderIntentionsView() {
+    const intentions = state.intentions || {};
+    
+    // Update view-only text fields
+    const fields = [
+        'release_beliefs', 'release_emotions', 'release_trauma',
+        'raise_consciousness', 'raise_intelligences',
+        'realize_health', 'realize_wealth', 'realize_relationships', 'realize_other'
+    ];
+    
+    fields.forEach(field => {
+        const el = document.getElementById(`view_${field}`);
+        if (el) {
+            const value = intentions[field];
+            if (value && value.trim()) {
+                el.textContent = value;
+                el.classList.remove('not-set');
+            } else {
+                el.textContent = 'Not set';
+                el.classList.add('not-set');
+            }
+        }
+    });
+    
+    // Update settings previews too
+    updateIntentionSettingsPreviews();
+}
+
+// Update intention previews in settings view
+function updateIntentionSettingsPreviews() {
+    const intentions = state.intentions || {};
+    
+    const fields = [
+        { key: 'release_beliefs', defaultText: 'What beliefs hold you back? Tap to add...' },
+        { key: 'release_emotions', defaultText: 'What emotions do you want to release? Tap to add...' },
+        { key: 'release_trauma', defaultText: 'What patterns are you ready to let go of? Tap to add...' },
+        { key: 'raise_consciousness', defaultText: 'Describe your vision of living fully present. Tap to add...' },
+        { key: 'raise_intelligences', defaultText: 'Which intelligences do you want to strengthen? Tap to add...' },
+        { key: 'realize_health', defaultText: 'Describe your optimal state of health. Tap to add...' },
+        { key: 'realize_wealth', defaultText: 'What does fulfilling work look like for you? Tap to add...' },
+        { key: 'realize_relationships', defaultText: 'Describe the quality of relationships you want. Tap to add...' },
+        { key: 'realize_other', defaultText: 'Any other goals or dreams? Tap to add...' }
+    ];
+    
+    fields.forEach(({ key, defaultText }) => {
+        const el = document.getElementById(`settings_preview_${key}`);
+        if (el) {
+            const value = intentions[key];
+            if (value && value.trim()) {
+                el.textContent = value.length > 80 ? value.substring(0, 80) + '...' : value;
+                el.classList.add('has-content');
+            } else {
+                el.textContent = defaultText;
+                el.classList.remove('has-content');
+            }
+        }
+    });
 }
 
 function editIntention(field) {
@@ -10101,8 +10230,30 @@ function renderMindfulAlerts() {
     
     if (emptyEl) emptyEl.style.display = 'none';
     
+    // Redirect labels
+    const redirectLabels = {
+        'dashboard': 'Home',
+        'checkin': 'Daily Check-in',
+        'intentions': 'Intentions',
+        'signal': 'Daily Signal',
+        'habits': 'Daily Habits',
+        'shadow': 'Shadow',
+        'integrate': 'Integrate',
+        'process': 'Process',
+        'deepClean': 'Deep Clean',
+        'liberation': 'Liberation',
+        'timer': 'Energy Work',
+        'playlists': 'Programs',
+        'track': 'Track Progress',
+        'awaken': 'Recognize',
+        'attunements': 'Attunements',
+        'stats': 'Statistics',
+        'profile': 'Profile'
+    };
+    
     let html = '';
     pushState.mindfulAlerts.forEach(alert => {
+        const redirectText = alert.redirect ? `→ ${redirectLabels[alert.redirect] || alert.redirect}` : '';
         html += `
             <div class="mindful-alert-card" data-alert-id="${alert.id}">
                 <div class="mindful-alert-header">
@@ -10114,7 +10265,7 @@ function renderMindfulAlerts() {
                 </div>
                 <div class="mindful-alert-message">"${escapeHtml(alert.message)}"</div>
                 <div class="mindful-alert-meta">
-                    <span>${alert.frequency}x/day • ${alert.startTime} - ${alert.endTime}</span>
+                    <span>${alert.frequency}x/day • ${alert.startTime} - ${alert.endTime} ${redirectText}</span>
                     <div class="mindful-alert-actions">
                         <button onclick="editAlert('${alert.id}')" title="Edit">✎</button>
                         <button class="delete" onclick="deleteAlert('${alert.id}')" title="Delete">✕</button>
@@ -10136,6 +10287,7 @@ function showAddAlertModal() {
     document.getElementById('alertFrequency').value = '3';
     document.getElementById('alertStartTime').value = '08:00';
     document.getElementById('alertEndTime').value = '21:00';
+    document.getElementById('alertRedirect').value = '';
     document.getElementById('alertModal').classList.remove('hidden');
 }
 
@@ -10151,6 +10303,7 @@ function editAlert(alertId) {
     document.getElementById('alertFrequency').value = alert.frequency;
     document.getElementById('alertStartTime').value = alert.startTime;
     document.getElementById('alertEndTime').value = alert.endTime;
+    document.getElementById('alertRedirect').value = alert.redirect || '';
     document.getElementById('alertModal').classList.remove('hidden');
 }
 
@@ -10167,6 +10320,7 @@ function saveAlert() {
     const frequency = parseInt(document.getElementById('alertFrequency').value);
     const startTime = document.getElementById('alertStartTime').value;
     const endTime = document.getElementById('alertEndTime').value;
+    const redirect = document.getElementById('alertRedirect').value;
     
     if (!name) {
         showToast('Please enter a name', 'error');
@@ -10186,6 +10340,7 @@ function saveAlert() {
             alert.frequency = frequency;
             alert.startTime = startTime;
             alert.endTime = endTime;
+            alert.redirect = redirect;
         }
         showToast('Alert updated', 'success');
     } else {
@@ -10197,6 +10352,7 @@ function saveAlert() {
             frequency,
             startTime,
             endTime,
+            redirect,
             enabled: true
         };
         pushState.mindfulAlerts.push(newAlert);

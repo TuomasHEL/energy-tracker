@@ -164,6 +164,18 @@
                     </div>
                     <div class="checkin-home-arrow">→</div>
                 </div>
+
+                <!-- Intentions Card -->
+                <div class="intentions-home-card" onclick="showView('intentions')">
+                    <div class="intentions-home-icon">★</div>
+                    <div class="intentions-home-content">
+                        <div class="intentions-home-title">Intentions</div>
+                        <div class="intentions-home-stats">
+                            <span id="intentionsStatus">Your northstar guidance</span>
+                        </div>
+                    </div>
+                    <div class="intentions-home-arrow">→</div>
+                </div>
             </section>
 
             <!-- Signal View -->
@@ -768,6 +780,30 @@
                                 <span>to</span>
                                 <input type="time" id="alertEndTime" value="21:00">
                             </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Open app to</label>
+                            <select id="alertRedirect">
+                                <option value="">None (dismiss only)</option>
+                                <option value="dashboard">Home</option>
+                                <option value="checkin">Daily Check-in</option>
+                                <option value="intentions">Intentions</option>
+                                <option value="signal">Daily Signal</option>
+                                <option value="habits">Daily Habits</option>
+                                <option value="shadow">Shadow</option>
+                                <option value="integrate">Shadow - Integrate</option>
+                                <option value="process">Shadow - Process</option>
+                                <option value="deepClean">Shadow - Deep Clean</option>
+                                <option value="liberation">Liberation Process</option>
+                                <option value="timer">Energy Work</option>
+                                <option value="playlists">Programs</option>
+                                <option value="track">Track Progress</option>
+                                <option value="awaken">Recognize</option>
+                                <option value="attunements">Attunements</option>
+                                <option value="stats">Statistics</option>
+                                <option value="profile">Profile</option>
+                            </select>
+                            <p class="form-hint">Choose where to go when tapping "Let's go" on the notification</p>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -1951,7 +1987,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Clear Ground v5.7.4</p>
+                    <p class="version">Clear Ground v5.8.0</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>
@@ -1984,107 +2020,14 @@
                     </div>
                 </div>
 
-                <!-- Northstar Intentions -->
-                <div class="intentions-section">
-                    <div class="intentions-header">
-                        <span class="intentions-icon">★</span>
-                        <h3>Northstar Intentions</h3>
+                <!-- Link to Intentions Settings -->
+                <div class="profile-link-card" onclick="showView('intentionsSettings')">
+                    <div class="profile-link-icon">★</div>
+                    <div class="profile-link-content">
+                        <div class="profile-link-title">Northstar Intentions</div>
+                        <div class="profile-link-subtitle">Edit your intentions and guidance</div>
                     </div>
-                    <p class="intentions-intro">Your intentions guide the energy work you receive. They bring clarity and energetic alignment to your journey.</p>
-
-                    <!-- Intention Tabs -->
-                    <div class="intention-tabs">
-                        <button class="intention-tab active" data-tab="release" onclick="switchIntentionTab('release')">
-                            <span class="tab-icon">↓</span> Release
-                        </button>
-                        <button class="intention-tab" data-tab="raise" onclick="switchIntentionTab('raise')">
-                            <span class="tab-icon">↑</span> Raise
-                        </button>
-                        <button class="intention-tab" data-tab="realize" onclick="switchIntentionTab('realize')">
-                            <span class="tab-icon">✦</span> Realize
-                        </button>
-                    </div>
-
-                    <!-- Release Tab Content -->
-                    <div class="intention-content active" id="intentionRelease">
-                        <div class="intention-card" onclick="editIntention('release_beliefs')">
-                            <div class="intention-card-header">
-                                <span class="intention-label">Limiting Beliefs & Blocks</span>
-                                <span class="intention-edit">✎</span>
-                            </div>
-                            <p class="intention-preview" id="preview_release_beliefs">What beliefs hold you back? Tap to add...</p>
-                        </div>
-
-                        <div class="intention-card" onclick="editIntention('release_emotions')">
-                            <div class="intention-card-header">
-                                <span class="intention-label">Negative Patterns</span>
-                                <span class="intention-edit">✎</span>
-                            </div>
-                            <p class="intention-preview" id="preview_release_emotions">What emotions do you want to release? Tap to add...</p>
-                        </div>
-
-                        <div class="intention-card" onclick="editIntention('release_trauma')">
-                            <div class="intention-card-header">
-                                <span class="intention-label">Trauma & Habits</span>
-                                <span class="intention-edit">✎</span>
-                            </div>
-                            <p class="intention-preview" id="preview_release_trauma">What patterns are you ready to let go of? Tap to add...</p>
-                        </div>
-                    </div>
-
-                    <!-- Raise Tab Content -->
-                    <div class="intention-content" id="intentionRaise">
-                        <div class="intention-card" onclick="editIntention('raise_consciousness')">
-                            <div class="intention-card-header">
-                                <span class="intention-label">Consciousness & Presence</span>
-                                <span class="intention-edit">✎</span>
-                            </div>
-                            <p class="intention-preview" id="preview_raise_consciousness">Describe your vision of living fully present. Tap to add...</p>
-                        </div>
-
-                        <div class="intention-card" onclick="editIntention('raise_intelligences')">
-                            <div class="intention-card-header">
-                                <span class="intention-label">Developing Capacities</span>
-                                <span class="intention-edit">✎</span>
-                            </div>
-                            <p class="intention-preview" id="preview_raise_intelligences">Which intelligences do you want to strengthen? Tap to add...</p>
-                        </div>
-                    </div>
-
-                    <!-- Realize Tab Content -->
-                    <div class="intention-content" id="intentionRealize">
-                        <div class="intention-card" onclick="editIntention('realize_health')">
-                            <div class="intention-card-header">
-                                <span class="intention-label">Health & Vitality</span>
-                                <span class="intention-edit">✎</span>
-                            </div>
-                            <p class="intention-preview" id="preview_realize_health">Describe your optimal state of health. Tap to add...</p>
-                        </div>
-
-                        <div class="intention-card" onclick="editIntention('realize_wealth')">
-                            <div class="intention-card-header">
-                                <span class="intention-label">Abundance & Purpose</span>
-                                <span class="intention-edit">✎</span>
-                            </div>
-                            <p class="intention-preview" id="preview_realize_wealth">What does fulfilling work look like for you? Tap to add...</p>
-                        </div>
-
-                        <div class="intention-card" onclick="editIntention('realize_relationships')">
-                            <div class="intention-card-header">
-                                <span class="intention-label">Relationships & Connection</span>
-                                <span class="intention-edit">✎</span>
-                            </div>
-                            <p class="intention-preview" id="preview_realize_relationships">Describe the quality of relationships you want. Tap to add...</p>
-                        </div>
-
-                        <div class="intention-card" onclick="editIntention('realize_other')">
-                            <div class="intention-card-header">
-                                <span class="intention-label">Other Intentions</span>
-                                <span class="intention-edit">✎</span>
-                            </div>
-                            <p class="intention-preview" id="preview_realize_other">Any other goals or dreams? Tap to add...</p>
-                        </div>
-                    </div>
+                    <div class="profile-link-arrow">→</div>
                 </div>
 
                 <p class="privacy-note">🔒 Your intentions are private and only visible to you.</p>
@@ -2680,6 +2623,186 @@
                         <!-- Will be populated dynamically -->
                     </div>
                 </div>
+            </section>
+
+            <!-- Intentions View -->
+            <section id="viewIntentions" class="view">
+                <div class="view-header">
+                    <button class="back-btn" onclick="showView('dashboard')">←</button>
+                    <h2>Intentions</h2>
+                    <button class="header-action-btn" onclick="showView('intentionsSettings')">✎ Edit</button>
+                </div>
+
+                <p class="intentions-view-intro">Your intentions guide the energy work you receive. They bring clarity and energetic alignment to your journey.</p>
+
+                <!-- View-Only Intention Tabs -->
+                <div class="intentions-view-tabs">
+                    <button class="intentions-view-tab active" data-tab="release" onclick="switchIntentionsViewTab('release')">
+                        <span class="tab-icon">↓</span> Release
+                    </button>
+                    <button class="intentions-view-tab" data-tab="raise" onclick="switchIntentionsViewTab('raise')">
+                        <span class="tab-icon">↑</span> Raise
+                    </button>
+                    <button class="intentions-view-tab" data-tab="realize" onclick="switchIntentionsViewTab('realize')">
+                        <span class="tab-icon">✦</span> Realize
+                    </button>
+                </div>
+
+                <!-- Release Tab Content -->
+                <div class="intentions-view-content active" id="intentionsViewRelease">
+                    <div class="intention-view-card">
+                        <div class="intention-view-label">Limiting Beliefs & Blocks</div>
+                        <p class="intention-view-text" id="view_release_beliefs">Not set</p>
+                    </div>
+                    <div class="intention-view-card">
+                        <div class="intention-view-label">Negative Patterns</div>
+                        <p class="intention-view-text" id="view_release_emotions">Not set</p>
+                    </div>
+                    <div class="intention-view-card">
+                        <div class="intention-view-label">Trauma & Habits</div>
+                        <p class="intention-view-text" id="view_release_trauma">Not set</p>
+                    </div>
+                </div>
+
+                <!-- Raise Tab Content -->
+                <div class="intentions-view-content" id="intentionsViewRaise">
+                    <div class="intention-view-card">
+                        <div class="intention-view-label">Consciousness & Presence</div>
+                        <p class="intention-view-text" id="view_raise_consciousness">Not set</p>
+                    </div>
+                    <div class="intention-view-card">
+                        <div class="intention-view-label">Developing Capacities</div>
+                        <p class="intention-view-text" id="view_raise_intelligences">Not set</p>
+                    </div>
+                </div>
+
+                <!-- Realize Tab Content -->
+                <div class="intentions-view-content" id="intentionsViewRealize">
+                    <div class="intention-view-card">
+                        <div class="intention-view-label">Health & Vitality</div>
+                        <p class="intention-view-text" id="view_realize_health">Not set</p>
+                    </div>
+                    <div class="intention-view-card">
+                        <div class="intention-view-label">Abundance & Purpose</div>
+                        <p class="intention-view-text" id="view_realize_wealth">Not set</p>
+                    </div>
+                    <div class="intention-view-card">
+                        <div class="intention-view-label">Relationships & Connection</div>
+                        <p class="intention-view-text" id="view_realize_relationships">Not set</p>
+                    </div>
+                    <div class="intention-view-card">
+                        <div class="intention-view-label">Other Intentions</div>
+                        <p class="intention-view-text" id="view_realize_other">Not set</p>
+                    </div>
+                </div>
+
+                <p class="privacy-note">🔒 Your intentions are private and only visible to you.</p>
+            </section>
+
+            <!-- Intentions Settings View -->
+            <section id="viewIntentionsSettings" class="view">
+                <div class="view-header">
+                    <button class="back-btn" onclick="showView('intentions')">←</button>
+                    <h2>Edit Intentions</h2>
+                </div>
+
+                <p class="intentions-intro">Tap any card to edit your intentions.</p>
+
+                <!-- Intention Tabs -->
+                <div class="intention-tabs">
+                    <button class="intention-tab active" data-tab="release" onclick="switchIntentionSettingsTab('release')">
+                        <span class="tab-icon">↓</span> Release
+                    </button>
+                    <button class="intention-tab" data-tab="raise" onclick="switchIntentionSettingsTab('raise')">
+                        <span class="tab-icon">↑</span> Raise
+                    </button>
+                    <button class="intention-tab" data-tab="realize" onclick="switchIntentionSettingsTab('realize')">
+                        <span class="tab-icon">✦</span> Realize
+                    </button>
+                </div>
+
+                <!-- Release Tab Content -->
+                <div class="intention-settings-content active" id="intentionSettingsRelease">
+                    <div class="intention-card" onclick="editIntention('release_beliefs')">
+                        <div class="intention-card-header">
+                            <span class="intention-label">Limiting Beliefs & Blocks</span>
+                            <span class="intention-edit">✎</span>
+                        </div>
+                        <p class="intention-preview" id="settings_preview_release_beliefs">What beliefs hold you back? Tap to add...</p>
+                    </div>
+
+                    <div class="intention-card" onclick="editIntention('release_emotions')">
+                        <div class="intention-card-header">
+                            <span class="intention-label">Negative Patterns</span>
+                            <span class="intention-edit">✎</span>
+                        </div>
+                        <p class="intention-preview" id="settings_preview_release_emotions">What emotions do you want to release? Tap to add...</p>
+                    </div>
+
+                    <div class="intention-card" onclick="editIntention('release_trauma')">
+                        <div class="intention-card-header">
+                            <span class="intention-label">Trauma & Habits</span>
+                            <span class="intention-edit">✎</span>
+                        </div>
+                        <p class="intention-preview" id="settings_preview_release_trauma">What patterns are you ready to let go of? Tap to add...</p>
+                    </div>
+                </div>
+
+                <!-- Raise Tab Content -->
+                <div class="intention-settings-content" id="intentionSettingsRaise">
+                    <div class="intention-card" onclick="editIntention('raise_consciousness')">
+                        <div class="intention-card-header">
+                            <span class="intention-label">Consciousness & Presence</span>
+                            <span class="intention-edit">✎</span>
+                        </div>
+                        <p class="intention-preview" id="settings_preview_raise_consciousness">Describe your vision of living fully present. Tap to add...</p>
+                    </div>
+
+                    <div class="intention-card" onclick="editIntention('raise_intelligences')">
+                        <div class="intention-card-header">
+                            <span class="intention-label">Developing Capacities</span>
+                            <span class="intention-edit">✎</span>
+                        </div>
+                        <p class="intention-preview" id="settings_preview_raise_intelligences">Which intelligences do you want to strengthen? Tap to add...</p>
+                    </div>
+                </div>
+
+                <!-- Realize Tab Content -->
+                <div class="intention-settings-content" id="intentionSettingsRealize">
+                    <div class="intention-card" onclick="editIntention('realize_health')">
+                        <div class="intention-card-header">
+                            <span class="intention-label">Health & Vitality</span>
+                            <span class="intention-edit">✎</span>
+                        </div>
+                        <p class="intention-preview" id="settings_preview_realize_health">Describe your optimal state of health. Tap to add...</p>
+                    </div>
+
+                    <div class="intention-card" onclick="editIntention('realize_wealth')">
+                        <div class="intention-card-header">
+                            <span class="intention-label">Abundance & Purpose</span>
+                            <span class="intention-edit">✎</span>
+                        </div>
+                        <p class="intention-preview" id="settings_preview_realize_wealth">What does fulfilling work look like for you? Tap to add...</p>
+                    </div>
+
+                    <div class="intention-card" onclick="editIntention('realize_relationships')">
+                        <div class="intention-card-header">
+                            <span class="intention-label">Relationships & Connection</span>
+                            <span class="intention-edit">✎</span>
+                        </div>
+                        <p class="intention-preview" id="settings_preview_realize_relationships">Describe the quality of relationships you want. Tap to add...</p>
+                    </div>
+
+                    <div class="intention-card" onclick="editIntention('realize_other')">
+                        <div class="intention-card-header">
+                            <span class="intention-label">Other Intentions</span>
+                            <span class="intention-edit">✎</span>
+                        </div>
+                        <p class="intention-preview" id="settings_preview_realize_other">Any other goals or dreams? Tap to add...</p>
+                    </div>
+                </div>
+
+                <p class="privacy-note">🔒 Your intentions are private and only visible to you.</p>
             </section>
         </main>
 

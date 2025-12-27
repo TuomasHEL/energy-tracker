@@ -2132,18 +2132,24 @@ function processScheduledNotifications() {
     if (timeDiff >= -windowMs && timeDiff <= windowMs) {
       console.log('Notification due:', notifId, 'scheduled:', scheduledTime.toISOString(), 'diff:', timeDiff);
       
-      // Get user's OneSignal player ID
+      // Get user's OneSignal player ID and mindful alerts
       const pushData = getPushSettings(userId);
       const playerId = pushData.pushSettings?.onesignalPlayerId;
+      const alerts = pushData.mindfulAlerts || [];
       
-      console.log('User', userId, 'player ID:', playerId);
+      // Find the alert to get its redirect
+      const alert = alerts.find(a => a.id === alertId);
+      const redirect = alert?.redirect || '';
+      
+      console.log('User', userId, 'player ID:', playerId, 'redirect:', redirect);
       
       if (playerId) {
-        // Send notification
+        // Send notification with redirect
         const success = sendOneSignalNotification(
           playerId,
           'Clear Ground',
-          message
+          message,
+          redirect
         );
         
         console.log('Send result:', success);
@@ -2172,7 +2178,7 @@ function processScheduledNotifications() {
 }
 
 // Send notification via OneSignal API
-function sendOneSignalNotification(playerId, title, message) {
+function sendOneSignalNotification(playerId, title, message, redirect) {
   const apiKey = getOneSignalApiKey();
   
   if (apiKey === 'YOUR_REST_API_KEY_HERE') {
@@ -2181,13 +2187,31 @@ function sendOneSignalNotification(playerId, title, message) {
   }
   
   try {
+    // Build URL with redirect parameter if provided
+    let url = 'https://my.clearground.org/';
+    if (redirect) {
+      url += '?redirect=' + encodeURIComponent(redirect);
+    }
+    
     const payload = {
       app_id: ONESIGNAL_APP_ID,
       include_player_ids: [playerId],
       headings: { en: title },
       contents: { en: message },
-      url: 'https://my.clearground.org/'
+      url: url
     };
+    
+    // Add action buttons if redirect is specified
+    if (redirect) {
+      payload.buttons = [
+        { id: 'done', text: 'Done' },
+        { id: 'go', text: "Let's go" }
+      ];
+      payload.web_buttons = [
+        { id: 'done', text: 'Done', url: 'https://my.clearground.org/' },
+        { id: 'go', text: "Let's go", url: url }
+      ];
+    }
     
     const response = UrlFetchApp.fetch('https://onesignal.com/api/v1/notifications', {
       method: 'POST',
@@ -2272,19 +2296,31 @@ function processDailyReminders() {
   const pushData = pushSheet.getDataRange().getValues();
   const now = new Date();
   
+  console.log('Processing daily reminders at:', now.toISOString());
+  
   for (let i = 1; i < pushData.length; i++) {
     const userId = pushData[i][0];
     const settings = JSON.parse(pushData[i][1] || '{}');
     const timezone = pushData[i][3] || 'UTC';
     const playerId = pushData[i][4];
     
-    if (!playerId) continue;
+    console.log('User', userId, 'settings:', JSON.stringify(settings));
+    
+    if (!playerId) {
+      console.log('User', userId, 'has no player ID, skipping');
+      continue;
+    }
     
     const currentHour = parseInt(Utilities.formatDate(now, timezone, 'HH'));
     const currentMinute = parseInt(Utilities.formatDate(now, timezone, 'mm'));
     
+    console.log('User', userId, 'current time:', currentHour + ':' + currentMinute, 'timezone:', timezone);
+    
     // Only send if within first 10 minutes of the hour
-    if (currentMinute > 10) continue;
+    if (currentMinute > 10) {
+      console.log('User', userId, 'minute > 10, skipping');
+      continue;
+    }
     
     // Check habits reminder
     if (settings.habits) {
@@ -2313,15 +2349,62 @@ function processDailyReminders() {
     // Check daily check-in reminder
     if (settings.checkin) {
       const [targetHour] = (settings.checkinTime || '20:00').split(':').map(Number);
+      console.log('User', userId, 'check-in enabled, target hour:', targetHour, 'current hour:', currentHour);
       if (currentHour === targetHour) {
         // Check if user already completed check-in today
         const today = Utilities.formatDate(now, timezone, 'yyyy-MM-dd');
         const checkinsResult = getCheckins(userId, today, today);
+        console.log('User', userId, 'check-ins today:', checkinsResult.checkins?.length || 0);
         if (!checkinsResult.checkins || checkinsResult.checkins.length === 0) {
+          console.log('Sending check-in reminder to user', userId);
           sendOneSignalNotification(playerId, 'Clear Ground', '20 seconds to log your vibe ◉');
         }
       }
+    } else {
+      console.log('User', userId, 'check-in reminder not enabled');
     }
+  }
+}
+
+// Debug function to check push settings for a user
+function debugUserPushSettings(userId) {
+  const sheet = getSheet('PushSettings');
+  const data = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(userId)) {
+      const settings = JSON.parse(data[i][1] || '{}');
+      console.log('User push settings for', userId, ':', JSON.stringify(settings, null, 2));
+      console.log('Raw settings cell:', data[i][1]);
+      console.log('Timezone:', data[i][3]);
+      console.log('Player ID:', data[i][4]);
+      return { settings, timezone: data[i][3], playerId: data[i][4] };
+    }
+  }
+  console.log('No push settings found for user', userId);
+  return null;
+}
+
+// Test check-in reminder for a specific user
+function testCheckinReminder(userId) {
+  const userSettings = debugUserPushSettings(userId);
+  if (!userSettings) {
+    console.log('No settings found');
+    return;
+  }
+  
+  const { settings, timezone, playerId } = userSettings;
+  console.log('Check-in enabled:', settings.checkin);
+  console.log('Check-in time:', settings.checkinTime);
+  
+  if (settings.checkin && playerId) {
+    console.log('Sending test check-in notification...');
+    const result = sendOneSignalNotification(playerId, 'Clear Ground', '20 seconds to log your vibe ◉ (test)');
+    console.log('Send result:', result);
+    return result;
+  } else {
+    console.log('Check-in not enabled or no player ID');
+    return false;
   }
 }
 
