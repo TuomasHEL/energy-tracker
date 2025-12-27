@@ -1348,10 +1348,49 @@
                                 <span class="work-icon">✦</span>
                                 <span class="work-name">Vitality</span>
                             </button>
+                            <button class="work-option" data-work="custom" onclick="selectWorkOption('custom')">
+                                <span class="work-icon">⚡</span>
+                                <span class="work-name">Custom</span>
+                            </button>
+                            <button class="work-option" data-work="program" onclick="selectWorkOption('program')">
+                                <span class="work-icon">▶</span>
+                                <span class="work-name">Program</span>
+                            </button>
+                            <button class="work-option" data-work="meditation" onclick="selectWorkOption('meditation')">
+                                <span class="work-icon">◐</span>
+                                <span class="work-name">Meditation</span>
+                            </button>
                         </div>
                     </div>
 
-                    <div class="simple-section">
+                    <!-- Custom Transmission Dropdown (hidden by default) -->
+                    <div id="simpleCustomSection" class="simple-section hidden">
+                        <label class="simple-label">Transmission:</label>
+                        <select id="simpleCustomTransmission" class="simple-dropdown">
+                            <option value="">Select transmission...</option>
+                        </select>
+                    </div>
+
+                    <!-- Program Dropdown (hidden by default) -->
+                    <div id="simpleProgramSection" class="simple-section hidden">
+                        <label class="simple-label">Program:</label>
+                        <select id="simpleProgramSelect" class="simple-dropdown">
+                            <option value="">Select program...</option>
+                        </select>
+                    </div>
+
+                    <!-- Meditation Options (hidden by default) -->
+                    <div id="simpleMeditationSection" class="simple-section hidden">
+                        <div class="meditation-toggle-row">
+                            <span class="meditation-label">Master of Mind transmission</span>
+                            <label class="toggle">
+                                <input type="checkbox" id="simpleMasterOfMind" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="simple-section" id="simpleDurationSection">
                         <label class="simple-label">Duration:</label>
                         <div class="duration-selector">
                             <button class="duration-btn" onclick="adjustSimpleDuration(-15)">−</button>
@@ -1912,7 +1951,7 @@
 
                 <div class="settings-section">
                     <h3>About</h3>
-                    <p class="version">Clear Ground v5.7.2</p>
+                    <p class="version">Clear Ground v5.7.3</p>
                     <p class="copyright">Professional Energy Work Management</p>
                 </div>
             </section>

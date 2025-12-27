@@ -2128,14 +2128,18 @@ const simpleMode = {
     selectedWork: 'vitality',
     duration: 60,
     showElapsed: false,
-    isSimpleSession: false
+    isSimpleSession: false,
+    customTransmission: '',
+    selectedProgram: '',
+    masterOfMindEnabled: true
 };
 
 // Work type to transmission mapping
 const WORK_TRANSMISSIONS = {
     wisdom: 'Shift Shift',
     healing: 'Onelove',
-    vitality: 'Neigong'
+    vitality: 'Neigong',
+    meditation: 'Master of Mind'
 };
 
 // Toggle between simple and advanced mode
@@ -2167,6 +2171,56 @@ function selectWorkOption(work) {
     document.querySelectorAll('.work-option').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.work === work);
     });
+    
+    // Show/hide appropriate sections
+    const customSection = document.getElementById('simpleCustomSection');
+    const programSection = document.getElementById('simpleProgramSection');
+    const meditationSection = document.getElementById('simpleMeditationSection');
+    const durationSection = document.getElementById('simpleDurationSection');
+    
+    // Hide all optional sections first
+    customSection.classList.add('hidden');
+    programSection.classList.add('hidden');
+    meditationSection.classList.add('hidden');
+    durationSection.classList.remove('hidden');
+    
+    switch(work) {
+        case 'custom':
+            customSection.classList.remove('hidden');
+            populateSimpleTransmissions();
+            break;
+        case 'program':
+            programSection.classList.remove('hidden');
+            durationSection.classList.add('hidden'); // Programs have their own duration
+            populateSimplePrograms();
+            break;
+        case 'meditation':
+            meditationSection.classList.remove('hidden');
+            break;
+    }
+}
+
+// Populate custom transmissions dropdown
+function populateSimpleTransmissions() {
+    const select = document.getElementById('simpleCustomTransmission');
+    select.innerHTML = '<option value="">Select transmission...</option>';
+    
+    const transmissions = state.transmissions || [];
+    transmissions.forEach(t => {
+        const name = t.name || t;
+        select.innerHTML += `<option value="${name}">${name}</option>`;
+    });
+}
+
+// Populate programs dropdown
+function populateSimplePrograms() {
+    const select = document.getElementById('simpleProgramSelect');
+    select.innerHTML = '<option value="">Select program...</option>';
+    
+    const playlists = state.playlists || [];
+    playlists.forEach(pl => {
+        select.innerHTML += `<option value="${pl.playlist_id}">${pl.name}</option>`;
+    });
 }
 
 // Adjust simple mode duration
@@ -2177,14 +2231,46 @@ function adjustSimpleDuration(delta) {
 
 // Start simple session
 async function startSimpleSession() {
+    // Handle Program mode - use existing runPlaylist function
+    if (simpleMode.selectedWork === 'program') {
+        const programId = document.getElementById('simpleProgramSelect').value;
+        if (!programId) {
+            showToast('Please select a program', 'error');
+            return;
+        }
+        // Run the program using existing functionality
+        runPlaylist(programId);
+        return;
+    }
+    
     await ensureNotificationPermission();
     
     if (!state.audioContext) {
         state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
     
-    const workName = capitalize(simpleMode.selectedWork);
-    const transmission = WORK_TRANSMISSIONS[simpleMode.selectedWork];
+    let workName, transmission;
+    
+    switch(simpleMode.selectedWork) {
+        case 'custom':
+            const customTrans = document.getElementById('simpleCustomTransmission').value;
+            if (!customTrans) {
+                showToast('Please select a transmission', 'error');
+                return;
+            }
+            workName = customTrans;
+            transmission = customTrans;
+            break;
+        case 'meditation':
+            workName = 'Meditation';
+            const masterOfMind = document.getElementById('simpleMasterOfMind').checked;
+            transmission = masterOfMind ? 'Master of Mind' : '';
+            break;
+        default:
+            workName = capitalize(simpleMode.selectedWork);
+            transmission = WORK_TRANSMISSIONS[simpleMode.selectedWork];
+    }
+    
     const duration = simpleMode.duration;
     
     const now = new Date();
@@ -2225,7 +2311,11 @@ async function startSimpleSession() {
     state.timer.interval = setInterval(simpleTimerTick, 1000);
     
     updateHeaderLogo();
-    showToast(`${workName} session started: ${duration} minutes`, 'success');
+    
+    const toastMessage = transmission 
+        ? `${workName} session started: ${duration} minutes` 
+        : `Meditation started: ${duration} minutes`;
+    showToast(toastMessage, 'success');
 }
 
 // Simple timer tick
@@ -2625,11 +2715,12 @@ function addPlaylistItem() {
         }
     });
     
-    // Build transmission options
+    // Build transmission options from state.transmissions (not state.settings.transmissions)
     let transmissionOptions = '<option value="">Energy type...</option>';
-    const transmissions = state.settings.transmissions || [];
+    const transmissions = state.transmissions || [];
     transmissions.forEach(t => {
-        transmissionOptions += `<option value="${t}">${t}</option>`;
+        const name = t.name || t;
+        transmissionOptions += `<option value="${name}">${name}</option>`;
     });
     
     const html = `
@@ -2850,11 +2941,12 @@ function editPlaylist(playlistId) {
             }
         });
         
-        // Build transmission options
+        // Build transmission options from state.transmissions
         let transmissionOptions = '<option value="">Energy type...</option>';
-        const transmissions = state.settings.transmissions || [];
+        const transmissions = state.transmissions || [];
         transmissions.forEach(t => {
-            transmissionOptions += `<option value="${t}" ${t === item.transmission ? 'selected' : ''}>${t}</option>`;
+            const name = t.name || t;
+            transmissionOptions += `<option value="${name}" ${name === item.transmission ? 'selected' : ''}>${name}</option>`;
         });
         
         const isCustom = item.marker_id === 'custom';

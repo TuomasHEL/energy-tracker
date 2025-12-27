@@ -1138,8 +1138,9 @@ input:checked + .toggle-slider:before {
 
 /* Work Options */
 .work-options {
-    display: flex;
-    gap: var(--space-md);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-sm);
     justify-content: center;
 }
 
@@ -1147,14 +1148,14 @@ input:checked + .toggle-slider:before {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-lg);
+    gap: var(--space-xs);
+    padding: var(--space-md);
     background: var(--bg-surface);
     border: 2px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-md);
     cursor: pointer;
     transition: all var(--transition-fast);
-    min-width: 90px;
+    min-width: 80px;
     font-family: inherit;
 }
 
@@ -1170,7 +1171,7 @@ input:checked + .toggle-slider:before {
 }
 
 .work-icon {
-    font-size: 1.75rem;
+    font-size: 1.5rem;
     color: var(--text-muted);
     transition: color var(--transition-fast);
 }
@@ -1180,13 +1181,45 @@ input:checked + .toggle-slider:before {
 }
 
 .work-name {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--text-secondary);
     font-weight: 500;
 }
 
 .work-option.active .work-name {
     color: var(--text-primary);
+}
+
+/* Simple Mode Dropdowns */
+.simple-dropdown {
+    width: 100%;
+    padding: var(--space-md);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.simple-dropdown:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+/* Meditation Toggle Row */
+.meditation-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-md);
+    background: var(--bg-surface);
+    border-radius: var(--radius-md);
+}
+
+.meditation-label {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
 }
 
 /* Duration Selector */
