@@ -4560,16 +4560,23 @@ input:checked + .toggle-slider:before {
     background: var(--bg-card);
     border: 2px solid var(--border-color);
     border-radius: var(--radius-lg);
-    padding: var(--space-lg);
+    padding: var(--space-md);
     text-align: center;
-    cursor: pointer;
     transition: all 0.2s ease;
     position: relative;
-    min-height: 100px;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+}
+
+.habit-main {
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    cursor: pointer;
+    padding: var(--space-sm) 0;
 }
 
 .habit-card:hover {
@@ -4602,14 +4609,14 @@ input:checked + .toggle-slider:before {
 }
 
 .habit-icon {
-    font-size: 2rem;
-    margin-bottom: var(--space-sm);
+    font-size: 1.8rem;
+    margin-bottom: var(--space-xs);
     color: var(--text-secondary);
     transition: color 0.2s ease;
 }
 
 .habit-name {
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     color: var(--text-primary);
     font-weight: 500;
 }
@@ -4618,14 +4625,14 @@ input:checked + .toggle-slider:before {
     position: absolute;
     top: 8px;
     left: 8px;
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     border: 2px solid var(--border-color);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: transparent;
     transition: all 0.2s ease;
 }
@@ -4634,6 +4641,52 @@ input:checked + .toggle-slider:before {
     background: #10B981;
     border-color: #10B981;
     color: white;
+}
+
+/* Habit Action Buttons */
+.habit-actions {
+    display: flex;
+    gap: 4px;
+    padding-top: var(--space-xs);
+    border-top: 1px solid var(--border-subtle);
+    margin-top: auto;
+}
+
+.habit-action-btn {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 0.7rem;
+    border-radius: var(--radius-sm);
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+    transition: all var(--transition-fast);
+}
+
+.habit-action-btn.go {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.habit-action-btn.go:hover {
+    background: var(--accent-hover);
+}
+
+.habit-action-btn.done {
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+}
+
+.habit-action-btn.done:hover {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: #10B981;
+    color: #10B981;
+}
+
+.habit-action-btn.wide {
+    width: 100%;
 }
 
 /* Habits Summary */
@@ -4685,12 +4738,18 @@ input:checked + .toggle-slider:before {
 
 .habit-setting-row {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
+    gap: var(--space-sm);
     padding: var(--space-md);
     background: var(--bg-card);
     border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
+}
+
+.habit-setting-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
 .habit-setting-info {
@@ -4717,6 +4776,30 @@ input:checked + .toggle-slider:before {
     margin-left: var(--space-sm);
 }
 
+.habit-setting-redirect {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding-top: var(--space-sm);
+    border-top: 1px solid var(--border-subtle);
+}
+
+.habit-setting-redirect label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.habit-setting-redirect select {
+    flex: 1;
+    padding: 6px 10px;
+    font-size: 0.85rem;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+}
+
 .custom-habits-list {
     display: flex;
     flex-direction: column;
@@ -4734,8 +4817,26 @@ input:checked + .toggle-slider:before {
     border: 1px solid var(--border-color);
 }
 
+.custom-habit-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
 .custom-habit-name {
     color: var(--text-primary);
+}
+
+.custom-habit-redirect {
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    max-width: 150px;
 }
 
 .custom-habit-delete {

@@ -4911,8 +4911,14 @@ async function saveIntention() {
             }
             state.intentions[currentEditingIntention] = value;
             
-            // Update UI
-            updateIntentionPreviews();
+            // Update all UI views
+            updateIntentionPreviews(); // Profile view (backward compat)
+            updateIntentionSettingsPreviews(); // Settings view
+            renderIntentionsView(); // View-only display
+            
+            // Update cache
+            saveToCache();
+            
             closeIntentionModal();
             showToast('Intention saved', 'success');
         } else {
@@ -7043,6 +7049,9 @@ function finishIntegrationAnimation() {
     saveShadowState();
     syncShadowToBackend();
     
+    // Mark shadow habit as completed
+    markShadowHabit();
+    
     // Hide animation, show complete screen
     document.getElementById('integrateAnimationScreen').classList.add('hidden');
     document.getElementById('integrateCompleteScreen').classList.remove('hidden');
@@ -7286,6 +7295,9 @@ function finishProcessAnimation() {
     incrementDailyProcess();
     saveShadowState();
     syncShadowToBackend();
+    
+    // Mark shadow habit as completed
+    markShadowHabit();
     
     // Hide animation, show complete screen
     document.getElementById('processAnimationScreen').classList.add('hidden');
@@ -7949,6 +7961,9 @@ function completeLiberationProcess() {
     // Update complete screen stats
     document.getElementById('liberationCompleteRounds').textContent = liberationState.totalRounds;
     document.getElementById('liberationCompleteStreak').textContent = liberationState.currentStreak;
+    
+    // Mark shadow habit as completed
+    markShadowHabit();
     
     // Show complete view
     showView('liberationComplete');
@@ -8864,13 +8879,33 @@ function deleteAttunement(attId) {
 
 // Default habits configuration
 const DEFAULT_HABITS = [
-    { id: 'energy-work', name: 'Energy Work', icon: '⚡', autoTracked: true, enabled: true },
-    { id: 'meditation', name: 'Meditation', icon: '🧘', autoTracked: false, enabled: true },
-    { id: 'nature', name: 'Time in Nature', icon: '🌿', autoTracked: false, enabled: true },
-    { id: 'gratitude', name: 'Gratitude', icon: '🙏', autoTracked: false, enabled: true },
-    { id: 'signal', name: 'Signal', icon: '📡', autoTracked: true, enabled: true },
-    { id: 'intentions', name: 'Intentions', icon: '🎯', autoTracked: false, enabled: true }
+    { id: 'energy-work', name: 'Energy Work', icon: '⚡', autoTracked: true, enabled: true, redirect: 'timer' },
+    { id: 'meditation', name: 'Meditation', icon: '🧘', autoTracked: false, enabled: true, redirect: 'timer' },
+    { id: 'nature', name: 'Time in Nature', icon: '🌿', autoTracked: false, enabled: true, redirect: '' },
+    { id: 'gratitude', name: 'Gratitude', icon: '🙏', autoTracked: false, enabled: true, redirect: '' },
+    { id: 'signal', name: 'Signal', icon: '📡', autoTracked: true, enabled: true, redirect: 'signal' },
+    { id: 'intentions', name: 'Intentions', icon: '🎯', autoTracked: false, enabled: true, redirect: 'intentions' },
+    { id: 'checkin', name: 'Daily Check-in', icon: '◉', autoTracked: true, enabled: true, redirect: 'checkin' },
+    { id: 'shadow', name: 'Shadow Work', icon: '◐', autoTracked: true, enabled: true, redirect: 'shadow' }
 ];
+
+// Habit redirect options
+const HABIT_REDIRECTS = {
+    '': 'None',
+    'dashboard': 'Home',
+    'checkin': 'Daily Check-in',
+    'intentions': 'Intentions',
+    'signal': 'Daily Signal',
+    'shadow': 'Shadow',
+    'integrate': 'Shadow - Integrate',
+    'process': 'Shadow - Process',
+    'deepClean': 'Shadow - Deep Clean',
+    'liberation': 'Liberation Process',
+    'timer': 'Energy Work',
+    'playlists': 'Programs',
+    'awaken': 'Recognize',
+    'attunements': 'Attunements'
+};
 
 // Habit state
 let habitState = {
@@ -8986,6 +9021,30 @@ function markSignalHabit() {
     updateHabitHomeCard();
 }
 
+// Mark check-in habit as completed
+function markCheckinHabit() {
+    const today = getTodayDateString();
+    if (!habitState.completions[today]) {
+        habitState.completions[today] = {};
+    }
+    habitState.completions[today]['checkin'] = true;
+    saveHabitState();
+    updateHabitsView();
+    updateHabitHomeCard();
+}
+
+// Mark shadow habit as completed
+function markShadowHabit() {
+    const today = getTodayDateString();
+    if (!habitState.completions[today]) {
+        habitState.completions[today] = {};
+    }
+    habitState.completions[today]['shadow'] = true;
+    saveHabitState();
+    updateHabitsView();
+    updateHabitHomeCard();
+}
+
 // Toggle habit completion
 function toggleHabit(habitId) {
     const today = getTodayDateString();
@@ -9038,12 +9097,35 @@ function updateHabitsView() {
         const isCompleted = todayCompletions[habit.id] || false;
         const autoClass = habit.autoTracked ? 'auto-tracked' : '';
         const completedClass = isCompleted ? 'completed' : '';
+        const hasRedirect = habit.redirect && !isCompleted;
+        
+        // Build action buttons
+        let actionsHtml = '';
+        if (!isCompleted) {
+            if (hasRedirect) {
+                actionsHtml = `
+                    <div class="habit-actions">
+                        <button class="habit-action-btn go" onclick="event.stopPropagation(); goToHabit('${habit.id}')">Let's do it</button>
+                        <button class="habit-action-btn done" onclick="event.stopPropagation(); toggleHabit('${habit.id}')">Done</button>
+                    </div>
+                `;
+            } else {
+                actionsHtml = `
+                    <div class="habit-actions">
+                        <button class="habit-action-btn done wide" onclick="event.stopPropagation(); toggleHabit('${habit.id}')">Mark Done</button>
+                    </div>
+                `;
+            }
+        }
         
         return `
-            <div class="habit-card ${completedClass} ${autoClass}" onclick="toggleHabit('${habit.id}')">
-                <div class="habit-check">${isCompleted ? '✓' : ''}</div>
-                <div class="habit-icon">${habit.icon}</div>
-                <div class="habit-name">${habit.name}</div>
+            <div class="habit-card ${completedClass} ${autoClass}" data-habit-id="${habit.id}">
+                <div class="habit-main" onclick="toggleHabit('${habit.id}')">
+                    <div class="habit-check">${isCompleted ? '✓' : ''}</div>
+                    <div class="habit-icon">${habit.icon}</div>
+                    <div class="habit-name">${habit.name}</div>
+                </div>
+                ${actionsHtml}
             </div>
         `;
     }).join('');
@@ -9071,6 +9153,19 @@ function updateHabitsView() {
         habitState.stats.longestStreak = streak;
     }
     saveHabitState();
+}
+
+// Navigate to habit's linked view
+function goToHabit(habitId) {
+    const habit = habitState.habits.find(h => h.id === habitId);
+    if (habit && habit.redirect) {
+        // For check-in, start the check-in flow
+        if (habit.redirect === 'checkin') {
+            startCheckin();
+        } else {
+            showView(habit.redirect);
+        }
+    }
 }
 
 // Calculate current habit streak (all enabled habits completed)
@@ -9138,23 +9233,36 @@ function updateHabitSettingsView() {
     const list = document.getElementById('habitSettingsList');
     if (!list) return;
     
-    // Show default habits with toggle
+    // Build redirect options HTML
+    const redirectOptions = Object.entries(HABIT_REDIRECTS).map(([value, label]) => 
+        `<option value="${value}">${label}</option>`
+    ).join('');
+    
+    // Show default habits with toggle and redirect config
     const defaultHabits = habitState.habits.filter(h => 
         DEFAULT_HABITS.find(d => d.id === h.id)
     );
     
     list.innerHTML = defaultHabits.map(habit => `
         <div class="habit-setting-row">
-            <div class="habit-setting-info">
-                <span class="habit-setting-icon">${habit.icon}</span>
-                <span class="habit-setting-name">${habit.name}</span>
-                ${habit.autoTracked ? '<span class="habit-setting-auto">Auto-tracked</span>' : ''}
+            <div class="habit-setting-main">
+                <div class="habit-setting-info">
+                    <span class="habit-setting-icon">${habit.icon}</span>
+                    <span class="habit-setting-name">${habit.name}</span>
+                    ${habit.autoTracked ? '<span class="habit-setting-auto">Auto-tracked</span>' : ''}
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" ${habit.enabled ? 'checked' : ''} 
+                        onchange="toggleHabitEnabled('${habit.id}', this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
             </div>
-            <label class="toggle">
-                <input type="checkbox" ${habit.enabled ? 'checked' : ''} 
-                    onchange="toggleHabitEnabled('${habit.id}', this.checked)">
-                <span class="toggle-slider"></span>
-            </label>
+            <div class="habit-setting-redirect">
+                <label>Link to:</label>
+                <select onchange="setHabitRedirect('${habit.id}', this.value)">
+                    ${redirectOptions.replace(`value="${habit.redirect || ''}"`, `value="${habit.redirect || ''}" selected`)}
+                </select>
+            </div>
         </div>
     `).join('');
     
@@ -9171,10 +9279,26 @@ function updateHabitSettingsView() {
     } else {
         customList.innerHTML = customHabits.map(habit => `
             <div class="custom-habit-row">
-                <span class="custom-habit-name">${habit.icon} ${habit.name}</span>
+                <div class="custom-habit-info">
+                    <span class="custom-habit-name">${habit.icon} ${habit.name}</span>
+                    <select class="custom-habit-redirect" onchange="setHabitRedirect('${habit.id}', this.value)">
+                        ${redirectOptions.replace(`value="${habit.redirect || ''}"`, `value="${habit.redirect || ''}" selected`)}
+                    </select>
+                </div>
                 <button class="custom-habit-delete" onclick="removeCustomHabit('${habit.id}')" title="Delete">×</button>
             </div>
         `).join('');
+    }
+}
+
+// Set habit redirect
+function setHabitRedirect(habitId, redirect) {
+    const habit = habitState.habits.find(h => h.id === habitId);
+    if (habit) {
+        habit.redirect = redirect;
+        saveHabitState();
+        updateHabitsView();
+        showToast('Habit link updated', 'success');
     }
 }
 
@@ -9213,7 +9337,8 @@ function addCustomHabit() {
         name: name,
         icon: '⭐',  // Default icon for custom habits
         autoTracked: false,
-        enabled: true
+        enabled: true,
+        redirect: ''
     });
     
     saveHabitState();
@@ -9554,6 +9679,9 @@ async function saveCheckin() {
         // Update local state
         checkinState.todayCompleted = true;
         updateCheckinHomeCard();
+        
+        // Mark habit as completed
+        markCheckinHabit();
         
         // Show result
         document.getElementById('checkinVibeScore').textContent = vibeScore;
